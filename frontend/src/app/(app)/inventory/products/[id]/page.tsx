@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Barcode } from "@/features/inventory/barcode";
 import { ProductDialog } from "@/features/inventory/product-form";
+import { Attachments } from "@/features/files/attachments";
 import { useBizMutation, useBizQuery, useBusiness } from "@/hooks/use-business";
 import { date, money, qty, titleCase } from "@/lib/format";
 import type { Product } from "@/lib/types";
@@ -72,6 +73,7 @@ export default function ProductPage() {
       </div>
       {p.track_inventory && <div className="mt-6"><h2 className="mb-3 text-lg font-semibold">Movements</h2>
         <DataTable<Entry> queryKey={["ledger", id]} path="/inventory/ledger" filters={{ product_id: id }} columns={cols} searchParam={null} /></div>}
+      <Attachments entityType="product" entityId={id} folder="/Products" className="mt-6" />
       <ProductDialog open={edit} onOpenChange={setEdit} product={p} />
     </>
   );

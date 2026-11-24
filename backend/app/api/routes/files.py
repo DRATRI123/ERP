@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from typing import Annotated, Any
@@ -9,7 +10,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, or_
+from sqlalchemy import String, cast, func, or_
 
 from app.api.deps import DB, require
 from app.api.pagination import Page, PageParams, page_params, paginate
@@ -91,9 +92,10 @@ def list_files(access: View, db: DB, params: Annotated[PageParams, Depends(page_
     if q:
         like = f"%{q.lower()}%"
         stmt = stmt.where(or_(func.lower(StoredFile.name).like(like), func.lower(func.coalesce(StoredFile.description, "")).like(like)))
+    if tag:  # tags are a JSON list of lower-case strings; its text form contains '"tag"' on both databases
+        needle = json.dumps(tag.strip().lower())[1:-1].replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        stmt = stmt.where(cast(StoredFile.tags, String).like(f'%"{needle}"%', escape="\\"))
     rows, total = paginate(db, stmt.order_by(StoredFile.updated_at.desc()), params)
-    if tag:  # tags are a JSON list; filtered after the page is read for database portability
-        rows = [r for r in rows if tag.lower() in r.tags]
     return Page(items=[FileOut.model_validate(r) for r in rows], total=total, limit=params.limit, offset=params.offset)
 
 

@@ -22,10 +22,11 @@ The daily running of the ERP after [deployment](deployment.md). Commands run fro
 
 | Warning on /system/health | Meaning | Action |
 |---|---|---|
-| *The background worker is not running* | messages, webhooks and backups are paused | `docker compose ps worker`; `docker compose logs --tail 100 worker`; `docker compose up -d worker` |
+| *The background worker is not running* | messages, automation rules, webhooks and backups are paused | `docker compose ps worker`; `docker compose logs --tail 100 worker`; `docker compose up -d worker` |
 | *No successful backup in the last 26 hours* / *Last backup failed: …* | backups are failing | read the error; usual causes: disk full (`df -h`), `ERP_BACKUP_KEY` missing, Google token expired (reconnect the integration). Then `erp backup` |
 | *Last restore drill failed* | the latest backup could not be restored or its books did not verify | **treat as urgent**: `erp restore-drill` to see the problem; keep older backups (raise `keep_daily`) until it passes |
 | *Queue … waiting for over 15 minutes* | a provider is down or credentials expired | `/integrations/{id}/logs`; fix and retry the message |
+| An automation rule did not do what you expected | the run history explains each run (`skipped`: conditions no longer held; `failed`: e.g. no e-mail integration connected) | Automation → Run history, or `GET /businesses/{id}/automation/runs?status=failed` |
 | *n message(s) failed in the last 24 hours* | e-mail/WhatsApp/SMS gave up after retries | `/messages?failed_only=true`, `POST /messages/{id}/retry` |
 | *custom domain(s) disabled* | the TXT record disappeared | restore the DNS record, then `PATCH /system/domains/{id} {"enabled": true}` and verify |
 | *disk check failing* | under `ERP_MIN_FREE_DISK_MB` free | delete old images (`docker image prune`), lower backup retention, or grow the disk |

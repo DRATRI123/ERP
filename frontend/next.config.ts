@@ -17,6 +17,8 @@ const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   allowedDevOrigins: ["127.0.0.1", "localhost"],
+  // Uploads pass through the /api/v1 rewrite in local runs; match Caddy's 30 MB (file limit is 25 MB).
+  experimental: { proxyClientMaxBodySize: "30mb" },
   async rewrites() {
     return [{ source: "/api/v1/:path*", destination: `${API}/api/v1/:path*` }];
   },

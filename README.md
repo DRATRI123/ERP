@@ -60,7 +60,10 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   suppliers, accounting, payments, GST returns, reports, invoice designer (drag-and-drop), users and
   roles, integrations, developer API and webhooks, settings, 2FA, backups and system health. Dark
   mode, mobile layout, global search (Ctrl K), live updates. See [docs/frontend.md](docs/frontend.md).
-* **Not built yet:** file management (document library) and user-defined automation rules.
+* **Document library and automation — complete:** a versioned file library with folders, tags,
+  trash and permission-aware attachments on invoices, parties and products; your own
+  "when this happens, do that" rules (overdue reminders, big-sale alerts, low-stock e-mails,
+  welcome e-mails) run by the worker, with a run history. See [docs/roadmap.md](docs/roadmap.md).
 
 After upgrading a database that already has invoices or stock from earlier phases, run
 `python -m app.cli accounting-backfill` once to post their journals.

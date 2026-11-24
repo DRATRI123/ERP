@@ -68,7 +68,16 @@ ERP_E2E_EMAIL=… ERP_E2E_PASSWORD=… node e2e/smoke.mjs   # against a running 
 CI runs these plus `npm audit`, and an end-to-end job that installs with `setup.sh`, starts with
 `start.sh` and drives a real sale in Chromium (stock, payment and books verified through the API).
 
-## Not built yet
+## Documents and automation
 
-* **Documents → file library** and **Automation → custom rules** need backend modules that do
-  not exist yet; those pages say so and link to what already works instead of showing fake data.
+* **Documents** is the file library. It has a folder tree, drag-and-drop upload (several files at
+  once), list and grid views, and search. Clicking a file opens a side panel with:
+  * a preview (images, PDF, text), fetched with your session as a private blob, never a public URL;
+  * rename, move, tags and notes;
+  * version history, with a download of any version;
+  * remove to trash, restore, and delete for ever.
+* **Attachments** (`<Attachments entityType entityId />`) appears on invoices, bills, customers,
+  suppliers and products. You can drop files straight onto it.
+* **Automation** offers templates and a When / Only if / Wait / Then rule builder. It shows a live
+  plain-English summary, an on/off switch per rule, and the run history with the reason for each
+  skipped or failed run.

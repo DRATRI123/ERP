@@ -21,6 +21,7 @@ import { Field } from "@/components/ui/form-field";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Attachments } from "@/features/files/attachments";
 import { useBusiness } from "@/hooks/use-business";
 import { api, ApiError, openFile } from "@/lib/api";
 import { date, money, qty, todayISO } from "@/lib/format";
@@ -158,6 +159,7 @@ function DocumentPage() {
               {(d.cancel_reason as string) && <Meta k="Cancelled" v={d.cancel_reason as string} />}
             </CardContent>
           </Card>
+          <Attachments entityType="document" entityId={d.id} folder={sales ? "/Sales" : "/Purchases"} />
         </div>
       </div>
 

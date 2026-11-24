@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PartyDialog } from "@/features/parties/party-form";
+import { Attachments } from "@/features/files/attachments";
 import { useBizQuery, useBusiness } from "@/hooks/use-business";
 import { date, money } from "@/lib/format";
 import { DOC_LABEL, type DocumentSummary, type Party } from "@/lib/types";
@@ -88,6 +89,7 @@ export function PartyDetail({ kind }: { kind: "customers" | "suppliers" }) {
           {ledger.data && <p className="border-t px-4 py-2 text-xs text-muted-foreground">Opening balance {money(ledger.data.opening)}</p>}
         </Card>
       </div>
+      <Attachments entityType="party" entityId={p.id} folder={sales ? "/Customers" : "/Suppliers"} className="mt-4" />
       <PartyDialog kind={kind} open={edit} onOpenChange={setEdit} party={p} />
     </>
   );

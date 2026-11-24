@@ -26,6 +26,30 @@ PostgreSQL.
   `setup.sh` / `start.sh` (macOS, Linux); tested from a fresh clone in CI.
 * Docker image for the web app; Caddy routes everything else to it.
 
+## Document library and automation — what exists
+
+* **Document library** (`/businesses/{id}/files`): folders, tags, notes, versions, trash with
+  restore and permanent delete. Content is identified by its bytes, not its name (HTML, SVG,
+  scripts and executables are refused). Identical content is stored once per business, and
+  downloads are sandboxed attachments. A file can be attached to an invoice or bill, a customer
+  or supplier, a product, an expense or a payment. It is then visible only to members who can
+  see that record, including branch scope. Permissions: `files.view` and `files.manage`.
+  The limit is `ERP_MAX_UPLOAD_MB` (default 25).
+* **Automation rules** (`/businesses/{id}/automation`): *when* an event happens (an invoice is
+  finalized, overdue, paid or cancelled; a purchase; a payment; low stock; a new customer; an
+  expense), *if* conditions hold, *after* an optional delay of up to 90 days, *then* either send
+  the invoice to the customer (e-mail, WhatsApp or SMS) or e-mail you and your team with
+  `{placeholders}`. Behaviour:
+  * Conditions are checked again when a delayed run is due, so a reminder is skipped once the
+    invoice is paid.
+  * Events from before a rule was created are never replayed.
+  * Every run, and the reason a run was skipped or failed, is kept in the run history.
+  * The background worker runs the rules. Permission: `automation.manage`.
+* Web app: Documents page (folder tree, drag-and-drop upload, list and grid views, image, PDF
+  and text preview, versions, trash); an attachments panel on invoices, customers, suppliers
+  and products; and an Automation page with templates, a rule builder and run history.
+* 254 tests in total, passing on SQLite and PostgreSQL.
+
 ## Phase 10 — what exists
 
 * **Load test** (`scripts/loadtest.py`) against the real server, with integrity checks
@@ -123,7 +147,7 @@ PostgreSQL.
   detection, session list/revoke, login history.
 * Businesses (create/edit/archive/restore), auto-created head office, financial year and roles.
 * Branches, financial years, GSTIN/PAN/state-code validation.
-* 42 permission codes (two added in Phase 2), 7 built-in roles, custom roles, per-member grant/deny overrides,
+* 42 permission codes (two added in Phase 2; 45 since the document library and automation), 7 built-in roles, custom roles, per-member grant/deny overrides,
   branch scoping, 30-user cap, anti-escalation rules, business-isolation via 404.
 * Audit log (per business and owner-wide), transactional outbox, structured errors/logs,
   request ids, DB integrity check and verified online backup.

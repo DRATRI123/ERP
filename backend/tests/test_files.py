@@ -32,6 +32,7 @@ def test_upload_list_download_and_folders(fshop):
     page = fshop.get("/files", folder="/Licences", recursive="true")
     assert {x["name"] for x in page["items"]} == {"GST certificate.pdf", "shop.png"}
     assert fshop.get("/files", folder="/Licences")["total"] == 1
+    assert fshop.get("/files", tag="GST")["total"] == 1 and fshop.get("/files", tag="gs")["total"] == 0
     assert fshop.get("/files", q="registration")["items"][0]["id"] == f["id"]
     folders = fshop.get("/files/folders")
     assert [x["folder"] for x in folders["folders"]] == ["/Licences", "/Licences/2026", "/Price lists"]

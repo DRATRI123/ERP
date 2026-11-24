@@ -93,7 +93,7 @@ def cmd_accounting_backfill(_: argparse.Namespace) -> int:
 
 def cmd_worker(args: argparse.Namespace) -> int:
     """Background jobs: queued e-mails / WhatsApp / SMS, outgoing webhooks, the real-time event
-    relay, backups, domain re-verification and security alerts. Run exactly one, under systemd
+    relay, automation rules, backups, domain re-verification and security alerts. Run exactly one, under systemd
     or Docker alongside the API."""
     import time
     from datetime import UTC, datetime
@@ -120,7 +120,11 @@ def cmd_worker(args: argparse.Namespace) -> int:
             time.sleep(args.interval)
             continue
         try:
-            stats = process_due(db)
+            from app.modules.automation import service as automation
+
+            stats["automation_scheduled"] = automation.dispatch(db)
+            stats.update({f"automation_{k}": v for k, v in automation.execute_due(db).items()})
+            stats.update(process_due(db))  # after automation, so its messages go out this loop
             stats["webhooks_queued"] = fan_out(db)
             from app.core.redis import get_redis
 
