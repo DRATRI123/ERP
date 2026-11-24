@@ -37,15 +37,14 @@ export function PaymentDialog({ open, onOpenChange, initial }: {
   }, [open, initial?.partyId, initial?.direction, base]);
   const outstanding = useQuery({
     queryKey: ["biz", bizId, "outstanding", party?.id], enabled: open && !!party,
-    queryFn: () => api<{ documents: DocumentSummary[]; outstanding: string }>(`${base}/parties/${party!.id}/outstanding`),
+    queryFn: async () => {
+      const out = await api<{ documents: DocumentSummary[]; outstanding: string }>(`${base}/parties/${party!.id}/outstanding`);
+      const d = initial?.docId ? out.documents.find((x) => x.id === initial.docId) : undefined;
+      if (d) { setAmount(decStr(dec(d.balance_due))); setAlloc({ [d.id]: decStr(dec(d.balance_due)) }); }
+      return out;
+    },
   });
   const docs = (outstanding.data?.documents ?? []).filter((d) => ["sales_invoice", "debit_note", "purchase_invoice"].includes(d.doc_type));
-  useEffect(() => {
-    if (initial?.docId && docs.length) {
-      const d = docs.find((x) => x.id === initial.docId);
-      if (d && !amount) { setAmount(decStr(dec(d.balance_due))); setAlloc({ [d.id]: decStr(dec(d.balance_due)) }); }
-    }
-  }, [docs, initial?.docId, amount]);
 
   function autoAllocate(total: string) {
     let left = dec(total || "0");

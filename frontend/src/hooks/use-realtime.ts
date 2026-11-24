@@ -33,7 +33,7 @@ export function useRealtime(): LiveState {
   const [state, setState] = useState<LiveState>("connecting");
   const wsRef = useRef<WebSocket | null>(null);
   const tokenRef = useRef(token);
-  tokenRef.current = token;
+  useEffect(() => { tokenRef.current = token; }, [token]);
 
   useEffect(() => {
     if (!token || !businessId) return;

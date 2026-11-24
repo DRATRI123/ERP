@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/data/confirm";
@@ -38,22 +38,19 @@ function DocumentPage() {
   const router = useRouter();
   const qc = useQueryClient();
   const { base, id: bizId, can, isOwner } = useBusiness();
-  const [preview, setPreview] = useState<string | null>(null);
+  const [printOpen, setPrintOpen] = useState(params.get("print") === "1");
   const [paper, setPaper] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
   const [sendOpen, setSendOpen] = useState(false);
   const key = ["biz", bizId, "documents", id];
   const { data: d, isLoading, error, refetch } = useQuery({ queryKey: key, queryFn: () => api<DocumentFull>(`${base}/documents/${id}`), enabled: !!bizId });
 
-  async function showPreview(p = paper) {
-    try {
-      const res = await api<Response>(`${base}/documents/${id}/print`, { raw: true, query: { format: "html", paper: p || undefined } });
-      setPreview(await res.text());
-    } catch (e) {
-      toast.error((e as ApiError).message);
-    }
-  }
-  useEffect(() => { if (params.get("print") && d?.status === "final") void showPreview(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [d?.status]);
+  const printHtml = useQuery({
+    queryKey: [...key, "print", paper], enabled: printOpen && d?.status === "final",
+    queryFn: async () => (await api<Response>(`${base}/documents/${id}/print`, { raw: true, query: { format: "html", paper: paper || undefined } })).text(),
+  });
+  const preview = printOpen && d?.status === "final" ? (printHtml.data ?? "") : null;
+  const showPreview = () => setPrintOpen(true);
 
   const action = useMutation({
     mutationFn: ({ path, body }: { path: string; body?: unknown }) => api<DocumentFull>(`${base}/documents/${id}/${path}`, { body: body ?? {} }),
@@ -164,12 +161,12 @@ function DocumentPage() {
         </div>
       </div>
 
-      <Dialog open={preview !== null} onOpenChange={(v) => !v && setPreview(null)}>
+      <Dialog open={preview !== null} onOpenChange={(v) => !v && setPrintOpen(false)}>
         <DialogContent className="max-w-5xl gap-3 p-4">
           <DialogHeader className="flex-row items-center justify-between pr-8">
             <DialogTitle>Print preview</DialogTitle>
             <div className="flex items-center gap-2">
-              <NativeSelect className="h-8 w-36" value={paper} onChange={(e) => { setPaper(e.target.value); void showPreview(e.target.value); }} aria-label="Paper">
+              <NativeSelect className="h-8 w-36" value={paper} onChange={(e) => setPaper(e.target.value)} aria-label="Paper">
                 <option value="">Template default</option><option value="a4">A4</option><option value="a5">A5</option>
                 <option value="thermal_80">Thermal 80 mm</option><option value="thermal_58">Thermal 58 mm</option>
               </NativeSelect>

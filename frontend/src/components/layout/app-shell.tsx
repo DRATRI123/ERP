@@ -26,7 +26,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const status = useAuth((s) => s.status);
   const router = useRouter();
   const path = usePathname();
-  const [mobileNav, setMobileNav] = useState(false);
+  // Opened for a given path, so navigating elsewhere closes it without an effect.
+  const [navOpenAt, setNavOpenAt] = useState<string | null>(null);
+  const mobileNav = navOpenAt === path;
+  const setMobileNav = (v: boolean) => setNavOpenAt(v ? path : null);
   const [search, setSearch] = useState(false);
   const [help, setHelp] = useState(false);
   const live = useRealtime();
@@ -35,7 +38,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (status === "unknown") void restoreSession();
     else if (status === "signed-out") router.replace(`/login?next=${encodeURIComponent(path)}`);
   }, [status, router, path]);
-  useEffect(() => setMobileNav(false), [path]);
 
   const openSearch = useCallback(() => setSearch(true), []);
   const openHelp = useCallback(() => setHelp(true), []);

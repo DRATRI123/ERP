@@ -2,7 +2,7 @@
 
 import { ArrowRightLeftIcon, BoxesIcon, PackagePlusIcon, SlidersHorizontalIcon, WarehouseIcon } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 
 import { DataTable, StaticTable, type Column } from "@/components/data/data-table";
 import { PageHeader } from "@/components/data/page-header";
@@ -29,14 +29,14 @@ function InventoryPage() {
   const params = useSearchParams();
   const { can, isOwner } = useBusiness();
   const [tab, setTab] = useState(params.get("tab") ?? "products");
-  const [newProduct, setNewProduct] = useState(params.get("new") === "1");
+  const [newProductState, setNewProduct] = useState(false);
+  const newProduct = newProductState || params.get("new") === "1";
   const [stockMode, setStockMode] = useState<StockMode | null>(null);
   const [warehouse, setWarehouse] = useState("");
   const whs = useBizQuery<{ id: string; code: string; name: string }[]>(["warehouses"], "/warehouses");
   const valuation = useBizQuery<{ method: string; total_value: string; warehouses: { stock_lines: number }[] }>(["valuation"], "/inventory/valuation", undefined, { enabled: isOwner || can("stock_value.view") });
   const low = useBizQuery<Low[]>(["low-stock"], "/inventory/low-stock");
   const expiring = useBizQuery<Balance[]>(["expiring"], "/inventory/expiring", { within_days: 60 });
-  useEffect(() => { if (params.get("new") === "1") setNewProduct(true); }, [params]);
   const manage = isOwner || can("products.manage");
   const editStock = isOwner || can("stock.edit");
 

@@ -5,7 +5,7 @@ import {
   AlertTriangleIcon, CheckCircle2Icon, DatabaseBackupIcon, DownloadIcon, GlobeIcon, Loader2Icon, PaletteIcon, PlusIcon, ShieldCheckIcon, WrenchIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/data/page-header";
@@ -62,11 +62,16 @@ export default function SettingsPage() {
 }
 
 function BusinessProfile({ editable }: { editable: boolean }) {
+  const b = useBizQuery<Business>(["business"], "");
+  if (b.isLoading) return <Skeleton className="h-72" />;
+  if (b.error || !b.data) return <Card><ErrorState error={b.error} /></Card>;
+  return <BusinessForm key={b.data.id} business={b.data} editable={editable} />;
+}
+
+function BusinessForm({ business, editable }: { business: Business; editable: boolean }) {
   const { base, id } = useBusiness();
   const qc = useQueryClient();
-  const b = useBizQuery<Business>(["business"], "");
-  const [v, setV] = useState<Partial<Business>>({});
-  useEffect(() => { if (b.data) setV(b.data); }, [b.data]);
+  const [v, setV] = useState<Partial<Business>>(business);
   const save = useMutation({
     mutationFn: () => api(base, { method: "PATCH", body: {
       name: v.name, legal_name: v.legal_name || null, gstin: v.gstin || null, pan: v.pan || null, phone: v.phone || null, email: v.email || null,
@@ -74,13 +79,11 @@ function BusinessProfile({ editable }: { editable: boolean }) {
     onSuccess: () => { toast.success("Business profile saved"); qc.invalidateQueries({ queryKey: ["biz", id] }); },
     onError: (e: ApiError) => toast.error(e.message),
   });
-  if (b.isLoading) return <Skeleton className="h-72" />;
-  if (b.error) return <Card><ErrorState error={b.error} /></Card>;
   const set = (k: keyof Business) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV({ ...v, [k]: e.target.value });
   const gstinBad = !!v.gstin && !GSTIN_RE.test(v.gstin.toUpperCase());
   return (
     <Card>
-      <CardHeader><CardTitle>Business profile</CardTitle><CardDescription>Printed on invoices and used for GST. Financial year starts in month {b.data!.fy_start_month}; stock valued by {titleCase(b.data!.inventory_valuation)}.</CardDescription></CardHeader>
+      <CardHeader><CardTitle>Business profile</CardTitle><CardDescription>Printed on invoices and used for GST. Financial year starts in month {business.fy_start_month}; stock valued by {titleCase(business.inventory_valuation)}.</CardDescription></CardHeader>
       <CardContent>
         <fieldset disabled={!editable} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Trade name"><Input value={v.name ?? ""} onChange={set("name")} /></Field>
@@ -127,7 +130,7 @@ function Branches({ editable }: { editable: boolean }) {
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Code"><Input value={v.code} onChange={(e) => setV({ ...v, code: e.target.value.toUpperCase() })} placeholder="PUNE2" /></Field>
             <Field label="Name"><Input value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
-            <Field label="Type"><NativeSelect value={v.kind} onChange={(e) => setV({ ...v, kind: e.target.value })}><option value="branch">Branch / shop</option><option value="warehouse">Warehouse</option><option value="head_office">Head office</option></NativeSelect></Field>
+            <Field label="Type"><NativeSelect value={v.kind} onChange={(e) => setV({ ...v, kind: e.target.value })}><option value="branch">Branch / shop</option><option value="head_office">Head office</option></NativeSelect></Field>
             <Field label="GSTIN (if separate)"><Input value={v.gstin} onChange={(e) => setV({ ...v, gstin: e.target.value.toUpperCase() })} /></Field>
             <Field label="Address" className="sm:col-span-2"><Input value={v.address_line1} onChange={(e) => setV({ ...v, address_line1: e.target.value })} /></Field>
             <Field label="City"><Input value={v.city} onChange={(e) => setV({ ...v, city: e.target.value })} /></Field>

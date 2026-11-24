@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PartyPicker } from "@/components/pickers/party-picker";
+import { PartyDialog } from "@/features/parties/party-form";
 import { ProductSearch, type ProductSearchHandle } from "@/components/pickers/product-search";
 import { EmptyState } from "@/components/data/states";
 import { Badge } from "@/components/ui/badge";
@@ -37,42 +38,35 @@ const MODES = [
 ];
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+/** Loads a draft (if editing one), then renders the editor initialised from it. */
 export function DocumentEditor({ side, draftId }: { side: "sales" | "purchase"; draftId?: string }) {
+  const { base, id: bizId } = useBusiness();
+  const draft = useQuery({
+    queryKey: ["biz", bizId, "documents", draftId], enabled: !!draftId && !!bizId,
+    queryFn: () => api<DocumentFull>(`${base}/documents/${draftId}`),
+  });
+  if (draftId && !draft.data) return draft.error ? <EmptyState title="Draft not found" /> : <Skeleton className="h-96" />;
+  return <Editor side={side} draftId={draftId} draft={draft.data} />;
+}
+
+function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?: string; draft?: DocumentFull }) {
   const router = useRouter();
   const { base, id: bizId, can, isOwner } = useBusiness();
   const types = side === "sales" ? SALES_TYPES : PURCHASE_TYPES;
-  const [docType, setDocType] = useState<DocType>(side === "sales" ? "sales_invoice" : "purchase_invoice");
-  const [party, setParty] = useState<Party | null>(null);
-  const [partyName, setPartyName] = useState("");
-  const [docDate, setDocDate] = useState(todayISO());
-  const [dueDate, setDueDate] = useState("");
-  const [supplierNo, setSupplierNo] = useState("");
-  const [notes, setNotes] = useState("");
-  const [lines, setLines] = useState<Line[]>([]);
+  const [docType, setDocType] = useState<DocType>(draft?.doc_type ?? (side === "sales" ? "sales_invoice" : "purchase_invoice"));
+  const [party, setParty] = useState<Party | null>(draft?.party_id ? ({ id: draft.party_id, name: draft.party_name ?? "" } as Party) : null);
+  const [partyName, setPartyName] = useState(draft && !draft.party_id ? (draft.party_name ?? "") : "");
+  const [docDate, setDocDate] = useState(draft?.doc_date ?? todayISO());
+  const [dueDate, setDueDate] = useState(draft?.due_date ?? "");
+  const [supplierNo, setSupplierNo] = useState((draft?.supplier_invoice_no as string | undefined) ?? "");
+  const [notes, setNotes] = useState((draft?.notes as string | undefined) ?? "");
+  const [lines, setLines] = useState<Line[]>(() => (draft?.lines ?? []).map((l) => ({
+    key: uid(), product_id: l.product_id, name: l.description, hsn: l.hsn_sac, unit: l.unit_code ?? undefined,
+    quantity: String(Number(l.quantity)), unit_price: String(Number(l.unit_price)), discount_percent: String(Number(l.discount_percent)), gst_rate: l.gst_rate })));
   const [payments, setPayments] = useState<PayRow[]>([]);
-  const [loaded, setLoaded] = useState(!draftId);
+  const [newParty, setNewParty] = useState<string | null>(null);
   const search = useRef<ProductSearchHandle>(null);
   const partyBtn = useRef<HTMLButtonElement>(null);
-
-  // ------------------------------------------------------------------ load a draft
-  const draft = useQuery({
-    queryKey: ["biz", bizId, "documents", draftId], enabled: !!draftId,
-    queryFn: () => api<DocumentFull>(`${base}/documents/${draftId}`),
-  });
-  useEffect(() => {
-    const d = draft.data;
-    if (!d || loaded) return;
-    setDocType(d.doc_type);
-    setDocDate(d.doc_date);
-    setDueDate(d.due_date ?? "");
-    setNotes((d.notes as string) ?? "");
-    setSupplierNo((d.supplier_invoice_no as string) ?? "");
-    if (d.party_id) setParty({ id: d.party_id, name: d.party_name ?? "" } as Party);
-    else setPartyName(d.party_name ?? "");
-    setLines(d.lines.map((l) => ({ key: uid(), product_id: l.product_id, name: l.description, hsn: l.hsn_sac, unit: l.unit_code ?? undefined,
-      quantity: String(Number(l.quantity)), unit_price: String(Number(l.unit_price)), discount_percent: String(Number(l.discount_percent)), gst_rate: l.gst_rate })));
-    setLoaded(true);
-  }, [draft.data, loaded]);
 
   // ------------------------------------------------------------------ server-side totals
   const body = useMemo(() => ({
@@ -148,12 +142,11 @@ export function DocumentEditor({ side, draftId }: { side: "sales" | "purchase"; 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [canSave, save]);
-  useEffect(() => { if (loaded) search.current?.focus(); }, [loaded]);
+  useEffect(() => { search.current?.focus(); }, []);
 
   if (!isOwner && !can(side === "sales" ? "invoices.create" : "purchases.create")) {
     return <EmptyState title="You can't create documents here" description="Ask for the create permission." />;
   }
-  if (!loaded) return <Skeleton className="h-96" />;
 
   const lineTotals = new Map((totals?.lines ?? []).map((l, i) => [i, l]));
   const tax = totals ? (totals.is_interstate ? [["IGST", totals.igst_total]] : [["CGST", totals.cgst_total], ["SGST", totals.sgst_total]]) : [];
@@ -170,7 +163,8 @@ export function DocumentEditor({ side, draftId }: { side: "sales" | "purchase"; 
             </Field>
             <Field label={<>{side === "sales" ? "Customer" : "Supplier"} <kbd className="rounded border px-1 text-[10px] text-muted-foreground">F4</kbd></>} className="sm:col-span-2">
               <PartyPicker ref={partyBtn} kind={side === "sales" ? "customers" : "suppliers"} value={party} onChange={setParty}
-                placeholder={side === "sales" ? "Walk-in customer" : "Choose supplier"} />
+                placeholder={side === "sales" ? "Walk-in customer" : "Choose supplier"}
+                onCreate={(isOwner || can(side === "sales" ? "customers.manage" : "suppliers.manage")) ? setNewParty : undefined} />
             </Field>
             <Field label="Date"><Input type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} /></Field>
             {side === "sales" && !party && (
@@ -308,6 +302,8 @@ export function DocumentEditor({ side, draftId }: { side: "sales" | "purchase"; 
           </CardContent>
         </Card>
       </div>
+      <PartyDialog kind={side === "sales" ? "customers" : "suppliers"} open={newParty !== null} initialName={newParty ?? undefined}
+        onOpenChange={(v) => !v && setNewParty(null)} onSaved={(p) => { setParty(p); setNewParty(null); }} />
     </div>
   );
 }

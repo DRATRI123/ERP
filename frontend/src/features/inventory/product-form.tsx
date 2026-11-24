@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2Icon } from "lucide-react";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -64,6 +64,8 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
     },
   });
   const err = form.formState.errors;
+  const FLAGS = ["prices_include_tax", "track_inventory", "batch_tracking", "serial_tracking"] as const;
+  const flags = useWatch({ control: form.control, name: [...FLAGS] });
   useEffect(() => {
     if (!product && !form.getValues("unit_id") && units.data?.[0]) form.setValue("unit_id", units.data.find((u) => u.code === "NOS")?.id ?? units.data[0].id);
   }, [units.data, product, form]);
@@ -92,7 +94,7 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
           <div className="grid gap-3 rounded-lg border p-3 sm:col-span-4 sm:grid-cols-2">
             {([["prices_include_tax", "Prices include GST"], ["track_inventory", "Track stock"], ["batch_tracking", "Batches & expiry"], ["serial_tracking", "Serial numbers"]] as const).map(([k, label]) => (
               <label key={k} className="flex items-center justify-between gap-2 text-sm">{label}
-                <Switch checked={form.watch(k)} onCheckedChange={(v) => form.setValue(k, v)} disabled={!!product && (k === "batch_tracking" || k === "serial_tracking")} />
+                <Switch checked={!!flags[FLAGS.indexOf(k)]} onCheckedChange={(v) => form.setValue(k, v, { shouldDirty: true })} disabled={!!product && (k === "batch_tracking" || k === "serial_tracking")} />
               </label>
             ))}
           </div>
