@@ -11,8 +11,9 @@ venv/
 *.db-wal
 *.db-shm
 *.sqlite3
-backups/
-data/
+/backend/backups/
+/backend/data/backups/
+/backend/data/
 node_modules/
 .next/
 target/
