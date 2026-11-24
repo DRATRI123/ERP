@@ -95,6 +95,7 @@ jobs:
         run: |
           docker build -t erp-backend:ci backend
           docker build -t erp-realtime:ci services/realtime
+          docker build -t erp-web:ci frontend
       - name: Image smoke test (non-root, CLI, migrations on SQLite)
         run: |
           test "$(docker run --rm --entrypoint id erp-backend:ci -u)" = "10001"
@@ -112,3 +113,56 @@ jobs:
           docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             -e ERP_PRIMARY_HOST=erp.example.com -e ERP_ACME_EMAIL=ci@example.com -e ERP_TLS_ASK_TOKEN=x \
             caddy:2.8-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+  frontend:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=moderate
+
+  e2e:
+    # Installs with the same script people use locally, starts it, and drives a real sale in Chromium.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: setup.sh (non-interactive)
+        env:
+          ERP_OWNER_EMAIL: owner@example.com
+          ERP_OWNER_NAME: CI Owner
+          ERP_OWNER_PASSWORD: CI-Strong-Pass-2026
+          ERP_DEMO: "y"
+        run: ./setup.sh
+      - name: start.sh
+        run: |
+          setsid ./start.sh > start.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs -o /dev/null http://localhost:3000/login && break; sleep 2; done
+      - name: Browser smoke test
+        working-directory: frontend
+        env:
+          ERP_E2E_EMAIL: owner@example.com
+          ERP_E2E_PASSWORD: CI-Strong-Pass-2026
+        run: |
+          npm install --no-save playwright@1.64.1
+          npx playwright install --with-deps chromium
+          node e2e/smoke.mjs
+      - name: Logs on failure
+        if: failure()
+        run: cat start.log backend/data/logs/*.log || true

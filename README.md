@@ -9,6 +9,7 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
 * [Architecture](docs/architecture.md) – service boundaries, security model, database strategy
 * [Database schema](docs/database-schema.md) – tables, conventions, planned tables per phase
 * [Roadmap](docs/roadmap.md) – phases and current status
+* [Web app](docs/frontend.md) – frontend architecture, screens, shortcuts
 * [Deployment](docs/deployment.md) – VPS setup, Docker Compose, Caddy, backups, monitoring
 * [Operations](docs/operations.md) – routine tasks, health warnings, incidents, commands
 * [Security](docs/security.md) and [Performance](docs/performance.md) – controls, audit findings, load-test results
@@ -54,13 +55,46 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   static security scans in CI; automated monthly restore drills; operations runbook. See
   [performance](docs/performance.md), [security](docs/security.md),
   [operations](docs/operations.md).
-* **Not built yet:** the Next.js web frontend (all features are available through the API),
-  file management and the automation engine.
+* **Web app — complete:** Next.js frontend for every module: dashboard, fast billing counter
+  (barcode, F2/F4/F9), sales and purchases, inventory with barcode labels, customers and
+  suppliers, accounting, payments, GST returns, reports, invoice designer (drag-and-drop), users and
+  roles, integrations, developer API and webhooks, settings, 2FA, backups and system health. Dark
+  mode, mobile layout, global search (Ctrl K), live updates. See [docs/frontend.md](docs/frontend.md).
+* **Not built yet:** file management (document library) and user-defined automation rules.
 
 After upgrading a database that already has invoices or stock from earlier phases, run
 `python -m app.cli accounting-backfill` once to post their journals.
 
-## Running the backend
+## Run it on your computer
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+You need **Python 3.12+** ([python.org](https://www.python.org/downloads/) — on Windows tick
+"Add python.exe to PATH") and **Node.js 22 LTS** ([nodejs.org](https://nodejs.org/)).
+
+**Windows**
+
+1. Double-click **`setup.bat`** (first time, and again after every update). It installs
+   everything, creates `backend\.env` with new secret keys, sets up the database, asks for your
+   e-mail, name and password (hidden), and offers a sample *Demo* business to explore.
+2. Double-click **`start.bat`** — the ERP opens at <http://localhost:3000>.
+3. **`stop.bat`** stops it; **`backup.bat`** takes an encrypted backup now.
+
+**macOS / Linux:** `./setup.sh` once, then `./start.sh` (Ctrl+C stops it).
+
+Your data lives in `backend/data` and your keys in `backend/.env` — back up both (the backup
+key is needed to restore backups). PDFs use Microsoft Edge or Google Chrome automatically. The
+web app listens only on this computer; to use it from other counters on the shop network run
+`npm run start:lan` in `frontend` instead (and prefer a proper server deployment —
+[docs/deployment.md](docs/deployment.md) — for daily multi-user use). Live updates appear when
+Redis is available (`ERP_REDIS_URL` in `backend/.env`); everything else works without it.
+
+| | |
+|---|---|
+| ![Billing](docs/screenshots/billing.png) | ![Invoice designer](docs/screenshots/invoice-designer.png) |
+| ![Dark mode](docs/screenshots/dashboard-dark.png) | ![Phone](docs/screenshots/mobile-dashboard.png) |
+
+## Running the backend by hand (development)
 
 Requires Python 3.12+.
 

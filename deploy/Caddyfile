@@ -31,9 +31,9 @@
 			max_size 30MB
 		}
 	}
-	# The Next.js frontend will be served here (added with the frontend).
+	# Everything else is the web app (Next.js).
 	handle {
-		respond "Private ERP" 200
+		reverse_proxy web:3000
 	}
 
 	header {

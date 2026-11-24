@@ -100,8 +100,10 @@ function Designer({ templates }: { templates: Template[] }) {
   const docId = sample.data?.items[0]?.id;
   // The saved template rendered on a real invoice by the same engine that prints and makes PDFs.
   const previewQ = useQuery({
-    queryKey: ["biz", id, "tpl-preview", selected, docId, version], enabled: !!docId && selected !== "new",
-    queryFn: async () => (await api<Response>(`${base}/documents/${docId}/print`, { raw: true, query: { format: "html", template_id: selected } })).text(),
+    // Before the first save, show the built-in layout so there is always something to look at.
+    queryKey: ["biz", id, "tpl-preview", selected, docId, version], enabled: !!docId,
+    queryFn: async () => (await api<Response>(`${base}/documents/${docId}/print`, {
+      raw: true, query: { format: "html", template_id: selected === "new" ? undefined : selected } })).text(),
   });
   const preview = previewQ.data ?? null;
 
@@ -189,7 +191,7 @@ function Designer({ templates }: { templates: Template[] }) {
 
         <Card className="flex min-h-[70vh] flex-col overflow-hidden xl:sticky xl:top-20 xl:h-[calc(100vh-7rem)]">
           <div className="flex items-center justify-between border-b px-4 py-2.5">
-            <p className="flex items-center gap-2 text-sm font-medium"><EyeIcon className="size-4" /> Live preview {docId && <Badge variant="secondary">your latest invoice</Badge>}</p>
+            <p className="flex items-center gap-2 text-sm font-medium"><EyeIcon className="size-4" /> Live preview {docId && <Badge variant="secondary">{selected === "new" ? "built-in layout — save to apply yours" : "your latest invoice"}</Badge>}</p>
             {docId && selected !== "new" && <Button size="sm" variant="outline" onClick={() => openFile(`${base}/documents/${docId}/print`, { format: "pdf", template_id: selected }, "preview.pdf")}><FileDownIcon /> PDF</Button>}
           </div>
           <div className="flex-1 bg-muted/50 p-4">

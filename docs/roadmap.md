@@ -16,6 +16,16 @@ PostgreSQL.
 | 9 | SQLite → PostgreSQL migration utility and cutover | **Done** (227 tests in total) — see [postgres-migration.md](postgres-migration.md) |
 | 10 | Load/security testing, restore drills, production docs | **Done** — see [performance.md](performance.md), [security.md](security.md), [operations.md](operations.md) |
 
+## Web app — what exists
+
+* Next.js frontend covering every module, with permission-aware navigation, business switcher,
+  dashboard (server-computed figures; `GET /businesses/{id}/dashboard`, `GET /dashboard/overview`),
+  keyboard-first billing counter, invoice designer with live server-rendered preview, dark mode,
+  mobile layout, command palette and live updates. See [frontend.md](frontend.md).
+* One-click local run: `setup.bat` / `start.bat` / `stop.bat` / `backup.bat` (Windows) and
+  `setup.sh` / `start.sh` (macOS, Linux); tested from a fresh clone in CI.
+* Docker image for the web app; Caddy routes everything else to it.
+
 ## Phase 10 — what exists
 
 * **Load test** (`scripts/loadtest.py`) against the real server, with integrity checks

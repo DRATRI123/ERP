@@ -8,7 +8,8 @@ source backend/.venv/bin/activate
 (cd backend && python -m app.cli migrate >/dev/null)
 mkdir -p backend/data/logs
 pids=()
-cleanup() { kill "${pids[@]}" 2>/dev/null || true; wait 2>/dev/null || true; echo; echo "Private ERP stopped."; }
+# Stop the whole process group (npm's children such as the Next.js server included).
+cleanup() { trap - EXIT INT TERM; echo; echo "Stopping Private ERP..."; kill 0 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 
 (cd backend && exec python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000) > backend/data/logs/api.log 2>&1 & pids+=($!)

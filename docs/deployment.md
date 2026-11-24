@@ -1,6 +1,6 @@
 # Deployment — single VPS (Hostinger KVM, Ubuntu 24.04)
 
-One server runs everything with Docker Compose: **Caddy** (TLS, routing) → **api** (FastAPI)
+One server runs everything with Docker Compose: **Caddy** (TLS, routing) → **web** (Next.js app) + **api** (FastAPI)
 + **worker** (background jobs) + **realtime** (WebSockets) + **Redis**, with SQLite on a volume
 (or PostgreSQL with `--profile postgres`). Sized for a few businesses with up to 30 users each:
 2 vCPU / 8 GB RAM is comfortable; 1 vCPU / 4 GB works.
@@ -78,8 +78,7 @@ docker compose exec api python -m app.cli create-owner --email you@example.com -
 ```
 
 Sign in, then **turn on two-factor authentication for the owner account first**
-(`POST /api/v1/auth/2fa/setup` → `/2fa/enable`; the frontend will offer this on the profile
-page). Store the recovery codes offline.
+(Settings → Security in the web app). Store the recovery codes offline.
 
 ## 5. Custom domains
 

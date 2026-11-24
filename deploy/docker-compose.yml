@@ -79,6 +79,18 @@ services:
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
 
+  web:
+    build: ../frontend
+    image: erp-web:latest
+    restart: unless-stopped
+    networks: [internal]
+    depends_on:
+      api: { condition: service_healthy }
+    read_only: true
+    tmpfs: ["/tmp", "/app/.next/cache"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
   redis:
     image: redis:7.4-alpine
     restart: unless-stopped
@@ -123,6 +135,7 @@ services:
     networks: [internal, egress]
     depends_on:
       api: { condition: service_healthy }
+      web: { condition: service_healthy }
 
 networks:
   internal: { internal: true }   # no internet access: Redis, PostgreSQL, realtime

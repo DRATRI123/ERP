@@ -7,6 +7,7 @@ credentials and backups unreadable). Run: python scripts/init_env.py
 from __future__ import annotations
 
 import base64
+import contextlib
 import os
 import secrets
 import sys
@@ -37,10 +38,8 @@ ERP_PUBLIC_BASE_URL=http://localhost:3000
 ERP_TIMEZONE=Asia/Kolkata
 # Optional: Redis for live updates (ERP_REDIS_URL=redis://localhost:6379/0)
 """, encoding="utf-8")
-    try:
+    with contextlib.suppress(OSError):  # not supported on every filesystem (e.g. Windows)
         os.chmod(ENV, 0o600)
-    except OSError:
-        pass
     print(f"Created {ENV} with new secret keys.")
     return 0
 
