@@ -249,14 +249,21 @@ See [database-schema.md](database-schema.md) for the schema itself.
   and integrity-checks the copy before reporting success.
 * The same test suite runs against PostgreSQL by setting `ERP_TEST_DATABASE_URL`; CI runs both.
 
-### Migration to PostgreSQL (Phase 9)
+### Migration to PostgreSQL (Phase 9 — built)
 
-A dedicated utility will: back up SQLite → create the PostgreSQL schema from the same Alembic
-migrations → copy table by table in foreign-key order through the ORM types (which converts the
-scaled-integer money columns back to `NUMERIC`) → verify row counts, primary keys, foreign keys,
-decimal sums per column, trial balance, stock balances, customer outstanding and invoice
-totals → run the test suite against the new database → cut over in a maintenance window.
-No dual writes.
+`app/db/transfer.py` copies every table, in foreign-key order and through the ORM column types,
+from the source into a target built by the same Alembic migrations. It runs from one read
+snapshot into one target transaction and back-fills self-references afterwards. Before committing
+it verifies, inside that transaction:
+
+* row counts and an order-independent SHA-256 checksum over every column (canonical values, so
+  scaled-integer money and `NUMERIC`, or hex and native UUIDs, compare equal);
+* double-entry integrity and stock balances for every business.
+
+A failed check rolls everything back. Maintenance mode (`system_settings.maintenance`, cached
+3 s per process) refuses changes with 503 and pauses the worker during the cutover. Reads and
+sign-in keep working. There are no dual writes; the runbook is in
+[postgres-migration.md](postgres-migration.md).
 
 ## 13. API conventions
 

@@ -91,8 +91,11 @@ def _clean_db(engine: Engine) -> Iterator[None]:
     from app.core.ratelimit import limiter
     from app.modules.system.domains import host_cache
 
+    from app.modules.system.maintenance import cache as maintenance_cache
+
     limiter.reset()
     host_cache.invalidate()
+    maintenance_cache.invalidate()
     with engine.begin() as conn:
         # Self-referencing rows (reversal entries, sub-categories) are unlinked first; SQLite
         # checks foreign keys row by row while a single DELETE runs.

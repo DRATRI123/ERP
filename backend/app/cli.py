@@ -107,6 +107,18 @@ def cmd_worker(args: argparse.Namespace) -> int:
 
         db = SessionLocal()
         stats: dict[str, object] = {}
+        from app.modules.system import maintenance
+
+        try:
+            paused = maintenance.get(db).get("enabled")
+        except Exception:  # noqa: BLE001 - before migrations
+            paused = False
+        if paused:  # nothing may change while the database is being copied
+            db.close()
+            if args.once:
+                return 0
+            time.sleep(args.interval)
+            continue
         try:
             stats = process_due(db)
             stats["webhooks_queued"] = fan_out(db)
@@ -214,6 +226,98 @@ def cmd_reset_mfa(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_maintenance(args: argparse.Namespace) -> int:
+    from app.db.session import session_scope
+    from app.modules.system import maintenance
+
+    with session_scope() as db:
+        if args.state == "status":
+            state = maintenance.get(db)
+        else:
+            state = maintenance.set_mode(db, args.state == "on", args.message, by="cli")
+    print(f"Maintenance mode is {'ON' if state.get('enabled') else 'off'}")
+    if args.state == "on":
+        print("API processes pick this up within a few seconds; the worker on its next loop.")
+    return 0
+
+
+def _engine_for(url: str):  # type: ignore[no-untyped-def]
+    from app.db.session import build_engine
+
+    return build_engine(get_settings().model_copy(update={"database_url": url}))
+
+
+def cmd_migrate_to_postgres(args: argparse.Namespace) -> int:
+    """Copy the current database (ERP_DATABASE_URL, normally SQLite) into an empty PostgreSQL
+    database, verify it, and print the cutover steps. The source is never modified."""
+    import json
+
+    from app.db.session import session_scope
+    from app.db.transfer import TransferError, transfer, upgrade_target
+    from app.modules.system import maintenance
+
+    source_url = args.source or get_settings().database_url
+    if not args.target.startswith("postgresql"):
+        print("--target must be a postgresql+psycopg:// URL", file=sys.stderr)
+        return 1
+    source = _engine_for(source_url)
+    if not args.dry_run and not args.allow_live:
+        with session_scope() as db:
+            if not maintenance.get(db).get("enabled"):
+                print("Turn maintenance mode on first (python -m app.cli maintenance on) so nothing "
+                      "changes during the copy, or pass --dry-run for a rehearsal.", file=sys.stderr)
+                return 1
+    print("Creating the schema on the target (migrations)…", flush=True)
+    upgrade_target(args.target)
+    target = _engine_for(args.target)
+
+    def progress(table: str, rows: int) -> None:
+        if rows:
+            print(f"  {table:<32} {rows:>10,} rows", flush=True)
+
+    try:
+        report = transfer(source, target, dry_run=args.dry_run, batch_size=args.batch_size,
+                          progress=progress)
+    except TransferError as exc:
+        print(f"FAILED before copying: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        source.dispose()
+        target.dispose()
+    if args.report:
+        Path(args.report).write_text(json.dumps(report.as_dict(), indent=2))
+    print(f"\n{len(report.tables)} tables, {report.total_rows:,} rows in {report.seconds:.1f}s; "
+          f"checksums {'all match' if all(t.ok for t in report.tables) else 'DIFFER'}")
+    for p in report.problems:
+        print(f"  ! {p}")
+    if not report.ok:
+        print("Verification FAILED — nothing was written to the target.", file=sys.stderr)
+        return 2
+    if report.dry_run:
+        print("Dry run OK — the copy and every check succeeded and were rolled back.")
+        return 0
+    print("Copied and verified. Next:")
+    print("  1. set ERP_DATABASE_URL to the PostgreSQL URL (deploy/.env) and restart api, worker, realtime")
+    print("  2. python -m app.cli maintenance off   (now runs against PostgreSQL)")
+    print("  3. keep the SQLite file untouched for a while: switching the URL back is the rollback")
+    return 0
+
+
+def cmd_compare_databases(args: argparse.Namespace) -> int:
+    from app.db.transfer import compare
+
+    a, b = _engine_for(args.source), _engine_for(args.target)
+    try:
+        diffs = compare(a, b)
+    finally:
+        a.dispose()
+        b.dispose()
+    for d in diffs:
+        print(f"  - {d}")
+    print("Databases are identical" if not diffs else f"{len(diffs)} difference(s)")
+    return 0 if not diffs else 2
+
+
 def cmd_check_config(_: argparse.Namespace) -> int:
     problems = get_settings().check_production()
     for p in problems:
@@ -276,6 +380,26 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("reset-mfa", help="Switch off two-factor authentication for a user")
     p.add_argument("--email", required=True)
     p.set_defaults(func=cmd_reset_mfa)
+
+    p = sub.add_parser("maintenance", help="Pause or resume all changes (reads keep working)")
+    p.add_argument("state", choices=["on", "off", "status"])
+    p.add_argument("--message")
+    p.set_defaults(func=cmd_maintenance)
+
+    p = sub.add_parser("migrate-to-postgres", help="Copy this database into an empty PostgreSQL database")
+    p.add_argument("--target", required=True, help="postgresql+psycopg://user:pass@host:5432/db")
+    p.add_argument("--source", help="Default: ERP_DATABASE_URL")
+    p.add_argument("--dry-run", action="store_true", help="Copy and verify, then roll back")
+    p.add_argument("--batch-size", type=int, default=2000)
+    p.add_argument("--report", help="Write a JSON report (row counts, checksums) to this file")
+    p.add_argument("--allow-live", action="store_true",
+                   help="Copy without maintenance mode (only if nothing else is running)")
+    p.set_defaults(func=cmd_migrate_to_postgres)
+
+    p = sub.add_parser("compare-databases", help="Check two databases hold identical data")
+    p.add_argument("--source", required=True)
+    p.add_argument("--target", required=True)
+    p.set_defaults(func=cmd_compare_databases)
 
     p = sub.add_parser("check-config", help="Check production settings")
     p.set_defaults(func=cmd_check_config)

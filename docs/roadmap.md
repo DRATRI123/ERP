@@ -13,8 +13,37 @@ PostgreSQL.
 | 6 | Developer platform: API keys & scopes, webhooks, idempotency, rate limits | **Backend done** (197 tests in total) — see [api.md](api.md) |
 | 7 | Node.js realtime + webhook delivery, Redis, Rust workers (where benchmarks justify) | **Done** — real-time service, Redis stream + shared rate limits, batch PDF; Rust measured and not needed ([ADR 0001](adr/0001-rust-services.md)) |
 | 8 | Custom domains, SSL, encryption at rest, monitoring, backups, deployment | **Done** (220 tests in total) — first real VPS deployment still to be done with [deployment.md](deployment.md) |
-| 9 | SQLite → PostgreSQL migration utility and cutover | Next |
-| 10 | Load/security testing, restore drills, production docs | — |
+| 9 | SQLite → PostgreSQL migration utility and cutover | **Done** (227 tests in total) — see [postgres-migration.md](postgres-migration.md) |
+| 10 | Load/security testing, restore drills, production docs | Next |
+
+## Phase 9 — what exists
+
+* `migrate-to-postgres` CLI:
+  * preflight checks: source at head, SQLite integrity and foreign keys, target migrated and
+    empty;
+  * copies through the ORM types, parents first, with self-references back-filled (and
+    `updated_at` preserved);
+  * one target transaction, committed only after verification: row counts, per-table checksums
+    over every column, books and stock checks;
+  * `--dry-run` rehearsal and a JSON report.
+* `compare-databases` for checking at any later time.
+* Maintenance mode (CLI and owner API): changes refused with 503, reads and sign-in allowed,
+  worker paused.
+* Tests:
+  * a full copy with the application then run on the copy (same trial balance and stock, new
+    invoices work);
+  * dry run, refusal cases, and a corrupted value aborting the whole copy;
+  * checksum canonicalisation;
+  * the CLI flow and maintenance mode;
+  * both directions (SQLite → PostgreSQL in the SQLite suite, PostgreSQL → SQLite in the
+    PostgreSQL suite).
+* Benchmark: about 5,700 rows/s including verification.
+
+## Phase 9 — deliberately deferred
+
+* Online (zero-downtime) migration through replication: unnecessary at this scale; the window is
+  minutes.
+* PostgreSQL point-in-time recovery (WAL archiving).
 
 ## Phase 8 — what exists
 

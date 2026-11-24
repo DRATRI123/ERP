@@ -18,6 +18,7 @@ from app.core.context import client_ip_var, request_id_var, user_agent_var
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging
 from app.db.session import sqlite_write_intent
+from app.modules.system import maintenance
 from app.modules.system.domains import host_allowed
 
 API_PREFIX = "/api/v1"
@@ -74,6 +75,10 @@ def create_app() -> FastAPI:
                     "code": "unknown_host", "message": "This server does not serve that host name"}})
             if settings.force_https and request.url.scheme != "https" and host not in settings.internal_hosts:
                 return RedirectResponse(str(request.url.replace(scheme="https")), status_code=308)
+            paused = await run_in_threadpool(maintenance.blocks, request.method, path)
+            if paused:
+                return JSONResponse(status_code=503, headers={"Retry-After": "120"}, content={"error": {
+                    "code": "maintenance", "message": paused.get("message") or maintenance.DEFAULT_MESSAGE}})
         tokens = (
             request_id_var.set(rid),
             client_ip_var.set(request.client.host if request.client else None),

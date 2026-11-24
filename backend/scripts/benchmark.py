@@ -20,20 +20,20 @@ os.environ.update({"ERP_ENV": "test", "ERP_SECRET_KEY": secrets.token_urlsafe(48
                    "ERP_PDF_NO_SANDBOX": "true"})
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from app.cli import main as cli  # noqa: E402
-from app.main import create_app  # noqa: E402
+from app.cli import main as cli
+from app.main import create_app
 
 results: list[tuple[str, float, str]] = []
 
 
-def timed(name: str, unit: str = ""):  # noqa: ANN201
+def timed(name: str, unit: str = ""):
     class T:
-        def __enter__(self):  # noqa: ANN204
+        def __enter__(self):
             self.t = time.perf_counter()
 
-        def __exit__(self, *a):  # noqa: ANN002, ANN204
+        def __exit__(self, *a):
             results.append((name, time.perf_counter() - self.t, unit))
     return T()
 
@@ -47,8 +47,8 @@ biz = c.post("/api/v1/businesses", headers=h, json={"name": "Bench", "state_code
 base = f"/api/v1/businesses/{biz['id']}"
 
 # 1. CSV parsing + row validation only (the part a Rust parser would replace)
-from app.modules.integrations import data_io  # noqa: E402
-from app.modules.integrations.data_io import read_rows  # noqa: E402
+from app.modules.integrations import data_io
+from app.modules.integrations.data_io import read_rows
 
 data_io.MAX_ROWS = 200_000  # measure parsing beyond the normal per-import cap
 
@@ -95,6 +95,33 @@ ids = [d["id"] for d in c.get(f"{base}/documents", headers=h, params={"limit": 5
 with timed("Render 50 invoices as ONE batch PDF", "50 PDFs"):
     r = c.post(f"{base}/documents/print-batch", headers=h, json={"document_ids": ids})
 assert r.status_code == 200 and r.content[:4] == b"%PDF", r.text
+
+# 6. SQLite → PostgreSQL migration (Phase 9), when a server is available:
+#    ERP_BENCH_PG_URL=postgresql+psycopg://user:pw@localhost:5432/postgres python scripts/benchmark.py
+if os.environ.get("ERP_BENCH_PG_URL"):
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+
+    from app.cli import _engine_for
+    from app.db.session import get_engine
+    from app.db.transfer import transfer, upgrade_target
+
+    admin_url = make_url(os.environ["ERP_BENCH_PG_URL"])
+    admin = create_engine(admin_url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as conn:
+        conn.execute(text("DROP DATABASE IF EXISTS erp_bench_transfer WITH (FORCE)"))
+        conn.execute(text("CREATE DATABASE erp_bench_transfer"))
+    target_url = admin_url.set(database="erp_bench_transfer").render_as_string(hide_password=False)
+    upgrade_target(target_url)
+    target = _engine_for(target_url)
+    with timed("Copy + verify whole database SQLite → PostgreSQL", "1 run"):
+        rep = transfer(get_engine(), target)
+    assert rep.ok and rep.committed, rep.problems
+    print(f"migration: {rep.total_rows:,} rows in {rep.seconds:.2f}s "
+          f"({rep.total_rows / rep.seconds:,.0f} rows/s, copy + checksums + book checks)")
+    target.dispose()
+    with admin.connect() as conn:
+        conn.execute(text("DROP DATABASE IF EXISTS erp_bench_transfer WITH (FORCE)"))
 
 print(f"\n{'Workload':58} {'seconds':>8}  per unit")
 for name, secs, unit in results:

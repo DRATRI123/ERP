@@ -151,7 +151,12 @@ test suite runs the same drill on SQLite and PostgreSQL in CI.
 - [ ] restore drill (§6) completed
 - [ ] `/system/health` status is `ok`
 
-## 9. Updates
+## 9. Moving to PostgreSQL later
+
+See [postgres-migration.md](postgres-migration.md): a rehearsal (`--dry-run`), then a
+maintenance window of a few minutes.
+
+## 10. Updates
 
 ```bash
 cd /opt/erp && git pull

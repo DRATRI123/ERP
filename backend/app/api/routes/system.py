@@ -16,7 +16,7 @@ from app.api.pagination import Page, PageParams, page_params, paginate
 from app.core import metrics
 from app.core.config import get_settings
 from app.core.errors import NotFound, PermissionDenied
-from app.modules.system import backups, domains, monitor, security
+from app.modules.system import backups, domains, maintenance, monitor, security
 from app.modules.system.models import (
     BackupRun,
     BackupStatus,
@@ -250,3 +250,28 @@ def reset_user_mfa(user_id: uuid.UUID, p: OwnerPrincipal, db: DB) -> None:
         raise NotFound("User not found")
     security.owner_reset_mfa(db, target=target, actor=p.user)
     db.commit()
+
+
+# ---------------------------------------------------------------------------- maintenance
+
+
+class MaintenanceIn(BaseModel):
+    enabled: bool
+    message: str | None = Field(None, max_length=300)
+
+
+@router.get("/system/maintenance")
+def get_maintenance(_: OwnerPrincipal, db: DB) -> dict:
+    return maintenance.get(db)
+
+
+@router.put("/system/maintenance")
+def put_maintenance(body: MaintenanceIn, p: OwnerPrincipal, db: DB) -> dict:
+    """Pause all changes (reads keep working) — e.g. during the PostgreSQL cutover."""
+    out = maintenance.set_mode(db, body.enabled, body.message, by=p.user.email)
+    from app.modules.audit import service as audit
+
+    audit.record(db, action=f"system.maintenance_{'on' if body.enabled else 'off'}",
+                 entity_type="system", actor_id=p.user.id)
+    db.commit()
+    return out

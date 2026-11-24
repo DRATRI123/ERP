@@ -44,7 +44,11 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   with GFS retention, Google Drive off-site copies and tested restores; readiness, Prometheus
   metrics and an owner health page; Docker images and Compose stack. See
   [docs/deployment.md](docs/deployment.md).
-* Next: Phase 9 (SQLite → PostgreSQL migration utility). The Next.js frontend is still to be built.
+* **Phase 9 — complete:** verified SQLite → PostgreSQL migration (checksums over every row,
+  books and stock re-checked before commit, dry-run rehearsal), database comparison and
+  maintenance mode for the cutover. See [docs/postgres-migration.md](docs/postgres-migration.md).
+* Next: Phase 10 (load and security testing, production docs). The Next.js frontend is still to
+  be built.
 
 After upgrading a database that already has invoices or stock from earlier phases, run
 `python -m app.cli accounting-backfill` once to post their journals.
