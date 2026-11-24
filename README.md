@@ -68,7 +68,8 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   business side by side; manufacturing with recipes, true batch costing and quality-control release;
   staff attendance and salaries with commission; expense claims with bill photos and petty cash;
   e-way bill JSON for the GST portal; export of masters and vouchers to Tally; a WhatsApp
-  catalogue link where buyers order from their phone. See [docs/roadmap.md](docs/roadmap.md).
+  catalogue link where buyers order from their phone. Every page has an ⓘ guide, and Help & guide
+  explains each workflow step by step. See [docs/roadmap.md](docs/roadmap.md).
 * **Document library and automation — complete:** a versioned file library with folders, tags,
   trash and permission-aware attachments on invoices, parties and products; your own
   "when this happens, do that" rules (overdue reminders, big-sale alerts, low-stock e-mails,

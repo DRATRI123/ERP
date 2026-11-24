@@ -22,6 +22,7 @@ import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Attachments } from "@/features/files/attachments";
+import { HelpButton } from "@/features/help/help-button";
 import { useBusiness } from "@/hooks/use-business";
 import { api, ApiError, openFile } from "@/lib/api";
 import { date, money, qty, todayISO } from "@/lib/format";
@@ -81,6 +82,7 @@ function DocumentPage() {
           <h1 className="flex flex-wrap items-center gap-3 text-2xl font-semibold tracking-tight">
             {DOC_LABEL[d.doc_type]} {d.number ?? <span className="text-muted-foreground">(draft)</span>}
             <DocStatusBadge status={d.status} payment={d.payment_status} />
+            <HelpButton topic={sales ? "document" : "purchases"} />
           </h1>
           <p className="text-sm text-muted-foreground">{d.party_name ?? "Walk-in customer"} · {date(d.doc_date)}{d.due_date && ` · due ${date(d.due_date)}`}</p>
         </div>

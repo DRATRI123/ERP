@@ -1,7 +1,7 @@
 import {
   BarChart3Icon, BookOpenIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
   LayoutDashboardIcon, PlugIcon, ReceiptIndianRupeeIcon, SettingsIcon, ShoppingCartIcon, TruckIcon, UsersIcon,
-  IdCardIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
+  IdCardIcon, LifeBuoyIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -40,6 +40,7 @@ export const NAV: NavItem[] = [
   { href: "/users", label: "Users & Permissions", icon: UserCogIcon, any: ["users.view"], group: "manage", shortcut: "u" },
   { href: "/businesses", label: "Businesses", icon: Building2Icon, ownerOnly: true, group: "manage" },
   { href: "/settings", label: "Settings", icon: SettingsIcon, group: "manage" },
+  { href: "/help", label: "Help & guide", icon: LifeBuoyIcon, group: "manage", shortcut: "h" },
 ];
 
 export const GROUP_LABEL: Record<NavItem["group"], string> = { main: "Operations", money: "Finance", manage: "Workspace" };

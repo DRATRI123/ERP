@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -70,6 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div key={k} className="flex items-center justify-between py-2"><span>{v}</span><kbd className="rounded border bg-muted px-2 py-0.5 text-xs">{k}</kbd></div>
             ))}
           </div>
+          <Link href="/help" onClick={() => setHelp(false)} className="text-sm text-blue hover:underline">Open the Help & guide — step-by-step for every page →</Link>
         </DialogContent>
       </Dialog>
     </div>

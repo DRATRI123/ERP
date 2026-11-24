@@ -68,6 +68,16 @@ ERP_E2E_EMAIL=… ERP_E2E_PASSWORD=… node e2e/smoke.mjs   # against a running 
 CI runs these plus `npm audit`, and an end-to-end job that installs with `setup.sh`, starts with
 `start.sh` and drives a real sale in Chromium (stock, payment and books verified through the API).
 
+## Help and guides
+
+* Every page has an **ⓘ** button next to its title. It opens that page's step-by-step guide in
+  a side panel, with related guides one click away.
+* **Help & guide** (sidebar, or `g` then `h`) collects all the guides, with search and a
+  "How do I…" list: sales order, purchase order vs purchase bill, credit note, opening stock,
+  e-way bill, salaries, Tally and more.
+* The guides live in `src/features/help/content.ts`. Each topic lists the routes it belongs to,
+  and its steps name the real buttons, so update the text when you rename a button.
+
 ## Expiry, licences, pricing
 
 * **Billing:**
