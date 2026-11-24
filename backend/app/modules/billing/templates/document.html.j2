@@ -54,6 +54,7 @@
         {% if seller.address_line1 %}<div>{{ seller.address_line1 }}{% if seller.address_line2 %}, {{ seller.address_line2 }}{% endif %}</div>{% endif %}
         {% if seller.city or seller.pincode %}<div>{{ seller.city or "" }} {{ seller.pincode or "" }}</div>{% endif %}
         {% if seller.gstin %}<div><b>GSTIN:</b> {{ seller.gstin }}</div>{% endif %}
+        {% if seller.licences %}<div class="small">{% for l in seller.licences %}<b>{{ l.label }}</b> {{ l.number }}{% if not loop.last %} · {% endif %}{% endfor %}</div>{% endif %}
         {% if seller.phone %}<div class="muted">Ph: {{ seller.phone }}{% if seller.email %} · {{ seller.email }}{% endif %}</div>{% endif %}
         {% if cfg.header_text %}<div class="small">{{ cfg.header_text }}</div>{% endif %}
       </div>
@@ -174,6 +175,7 @@
       {% if cfg.terms_text or doc.terms %}<div class="small"><b>Terms:</b> {{ doc.terms or cfg.terms_text }}</div>{% endif %}
       {% if doc.notes %}<div class="small"><b>Notes:</b> {{ doc.notes }}</div>{% endif %}
       {% if doc.irn %}<div class="small"><b>IRN:</b> {{ doc.irn }} · Ack {{ doc.irn_ack_no }}</div>{% endif %}
+      {% if doc.eway_bill_no %}<div class="small"><b>E-way bill:</b> {{ doc.eway_bill_no }}{% if doc.vehicle_no %} · Vehicle {{ doc.vehicle_no }}{% endif %}</div>{% endif %}
     </div>
     {% if irn_qr %}<div class="qr"><img src="{{ irn_qr }}" alt="e-invoice QR"></div>{% endif %}
     {% if upi_qr %}<div class="qr" style="text-align:center"><img src="{{ upi_qr }}" alt="UPI QR"><div class="small">Scan to pay ₹{{ doc.balance_due | money }}</div></div>{% endif %}

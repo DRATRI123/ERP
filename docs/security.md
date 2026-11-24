@@ -9,7 +9,7 @@ the threats considered, the controls in place, and how each control is verified.
 |---|---|
 | Stolen or guessed passwords | Argon2id; per-account lockout; per-IP limits; TOTP two-factor sign-in with recovery codes; new-device alerts |
 | Stolen tokens | 15-minute access tokens; rotating refresh tokens with reuse detection; server-side session check on every request; optional httpOnly SameSite=strict cookie + CSRF token |
-| Staff seeing or changing what they shouldn't | 45 permissions, roles, branch scoping, enforced on the server for every route; API keys limited to their scopes ∩ their creator's current permissions |
+| Staff seeing or changing what they shouldn't | 51 permissions, roles, branch scoping, enforced on the server for every route; API keys limited to their scopes ∩ their creator's current permissions |
 | One business's data leaking into another | every business-scoped query filtered by the business; other businesses answer **404**, so their existence is not revealed |
 | Injection (SQL, HTML, template) | SQLAlchemy bound parameters only; Jinja2 autoescape; print templates rendered with JavaScript disabled and a CSP that blocks network access |
 | Forged webhooks | HMAC verification per provider, constant-time comparison, replay storage |

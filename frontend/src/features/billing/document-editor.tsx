@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  BanknoteIcon, CheckCircle2Icon, CreditCardIcon, Loader2Icon, MinusIcon, PlusIcon, SaveIcon, SmartphoneIcon, Trash2Icon, WalletIcon,
+  AlertTriangleIcon, BanknoteIcon, CheckCircle2Icon, GiftIcon, TagIcon, CreditCardIcon, Loader2Icon, MinusIcon, PlusIcon, SaveIcon, SmartphoneIcon, Trash2Icon, WalletIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -22,13 +22,17 @@ import { useBusiness } from "@/hooks/use-business";
 import { useDebounced } from "@/hooks/use-debounce";
 import { api, ApiError } from "@/lib/api";
 import { dec, decStr, money, qty, todayISO } from "@/lib/format";
-import { DOC_LABEL, PURCHASE_TYPES, SALES_TYPES, type DocType, type DocumentFull, type Party, type Product } from "@/lib/types";
+import { DOC_LABEL, PURCHASE_TYPES, SALES_TYPES, type DocType, type DocumentFull, type DocumentLine, type Party, type Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface Line {
   key: string; product_id: string | null; name: string; sku?: string; hsn?: string | null; unit?: string;
   quantity: string; unit_price: string; discount_percent: string; gst_rate?: string; stock?: string | null;
+  batched?: boolean; batch_no?: string; expiry_date?: string; mrp?: string;
+  priceTyped?: boolean; // only typed rates are sent; otherwise the server prices (price lists, tiers)
 }
+const isFree = (l: DocumentLine) => !!(l.custom_fields as Record<string, unknown> | undefined)?.scheme_free;
+interface AvailableBatch { batch_id: string; batch_no: string; expiry_date: string | null; mrp: string | null; quantity: string; days_left: number | null }
 interface PayRow { key: string; mode: string; amount: string; reference: string }
 
 const MODES = [
@@ -60,9 +64,11 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   const [dueDate, setDueDate] = useState(draft?.due_date ?? "");
   const [supplierNo, setSupplierNo] = useState((draft?.supplier_invoice_no as string | undefined) ?? "");
   const [notes, setNotes] = useState((draft?.notes as string | undefined) ?? "");
-  const [lines, setLines] = useState<Line[]>(() => (draft?.lines ?? []).map((l) => ({
+  const [lines, setLines] = useState<Line[]>(() => (draft?.lines ?? []).filter((l) => !isFree(l)).map((l) => ({ priceTyped: true,
     key: uid(), product_id: l.product_id, name: l.description, hsn: l.hsn_sac, unit: l.unit_code ?? undefined,
-    quantity: String(Number(l.quantity)), unit_price: String(Number(l.unit_price)), discount_percent: String(Number(l.discount_percent)), gst_rate: l.gst_rate })));
+    quantity: String(Number(l.quantity)), unit_price: String(Number(l.unit_price)), discount_percent: String(Number(l.discount_percent)), gst_rate: l.gst_rate,
+    batched: !!l.batch_no, batch_no: (l.batch_no as string | null) ?? undefined, expiry_date: (l.expiry_date as string | null) ?? undefined,
+    mrp: l.mrp ? String(Number(l.mrp)) : undefined })));
   const [payments, setPayments] = useState<PayRow[]>([]);
   const [newParty, setNewParty] = useState<string | null>(null);
   const search = useRef<ProductSearchHandle>(null);
@@ -76,9 +82,11 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
     notes: notes || undefined,
     lines: lines.map((l) => ({
       product_id: l.product_id ?? undefined, description: l.product_id ? undefined : l.name,
-      quantity: l.quantity || "0", unit_price: l.unit_price || undefined,
+      quantity: l.quantity || "0", unit_price: (l.priceTyped || !l.product_id) && l.unit_price ? l.unit_price : undefined,
       discount_percent: l.discount_percent && l.discount_percent !== "0" ? l.discount_percent : undefined,
       ...(l.product_id ? {} : { gst_rate: l.gst_rate ?? "0" }),
+      ...(l.batch_no ? { batch_no: l.batch_no } : {}),
+      ...(side === "purchase" && l.batched ? { expiry_date: l.expiry_date || undefined, mrp: l.mrp || undefined } : {}),
     })),
   }), [docType, docDate, dueDate, party, partyName, supplierNo, notes, lines, side]);
   const previewBody = useDebounced(body, 250);
@@ -96,7 +104,8 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   // ------------------------------------------------------------------ editing
   const addProduct = useCallback((p: Product) => {
     setLines((ls) => {
-      const i = ls.findIndex((l) => l.product_id === p.id);
+      // Batch-tracked purchases get a new line per scan (each pack may be another batch).
+      const i = side === "purchase" && p.batch_tracking ? -1 : ls.findIndex((l) => l.product_id === p.id);
       if (i >= 0) {
         const copy = [...ls];
         const l = copy[i]!;
@@ -105,7 +114,8 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
       }
       const price = side === "sales" ? p.selling_price : (p.purchase_price ?? p.selling_price);
       return [...ls, { key: uid(), product_id: p.id, name: p.name, sku: p.sku, hsn: p.hsn_sac, quantity: "1",
-        unit_price: price ? String(Number(price)) : "", discount_percent: "", gst_rate: p.gst_rate, stock: (p.on_hand as string) ?? null }];
+        unit_price: price ? String(Number(price)) : "", discount_percent: "", gst_rate: p.gst_rate, stock: (p.on_hand as string) ?? null,
+        batched: p.batch_tracking && p.track_inventory, mrp: side === "purchase" && p.mrp ? String(Number(p.mrp)) : undefined }];
     });
   }, [side]);
   const update = (key: string, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -128,7 +138,8 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
     },
     onError: (e: ApiError) => toast.error(e.message, { description: Object.values(e.fieldErrors)[0] }),
   });
-  const canSave = lines.length > 0 && lines.every((l) => Number(l.quantity) > 0) && !save.isPending;
+  const missingBatch = side === "purchase" && docType === "purchase_invoice" && lines.some((l) => l.batched && !l.batch_no?.trim());
+  const canSave = lines.length > 0 && lines.every((l) => Number(l.quantity) > 0) && !save.isPending && !missingBatch;
   const finalizeLabel = docType === "sales_invoice" || docType === "purchase_invoice" ? "Save & finalize" : "Save & issue";
 
   // ------------------------------------------------------------------ shortcuts
@@ -148,7 +159,8 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
     return <EmptyState title="You can't create documents here" description="Ask for the create permission." />;
   }
 
-  const lineTotals = new Map((totals?.lines ?? []).map((l, i) => [i, l]));
+  const lineTotals = new Map((totals?.lines ?? []).filter((l) => !isFree(l)).map((l, i) => [i, l]));
+  const freeLines = (totals?.lines ?? []).filter(isFree);
   const tax = totals ? (totals.is_interstate ? [["IGST", totals.igst_total]] : [["CGST", totals.cgst_total], ["SGST", totals.sgst_total]]) : [];
 
   return (
@@ -166,14 +178,15 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                 placeholder={side === "sales" ? "Walk-in customer" : "Choose supplier"}
                 onCreate={(isOwner || can(side === "sales" ? "customers.manage" : "suppliers.manage")) ? setNewParty : undefined} />
             </Field>
-            <Field label="Date"><Input type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} /></Field>
+            <Field label="Date" htmlFor="doc-date"><Input id="doc-date" type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} /></Field>
             {side === "sales" && !party && (
               <Field label="Walk-in name (optional)" className="sm:col-span-2"><Input value={partyName} onChange={(e) => setPartyName(e.target.value)} placeholder="Printed on the bill" /></Field>
             )}
             {side === "purchase" && (
-              <Field label="Supplier bill no."><Input value={supplierNo} onChange={(e) => setSupplierNo(e.target.value)} /></Field>
+              <Field label="Supplier bill no." htmlFor="doc-supplier-no"><Input id="doc-supplier-no" value={supplierNo} onChange={(e) => setSupplierNo(e.target.value)} /></Field>
             )}
-            {party && <Field label="Due date"><Input type="date" value={dueDate} min={docDate} onChange={(e) => setDueDate(e.target.value)} /></Field>}
+            {side === "sales" && party && <CreditPanel partyId={party.id} />}
+            {party && <Field label="Due date" htmlFor="doc-due"><Input id="doc-due" type="date" value={dueDate} min={docDate} onChange={(e) => setDueDate(e.target.value)} /></Field>}
           </CardContent>
         </Card>
 
@@ -205,6 +218,14 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                           )}
                           <p className="text-xs text-muted-foreground">{[l.sku, l.hsn && `HSN ${l.hsn}`].filter(Boolean).join(" · ")}
                             {low && <span className="ml-1 text-destructive">· only {qty(l.stock)} in stock</span>}</p>
+                          {l.batched && l.product_id && (side === "purchase" ? (
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              <Input value={l.batch_no ?? ""} onChange={(e) => update(l.key, { batch_no: e.target.value })} placeholder="Batch no." aria-label="Batch number"
+                                className={cn("h-7 w-28 text-xs", !l.batch_no && docType === "purchase_invoice" && "border-warning")} />
+                              <Input type="date" value={l.expiry_date ?? ""} onChange={(e) => update(l.key, { expiry_date: e.target.value })} aria-label="Expiry date" title="Expiry date" className="h-7 w-36 text-xs" />
+                              <Input value={l.mrp ?? ""} inputMode="decimal" onChange={(e) => update(l.key, { mrp: e.target.value.replace(/[^\d.]/g, "") })} placeholder="MRP" aria-label="MRP of this batch" className="num h-7 w-20 text-xs" />
+                            </div>
+                          ) : <BatchSelect productId={l.product_id} value={l.batch_no ?? ""} onChange={(b) => update(l.key, { batch_no: b || undefined })} />)}
                         </td>
                         <td className="px-2 py-2">
                           <div className="flex items-center justify-center gap-1">
@@ -213,7 +234,8 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                             <Button type="button" variant="ghost" size="icon-sm" className="size-7" onClick={() => update(l.key, { quantity: String(Number(l.quantity || 0) + 1) })} aria-label="Increase"><PlusIcon /></Button>
                           </div>
                         </td>
-                        <td className="px-2 py-2"><Input value={l.unit_price} inputMode="decimal" onChange={(e) => update(l.key, { unit_price: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 text-right" aria-label="Rate" /></td>
+                        <td className="px-2 py-2"><Input value={l.priceTyped || !t ? l.unit_price : String(Number(t.unit_price))} inputMode="decimal" onChange={(e) => update(l.key, { unit_price: e.target.value.replace(/[^\d.]/g, ""), priceTyped: true })} className="num h-8 text-right" aria-label="Rate" />
+                          {typeof t?.custom_fields === "object" && (t.custom_fields as Record<string, string>)?.scheme && <p className="mt-0.5 text-right text-[11px] text-primary">{(t.custom_fields as Record<string, string>).scheme}</p>}</td>
                         <td className="px-2 py-2"><Input value={l.discount_percent} inputMode="decimal" placeholder="0" onChange={(e) => update(l.key, { discount_percent: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 text-right" aria-label="Discount percent" /></td>
                         <td className="num hidden px-2 py-2 text-right text-muted-foreground md:table-cell">{l.gst_rate ? `${Number(l.gst_rate)}%` : "—"}</td>
                         <td className="num px-3 py-2 text-right font-medium">{t ? money(t.line_total) : preview.isFetching ? <Skeleton className="ml-auto h-4 w-16" /> : "—"}</td>
@@ -221,6 +243,14 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                       </tr>
                     );
                   })}
+                  {freeLines.map((f, i) => (
+                    <tr key={`free-${i}`} className="bg-primary-soft/40">
+                      <td className="px-3 py-2 text-primary"><GiftIcon className="size-4" /></td>
+                      <td className="px-3 py-2 font-medium text-primary" colSpan={2}>{f.description}</td>
+                      <td className="num px-2 py-2 text-center" colSpan={2}>{qty(f.quantity)} free</td>
+                      <td className="hidden md:table-cell" /><td className="num px-3 py-2 text-right text-muted-foreground">₹0.00</td><td />
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -232,6 +262,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
             <span className="text-xs text-muted-foreground">{lines.length} item{lines.length === 1 ? "" : "s"} · {qty(lines.reduce((s, l) => s + Number(l.quantity || 0), 0))} units</span>
           </div>
         </Card>
+        {missingBatch && <p className="text-sm text-amber-700 dark:text-warning">Enter the batch number for each batch-tracked item (printed on the pack).</p>}
         <Card><CardContent><Field label="Notes (printed)"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-14" /></Field></CardContent></Card>
       </div>
 
@@ -313,6 +344,50 @@ function Row({ label, value }: { label: string; value?: string }) {
     <div className="flex justify-between">
       <span className="text-muted-foreground">{label}</span>
       <span className="num">{value !== undefined ? money(value) : "—"}</span>
+    </div>
+  );
+}
+
+/** Sales: which batch to sell. "Auto" lets the server pick the earliest expiry (and split lines). */
+function BatchSelect({ productId, value, onChange }: { productId: string; value: string; onChange: (batch: string) => void }) {
+  const { base, id: bizId } = useBusiness();
+  const q = useQuery({
+    queryKey: ["biz", bizId, "batches-available", productId],
+    queryFn: () => api<AvailableBatch[]>(`${base}/products/${productId}/batches/available`), staleTime: 30_000,
+  });
+  const soon = (b: AvailableBatch) => b.days_left !== null && b.days_left <= 30;
+  return (
+    <NativeSelect value={value} onChange={(e) => onChange(e.target.value)} aria-label="Batch" className="mt-1.5 h-7 max-w-80 text-xs">
+      <option value="">Auto (first expiry){q.data?.[0] ? ` · ${q.data[0].batch_no}` : ""}</option>
+      {q.data?.map((b) => (
+        <option key={b.batch_id} value={b.batch_no}>
+          {b.batch_no} · {b.expiry_date ? `exp ${b.expiry_date}` : "no expiry"} · {qty(b.quantity)} left{b.mrp ? ` · MRP ${money(b.mrp)}` : ""}{soon(b) ? " ⚠" : ""}
+        </option>
+      ))}
+    </NativeSelect>
+  );
+}
+
+interface Credit { credit_limit: string | null; outstanding: string; available: string | null; overdue: string; oldest_overdue_days: number | null;
+  credit_hold: boolean; credit_days: number | null; price_list: { id: string; name: string } | null }
+
+/** Sales: the customer's dues, limit, hold and price list, shown as soon as they are picked. */
+function CreditPanel({ partyId }: { partyId: string }) {
+  const { base, id: bizId } = useBusiness();
+  const q = useQuery({ queryKey: ["biz", bizId, "credit", partyId], queryFn: () => api<Credit>(`${base}/parties/${partyId}/credit`), staleTime: 15_000 });
+  const c = q.data;
+  if (!c) return null;
+  const over = c.available !== null && Number(c.available) <= 0;
+  const warn = c.credit_hold || over || Number(c.overdue) > 0;
+  return (
+    <div className={cn("flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border px-3 py-2 text-sm sm:col-span-2 lg:col-span-4",
+      warn ? "border-warning/60 bg-warning/10" : "bg-muted/40")}>
+      {warn && <AlertTriangleIcon className="size-4 text-amber-600" />}
+      {c.credit_hold && <Badge variant="destructive">Credit hold — full payment only</Badge>}
+      <span>Dues <b className="num">{money(c.outstanding)}</b></span>
+      {Number(c.overdue) > 0 && <span className="text-destructive">Overdue <b className="num">{money(c.overdue)}</b>{c.oldest_overdue_days ? ` (oldest ${c.oldest_overdue_days} days)` : ""}</span>}
+      {c.credit_limit !== null && <span>Limit {money(c.credit_limit)} · <span className={over ? "font-medium text-destructive" : ""}>available {money(c.available)}</span></span>}
+      {c.price_list && <span className="flex items-center gap-1 text-primary"><TagIcon className="size-3.5" /> {c.price_list.name} prices</span>}
     </div>
   );
 }

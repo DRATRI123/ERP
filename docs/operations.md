@@ -26,6 +26,7 @@ The daily running of the ERP after [deployment](deployment.md). Commands run fro
 | *No successful backup in the last 26 hours* / *Last backup failed: …* | backups are failing | read the error; usual causes: disk full (`df -h`), `ERP_BACKUP_KEY` missing, Google token expired (reconnect the integration). Then `erp backup` |
 | *Last restore drill failed* | the latest backup could not be restored or its books did not verify | **treat as urgent**: `erp restore-drill` to see the problem; keep older backups (raise `keep_daily`) until it passes |
 | *Queue … waiting for over 15 minutes* | a provider is down or credentials expired | `/integrations/{id}/logs`; fix and retry the message |
+| A scheduled report did not arrive | its card under Reports → Scheduled shows the last error (e.g. no e-mail integration) | connect Gmail/SMTP under Integrations; use *Send now* to test |
 | An automation rule did not do what you expected | the run history explains each run (`skipped`: conditions no longer held; `failed`: e.g. no e-mail integration connected) | Automation → Run history, or `GET /businesses/{id}/automation/runs?status=failed` |
 | *n message(s) failed in the last 24 hours* | e-mail/WhatsApp/SMS gave up after retries | `/messages?failed_only=true`, `POST /messages/{id}/retry` |
 | *custom domain(s) disabled* | the TXT record disappeared | restore the DNS record, then `PATCH /system/domains/{id} {"enabled": true}` and verify |

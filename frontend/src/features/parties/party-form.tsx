@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/form-field";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
-import { useBusiness } from "@/hooks/use-business";
+import { useBizQuery, useBusiness } from "@/hooks/use-business";
 import { api, ApiError } from "@/lib/api";
 import { GSTIN_RE, STATES } from "@/lib/india";
 import type { Party } from "@/lib/types";
@@ -28,6 +28,8 @@ const schema = z.object({
   credit_days: z.string().regex(/^\d*$/).optional(),
   address: z.string().optional(), city: z.string().optional(), pincode: z.string().regex(/^(\d{6})?$/, "6 digits").optional(),
   notes: z.string().optional(),
+  price_list_id: z.string().optional(),
+  credit_hold: z.boolean().optional(),
 });
 type Values = z.infer<typeof schema>;
 
@@ -36,12 +38,14 @@ export function PartyDialog({ kind, open, onOpenChange, party, initialName, onSa
 }) {
   const { base, id } = useBusiness();
   const qc = useQueryClient();
+  const priceLists = useBizQuery<{ id: string; name: string; is_active: boolean }[]>(["price-lists"], "/price-lists", undefined, { enabled: open && kind === "customers" });
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     values: party ? {
       name: party.name, gst_type: (party.gst_type as string) ?? "unregistered", gstin: party.gstin ?? "", state_code: party.state_code ?? "",
       contact_person: (party.contact_person as string) ?? "", phone: party.phone ?? "", email: party.email ?? "",
       credit_limit: party.credit_limit ? String(Number(party.credit_limit)) : "", credit_days: party.credit_days?.toString() ?? "", notes: (party.notes as string) ?? "",
+      price_list_id: (party.price_list_id as string | null) ?? "", credit_hold: !!party.credit_hold,
     } : undefined,
     defaultValues: { name: initialName ?? "", gst_type: "unregistered", state_code: "" },
   });
@@ -52,6 +56,7 @@ export function PartyDialog({ kind, open, onOpenChange, party, initialName, onSa
         name: v.name, gst_type: v.gstin ? "regular" : v.gst_type, gstin: nn(v.gstin), state_code: nn(v.state_code ?? (v.gstin ? v.gstin.slice(0, 2) : "")),
         contact_person: nn(v.contact_person), phone: nn(v.phone), email: nn(v.email), credit_limit: nn(v.credit_limit),
         credit_days: v.credit_days ? Number(v.credit_days) : null, notes: nn(v.notes),
+        ...(kind === "customers" ? { price_list_id: nn(v.price_list_id), credit_hold: !!v.credit_hold } : {}),
       };
       if (!party && v.address) body.addresses = [{ kind: "billing", address_line1: v.address, city: nn(v.city), pincode: nn(v.pincode), state_code: body.state_code, is_default: true }];
       return party ? api<Party>(`${base}/${kind}/${party.id}`, { method: "PATCH", body }) : api<Party>(`${base}/${kind}`, { body });
@@ -78,6 +83,12 @@ export function PartyDialog({ kind, open, onOpenChange, party, initialName, onSa
             <Field label="Credit limit"><Input inputMode="decimal" {...form.register("credit_limit")} /></Field>
             <Field label="Credit days"><Input inputMode="numeric" {...form.register("credit_days")} /></Field>
           </div>
+          {kind === "customers" && <>
+            <Field label="Price list" hint="Hospital, doctor, wholesale… prices"><NativeSelect {...form.register("price_list_id")}>
+              <option value="">Normal prices</option>{priceLists.data?.filter((p) => p.is_active).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</NativeSelect></Field>
+            <label className="flex items-center gap-2 self-end pb-2 text-sm"><input type="checkbox" className="size-4 accent-[var(--primary)]" {...form.register("credit_hold")} />
+              Credit hold — only full-payment sales</label>
+          </>}
           {!party && <>
             <Field label="Address" className="sm:col-span-2"><Input {...form.register("address")} /></Field>
             <Field label="City"><Input {...form.register("city")} /></Field>

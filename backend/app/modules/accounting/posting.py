@@ -241,7 +241,8 @@ def post_stock_document(db: Session, business: Business, doc: StockDocument, *,
     value = sum((e.value for e in _stock_entries(db, STOCK_SOURCE, doc.id)), ZERO)
     if value == 0:
         return None
-    counter = acc["opening_balance"] if doc.kind == StockDocumentKind.OPENING else acc["stock_adjustment"]
+    counter = (acc["opening_balance"] if doc.kind == StockDocumentKind.OPENING else
+               acc["production_overhead"] if doc.kind == StockDocumentKind.PRODUCTION else acc["stock_adjustment"])
     lines = ([Line(acc["inventory"], debit=value), Line(counter, credit=value)] if value > 0 else
              [Line(counter, debit=-value), Line(acc["inventory"], credit=-value)])
     return post(db, business.id, entry_date=doc.doc_date, source_type=JournalSource.STOCK,

@@ -124,7 +124,10 @@ def cmd_worker(args: argparse.Namespace) -> int:
 
             stats["automation_scheduled"] = automation.dispatch(db)
             stats.update({f"automation_{k}": v for k, v in automation.execute_due(db).items()})
-            stats.update(process_due(db))  # after automation, so its messages go out this loop
+            from app.modules.digest.service import send_due as send_reports
+
+            stats.update({f"report_{k}": v for k, v in send_reports(db).items()})
+            stats.update(process_due(db))  # after automation and reports, so their messages go out this loop
             stats["webhooks_queued"] = fan_out(db)
             from app.core.redis import get_redis
 
@@ -138,6 +141,12 @@ def cmd_worker(args: argparse.Namespace) -> int:
             stats.update({f"webhook_{k}": v for k, v in deliver_due(db).items()})
             if datetime.now(UTC).hour == 3 or args.once:  # daily overdue scan (idempotent)
                 stats["overdue_events"] = emit_overdue(db)
+                from app.modules.inventory.expiry import emit_expiry_alerts
+
+                stats["expiry_alerts"] = emit_expiry_alerts(db)
+                from app.modules.compliance.service import emit_renewal_alerts
+
+                stats["licence_alerts"] = emit_renewal_alerts(db)
             stats.update(security.deliver_alerts(db))
             d = domains.reverify_due(db)
             if d["checked"]:

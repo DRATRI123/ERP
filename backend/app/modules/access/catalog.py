@@ -25,6 +25,7 @@ PERMISSIONS: tuple[Permission, ...] = (
     # Business & settings
     _P("business.view", "Business", "View business profile"),
     _P("business.settings", "Business", "Edit business profile and settings"),
+    _P("licences.manage", "Business", "Add and renew licences (drug, FSSAI, AYUSH, trade…)"),
     _P("branches.manage", "Business", "Create and edit branches"),
     _P("financial_years.manage", "Business", "Create, lock and close financial years"),
     # Users & access
@@ -49,6 +50,10 @@ PERMISSIONS: tuple[Permission, ...] = (
     _P("products.manage", "Inventory", "Create and edit products"),
     _P("stock.view", "Inventory", "View stock levels"),
     _P("stock.edit", "Inventory", "Post opening stock, adjustments, transfers and counts"),
+    _P("expenses.claim", "Staff", "Submit own expense claims with the bill"),
+    _P("payroll.manage", "Staff", "Manage employees, salaries and see pay details"),
+    _P("attendance.mark", "Staff", "Mark staff attendance"),
+    _P("production.manage", "Inventory", "Manage recipes, record production and release batches after QC"),
     _P("stock_value.view", "Inventory", "View purchase prices, stock cost and valuation"),
     _P("warehouses.manage", "Inventory", "Create and edit warehouses"),
     # Parties
@@ -110,12 +115,14 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Branch Manager",
         "Runs day-to-day operations of assigned branches",
         _codes(
+            "expenses.claim",
             *_VIEW_ALL - {"audit.view"},
             "invoices.create", "invoices.edit", "invoices.cancel",
             "purchases.create", "purchases.edit", "purchases.approve",
             "products.manage", "stock.edit", "customers.manage", "suppliers.manage",
             "warehouses.manage", "credit_limit.override",
-            "payments.create", "expenses.manage", "data.export", "files.manage",
+            "payments.create", "expenses.manage", "data.export", "files.manage", "licences.manage",
+            "attendance.mark",
         ),
     ),
     RoleTemplate(
@@ -123,6 +130,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Accountant",
         "Books, ledgers, GST and financial reporting",
         _codes(
+            "expenses.claim",
             *_VIEW_ALL - {"users.view"},
             "payments.create", "expenses.manage", "accounting.post", "gst.file",
             "financial_years.manage", "data.export", "files.manage",
@@ -133,6 +141,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Billing Operator",
         "Counter billing: create invoices and collect payments",
         _codes(
+            "expenses.claim",
             "business.view", "invoices.view", "invoices.create", "invoices.edit",
             "products.view", "stock.view", "customers.view", "customers.manage",
             "payments.view", "payments.create",
@@ -143,6 +152,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Inventory Manager",
         "Products, stock levels, transfers and adjustments",
         _codes(
+            "expenses.claim",
             "business.view", "products.view", "products.manage", "stock.view", "stock.edit",
             "stock_value.view", "warehouses.manage", "purchases.view", "suppliers.view",
             "reports.view",
@@ -153,6 +163,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Purchase Manager",
         "Purchase orders, bills and supplier relationships",
         _codes(
+            "expenses.claim",
             "business.view", "purchases.view", "purchases.create", "purchases.edit",
             "purchases.approve", "suppliers.view", "suppliers.manage",
             "supplier_balances.view", "products.view", "stock.view", "stock_value.view",
@@ -164,6 +175,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Sales Executive",
         "Quotations, orders and customer relationships",
         _codes(
+            "expenses.claim",
             "business.view", "invoices.view", "invoices.create", "customers.view",
             "customers.manage", "customer_balances.view", "products.view", "stock.view",
         ),

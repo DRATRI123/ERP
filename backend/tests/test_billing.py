@@ -229,7 +229,7 @@ def test_partial_payments_and_cancellation(bshop, db):
     p = stocked(bshop, "pp", selling_price="1000")
     c = customer(bshop, credit_days=15)
     inv = invoice(bshop, [{"product_id": p}], party_id=c["id"])
-    assert inv["due_date"] == (date.today() + timedelta(days=15)).isoformat()
+    assert inv["due_date"] == (date.fromisoformat(TODAY) + timedelta(days=15)).isoformat()
     pay = {"direction": "in", "party_id": c["id"], "mode": "bank_transfer", "amount": "400",
            "allocations": [{"document_id": inv["id"], "amount": "400"}]}
     p1 = bshop.post("/payments", pay)

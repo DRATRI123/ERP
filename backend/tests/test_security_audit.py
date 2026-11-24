@@ -34,6 +34,8 @@ PUBLIC_ROUTES = {
     ("GET", "/developer/scopes"), ("GET", "/developer/events"), ("POST", "/oauth/token"),
     ("GET", "/ready"), ("GET", "/metrics"), ("GET", "/system/tls-ask"), ("GET", "/domain-info"),
     ("GET", "/health"),
+    # Link-only order catalogue: a 32-byte secret token, rate-limited orders that only create drafts.
+    ("GET", "/public/catalogue/{token}"), ("POST", "/public/catalogue/{token}/orders"),
 }
 AUTH_DEPS = {"get_any_principal", "get_principal", "require_owner"}
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}

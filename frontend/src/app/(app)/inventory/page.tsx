@@ -15,6 +15,8 @@ import { NativeSelect } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductDialog } from "@/features/inventory/product-form";
 import { StockDialog, type StockMode } from "@/features/inventory/stock-dialog";
+import { ExpiryPanel } from "@/features/inventory/expiry-panel";
+import { ReorderPanel } from "@/features/inventory/reorder-panel";
 import { useBizQuery, useBusiness } from "@/hooks/use-business";
 import { date, money, qty, titleCase } from "@/lib/format";
 import type { Product } from "@/lib/types";
@@ -88,6 +90,8 @@ function InventoryPage() {
         <TabsList>
           <TabsTrigger value="products">Products</TabsTrigger><TabsTrigger value="stock">Stock</TabsTrigger>
           <TabsTrigger value="alerts">Alerts{low.data?.length ? <Badge variant="destructive" className="ml-1 px-1.5">{low.data.length}</Badge> : null}</TabsTrigger>
+          <TabsTrigger value="reorder">Reorder</TabsTrigger>
+          <TabsTrigger value="expiry">Expiry</TabsTrigger>
           <TabsTrigger value="movements">Movements</TabsTrigger>
         </TabsList>
         <TabsContent value="products">
@@ -124,6 +128,8 @@ function InventoryPage() {
             )}
           </Card>
         </TabsContent>
+        <TabsContent value="reorder"><ReorderPanel /></TabsContent>
+        <TabsContent value="expiry"><ExpiryPanel /></TabsContent>
         <TabsContent value="movements">
           <DataTable<StockDoc> queryKey={["stock-docs"]} path="/inventory/documents" columns={docCols} searchParam={null}
             toolbar={editStock && <Button variant="outline" size="sm" onClick={() => setStockMode("opening")}>Opening stock</Button>} />

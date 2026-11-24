@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
-from typing import Annotated
+from decimal import Decimal
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from app.api.deps import DB, require
 from app.api.pagination import Page, PageParams, page_params, paginate
 from app.api.schemas_inventory import (
     AdjustmentIn,
+    AvailableBatchOut,
     BalanceOut,
     BatchOut,
     CancelIn,
@@ -31,7 +34,7 @@ from app.api.schemas_masters import WarehouseIn, WarehouseOut, WarehouseUpdateIn
 from app.core.clock import local_today
 from app.modules.access.service import BusinessAccess
 from app.modules.catalog.service import get_product
-from app.modules.inventory import reports, service
+from app.modules.inventory import expiry, reorder, reports, service
 from app.modules.inventory.models import (
     Batch,
     SerialStatus,
@@ -253,6 +256,85 @@ def product_batches(product_id: uuid.UUID, access: ViewStock, db: DB) -> list[Ba
     rows = db.scalars(select(Batch).where(Batch.product_id == p.id)
                       .order_by(Batch.expiry_date, Batch.batch_no))
     return [BatchOut.model_validate(b) for b in rows]
+
+
+@router.get("/products/{product_id}/batches/available", response_model=list[AvailableBatchOut], tags=["products"])
+def available_batches(product_id: uuid.UUID, access: ViewStock, db: DB, warehouse_id: uuid.UUID | None = None,
+                      on: date | None = None) -> list[AvailableBatchOut]:
+    """Unexpired batches with stock in the order billing uses them (first expiry first)."""
+    p = get_product(db, access, product_id)
+    day = on or local_today()
+    if warehouse_id:
+        service.get_warehouse(db, access, warehouse_id)
+        wids = [warehouse_id]
+    else:
+        wids = service.visible_warehouse_ids(db, access)
+    out: dict[uuid.UUID, AvailableBatchOut] = {}
+    for wid in wids:
+        for b, qty in expiry.available_batches(db, access.business.id, p.id, wid, on=day):
+            row = out.get(b.id)
+            if row:
+                row.quantity += qty
+            else:
+                out[b.id] = AvailableBatchOut(batch_id=b.id, batch_no=b.batch_no, expiry_date=b.expiry_date, mrp=b.mrp,
+                                              quantity=qty, days_left=(b.expiry_date - day).days if b.expiry_date else None)
+    return sorted(out.values(), key=lambda r: (r.expiry_date is None, r.expiry_date or date.max, r.batch_no))
+
+
+@router.get("/inventory/expiry-summary", tags=["inventory"])
+def expiry_summary(access: ViewStock, db: DB) -> dict[str, Any]:
+    """Stock expired and expiring within 30 / 60 / 90 days (values need stock_value.view)."""
+    data = expiry.expiry_summary(db, access)
+    if not access.can("stock_value.view"):
+        for v in data.values():
+            v["value"] = None
+    return data
+
+
+class ExpiryReturnIn(BaseModel):
+    purchase_invoice_id: uuid.UUID
+    within_days: int = Field(0, ge=0, le=365)
+
+
+@router.get("/inventory/expiry-returns", tags=["inventory"])
+def expiry_returns(access: ViewStock, db: DB, within_days: int = Query(0, ge=0, le=365)) -> list[dict[str, Any]]:
+    """Expired (and, with within_days, soon-expiring) stock grouped by the purchase bill to return it against."""
+    return expiry.expiry_returns(db, access, within_days=within_days)
+
+
+@router.post("/inventory/expiry-returns", status_code=status.HTTP_201_CREATED, tags=["inventory"])
+def draft_expiry_return(body: ExpiryReturnIn, access: ViewStock, db: DB) -> dict[str, Any]:
+    """Draft purchase return (debit note) for that stock; review and finalize it like any document."""
+    doc = expiry.draft_expiry_return(db, access, body.purchase_invoice_id, within_days=body.within_days)
+    db.commit()
+    return {"id": doc.id, "number": doc.number, "grand_total": doc.grand_total, "lines": len(doc.lines)}
+
+
+class ReorderItemIn(BaseModel):
+    product_id: uuid.UUID
+    quantity: Decimal = Field(gt=0, max_digits=14, decimal_places=3)
+    supplier_id: uuid.UUID | None = None
+    unit_price: Decimal | None = Field(None, ge=0, max_digits=16, decimal_places=4)
+
+
+class ReorderIn(BaseModel):
+    items: list[ReorderItemIn] = Field(min_length=1, max_length=500)
+
+
+@router.get("/inventory/reorder", tags=["inventory"])
+def reorder_suggestions(access: ViewStock, db: DB, days: int = Query(30, ge=7, le=365),
+                        lead_days: int = Query(7, ge=0, le=180), cover_days: int = Query(30, ge=1, le=365),
+                        include_all: bool = False) -> list[dict[str, Any]]:
+    """What to buy: from the last N days of sales, supplier lead time and the days of stock to cover."""
+    return reorder.suggestions(db, access, days=days, lead_days=lead_days, cover_days=cover_days, include_all=include_all)
+
+
+@router.post("/inventory/reorder", status_code=status.HTTP_201_CREATED, tags=["inventory"])
+def draft_reorder(body: ReorderIn, access: ViewStock, db: DB) -> list[dict[str, Any]]:
+    """Draft purchase orders (one per supplier) for the chosen quantities; review and issue them."""
+    docs = reorder.draft_purchase_orders(db, access, [i.model_dump() for i in body.items])
+    db.commit()
+    return [{"id": d.id, "party_name": d.party_name, "lines": len(d.lines), "grand_total": d.grand_total} for d in docs]
 
 
 @router.get("/inventory/serials", response_model=Page[SerialOut])

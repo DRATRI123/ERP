@@ -88,6 +88,10 @@ class Party(UUIDPrimaryKey, Timestamps, Base):
         Uuid, ForeignKey("party_groups.id", ondelete="RESTRICT")
     )
     credit_limit: Mapped[Decimal | None] = mapped_column(Money())
+    # Sales on credit blocked until released (payment in full still allowed).
+    credit_hold: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Customer-type prices (hospital, doctor, wholesale…); None = normal prices.
+    price_list_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("price_lists.id", ondelete="SET NULL"))
     credit_days: Mapped[int | None] = mapped_column(Integer)
 
     notes: Mapped[str | None] = mapped_column(Text)

@@ -75,6 +75,7 @@ class LineIn:
     itc_eligible: bool = True
     batch_no: str | None = None
     expiry_date: date | None = None
+    mrp: Decimal | None = None  # purchase lines: the MRP printed on this batch
     serials: list[str] | None = None
     source_line_id: uuid.UUID | None = None
     custom_fields: dict[str, Any] | None = None
@@ -188,7 +189,11 @@ def _price_line(db: Session, access: BusinessAccess, doc: Document, spec: DocTyp
 
     price, inclusive = li.unit_price, li.price_includes_tax
     if price is None and product is not None:
-        if spec.side == Side.PURCHASE:
+        listed = _party_list_price(db, doc, spec, product, li.quantity)
+        if listed is not None:
+            price, list_inclusive = listed
+            inclusive = list_inclusive if inclusive is None else inclusive
+        elif spec.side == Side.PURCHASE:
             price = product.purchase_price
         elif doc.price_tier == PriceTier.WHOLESALE:
             price = product.wholesale_price or product.selling_price
@@ -215,13 +220,26 @@ def _price_line(db: Session, access: BusinessAccess, doc: Document, spec: DocTyp
         line_no=i, product_id=product.id if product else None, description=description[:500],
         hsn_sac=hsn, unit_code=unit.code if unit else None, uqc=unit.uqc if unit else None,
         is_service=bool(product and product.kind == ProductKind.SERVICE),
-        quantity=li.quantity, unit_price=price, mrp=product.mrp if product else None,
+        quantity=li.quantity, unit_price=price,
+        mrp=li.mrp if li.mrp is not None else (product.mrp if product else None),
         discount_percent=li.discount_percent, discount_amount=li.discount_amount,
         price_includes_tax=bool(inclusive), tax_category=category, gst_rate=gst, cess_rate=cess,
         itc_eligible=li.itc_eligible if spec.side == Side.PURCHASE else True,
         batch_no=li.batch_no, expiry_date=li.expiry_date, serials=li.serials or None,
         source_line_id=li.source_line_id, custom_fields=li.custom_fields or {},
     )
+
+
+def _party_list_price(db: Session, doc: Document, spec: DocTypeSpec, product: Product,
+                      qty: Decimal) -> tuple[Decimal, bool | None] | None:
+    if spec.side != Side.SALES or doc.party_id is None:
+        return None
+    party = db.get(Party, doc.party_id)
+    if party is None or party.price_list_id is None:
+        return None
+    from app.modules.pricing.service import list_price
+
+    return list_price(db, party.price_list_id, product, qty)
 
 
 def recompute(db: Session, access: BusinessAccess, doc: Document) -> None:
@@ -336,6 +354,10 @@ def _apply(db: Session, access: BusinessAccess, doc: Document, spec: DocTypeSpec
             doc.lines.clear()
             db.flush()  # delete old lines before inserting new ones with the same line numbers
         doc.lines.extend(_price_line(db, access, doc, spec, i, li) for i, li in enumerate(lines, 1))
+        if spec.side == Side.SALES and spec.code not in (DocType.CREDIT_NOTE, DocType.DEBIT_NOTE):
+            from app.modules.pricing.service import apply_schemes
+
+            apply_schemes(db, access, doc)
     _validate_reference(db, access, doc, spec)
     recompute(db, access, doc)
 
@@ -485,7 +507,16 @@ def _snapshot_seller(access: BusinessAccess, branch: Branch) -> dict[str, Any]:
             "address_line1": branch.address_line1 or b.address_line1,
             "address_line2": branch.address_line2 or b.address_line2,
             "city": branch.city or b.city, "state_code": branch.state_code or b.state_code,
-            "pincode": branch.pincode or b.pincode}
+            "pincode": branch.pincode or b.pincode, "licences": _printable_licences(access, branch)}
+
+
+def _printable_licences(access: BusinessAccess, branch: Branch) -> list[dict[str, str]]:
+    from sqlalchemy.orm import object_session
+
+    from app.modules.compliance.service import printable
+
+    db = object_session(branch)
+    return printable(db, access.business.id, branch.id, local_today()) if db is not None else []
 
 
 def party_outstanding(db: Session, party_id: uuid.UUID, side: Side) -> Decimal:
@@ -522,7 +553,7 @@ def _batch_id(db: Session, access: BusinessAccess, product: Product, line: Docum
         if not create:
             raise ValidationFailed(f"Line {line.line_no}: batch {line.batch_no} does not exist")
         b = Batch(business_id=access.business.id, product_id=product.id, batch_no=line.batch_no,
-                  expiry_date=line.expiry_date)
+                  expiry_date=line.expiry_date, mrp=line.mrp)
         db.add(b)
         db.flush()
     return b.id
@@ -594,6 +625,13 @@ def finalize(db: Session, access: BusinessAccess, doc: Document, *,
     require_for(access, spec, "create")
     if doc.status != DocStatus.DRAFT:
         raise Conflict("This document is already finalized")
+    # Batches first-expiry-first-out, no expired batches on sales, batch MRP on the line.
+    if spec.stock < 0:
+        from app.modules.inventory.expiry import prepare_issue_lines
+
+        if doc.warehouse_id is None and any(ln.product_id for ln in doc.lines):
+            doc.warehouse_id = _default_warehouse(db, access, doc.branch_id)
+        prepare_issue_lines(db, access, doc, spec, doc.warehouse_id)
     # Re-price from current rules: the draft may have been saved before a rate change.
     recompute(db, access, doc)
     party = _party(db, access, spec, doc.party_id)
@@ -655,6 +693,10 @@ def finalize(db: Session, access: BusinessAccess, doc: Document, *,
             pay_document(db, access, doc, **p)
     if doc.doc_type == DocType.SALES_INVOICE and party is None and doc.balance_due != 0:
         raise ValidationFailed("A cash sale without a customer must be paid in full")
+    if doc.doc_type in (DocType.SALES_INVOICE, DocType.DEBIT_NOTE) and party is not None \
+            and party.credit_hold and doc.balance_due > 0 and not access.can("credit_limit.override"):
+        raise Conflict(f"{party.name} is on credit hold: collect payment in full, or ask someone who may "
+                       "override credit limits", code="credit_hold")
     if doc.doc_type in (DocType.SALES_INVOICE, DocType.DEBIT_NOTE) and party is not None \
             and party.credit_limit is not None and doc.balance_due > 0:
         exposure = party_outstanding(db, party.id, Side.SALES)

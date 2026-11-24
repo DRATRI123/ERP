@@ -20,13 +20,14 @@ from app.modules.accounting.models import AccountSubtype as S
 DEFAULT_CHART: list[tuple[str, str, S, str | None]] = [
     ("1000", "Cash in Hand", S.CASH, "cash"),
     ("1010", "Bank Account", S.BANK, "bank"),
+    ("1020", "Petty Cash", S.CASH, "petty_cash"),
     ("1100", "Accounts Receivable (Debtors)", S.RECEIVABLE, "ar"),
     ("1200", "Inventory", S.INVENTORY, "inventory"),
     ("1300", "Input CGST", S.TAX_ASSET, "input_cgst"),
     ("1301", "Input SGST/UTGST", S.TAX_ASSET, "input_sgst"),
     ("1302", "Input IGST", S.TAX_ASSET, "input_igst"),
     ("1303", "Input Cess", S.TAX_ASSET, "input_cess"),
-    ("1400", "Advances & Deposits", S.CURRENT_ASSET, None),
+    ("1400", "Advances & Deposits", S.CURRENT_ASSET, "advances"),
     ("1500", "Furniture & Equipment", S.FIXED_ASSET, "fixed_assets"),
     ("1510", "Computers", S.FIXED_ASSET, None),
     ("1520", "Vehicles", S.FIXED_ASSET, None),
@@ -41,6 +42,7 @@ DEFAULT_CHART: list[tuple[str, str, S, str | None]] = [
     ("2112", "IGST Payable (Reverse Charge)", S.TAX_LIABILITY, "rcm_igst"),
     ("2113", "Cess Payable (Reverse Charge)", S.TAX_LIABILITY, "rcm_cess"),
     ("2200", "Landed Cost Clearing", S.CURRENT_LIABILITY, "landed_cost_clearing"),
+    ("2210", "Salaries Payable", S.CURRENT_LIABILITY, "salaries_payable"),
     ("2300", "Loans", S.LOAN, None),
     ("3000", "Owner's Capital", S.CAPITAL, "capital"),
     ("3100", "Retained Earnings", S.RETAINED_EARNINGS, "retained_earnings"),
@@ -54,8 +56,10 @@ DEFAULT_CHART: list[tuple[str, str, S, str | None]] = [
     ("5000", "Cost of Goods Sold", S.COST_OF_GOODS, "cogs"),
     ("5010", "Purchases (non-stock)", S.COST_OF_GOODS, "purchases"),
     ("5020", "Stock Adjustments", S.COST_OF_GOODS, "stock_adjustment"),
+    # Labour, fuel and packing added to the cost of manufactured goods (credited when absorbed).
+    ("5030", "Production Overhead Absorbed", S.COST_OF_GOODS, "production_overhead"),
     ("6000", "Rent", S.OPERATING_EXPENSE, None),
-    ("6010", "Salaries & Wages", S.OPERATING_EXPENSE, None),
+    ("6010", "Salaries & Wages", S.OPERATING_EXPENSE, "salaries"),
     ("6020", "Electricity", S.OPERATING_EXPENSE, None),
     ("6030", "Telephone & Internet", S.OPERATING_EXPENSE, None),
     ("6040", "Office Expenses", S.OPERATING_EXPENSE, None),
@@ -92,7 +96,30 @@ def system_account(db: Session, business_id: uuid.UUID, key: str) -> Account:
     acc = db.scalar(select(Account).where(Account.business_id == business_id,
                                           Account.system_key == key))
     if acc is None:
+        acc = _add_missing_system_account(db, business_id, key)
+    return acc
+
+
+def _add_missing_system_account(db: Session, business_id: uuid.UUID, key: str) -> Account:
+    """System accounts added in later versions are created on first use in older businesses."""
+    spec = next((c for c in DEFAULT_CHART if c[3] == key), None)
+    if spec is None:
         raise RuntimeError(f"System account {key!r} is missing from the chart of accounts")
+    code, name, subtype, _ = spec
+    # Older charts already have this account (same code and name) without the key: adopt it.
+    same = db.scalar(select(Account).where(Account.business_id == business_id, Account.code == code,
+                                           Account.name == name, Account.system_key.is_(None)))
+    if same is not None:
+        same.system_key = key
+        db.flush()
+        return same
+    taken = set(db.scalars(select(Account.code).where(Account.business_id == business_id)))
+    while code in taken:  # the owner used that code for something else
+        code = str(int(code) + 1)
+    acc = Account(business_id=business_id, code=code, name=name, subtype=subtype, type=SUBTYPE_TYPE[subtype],
+                  system_key=key)
+    db.add(acc)
+    db.flush()
     return acc
 
 

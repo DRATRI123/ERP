@@ -1,7 +1,7 @@
 import {
-  BarChart3Icon, BookOpenIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
+  BarChart3Icon, BookOpenIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
   LayoutDashboardIcon, PlugIcon, ReceiptIndianRupeeIcon, SettingsIcon, ShoppingCartIcon, TruckIcon, UsersIcon,
-  UserCogIcon, WalletIcon, type LucideIcon,
+  IdCardIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -17,16 +17,23 @@ export interface NavItem {
 
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon, group: "main", shortcut: "d" },
+  { href: "/owner", label: "All businesses", icon: Building2Icon, ownerOnly: true, group: "main", shortcut: "o" },
   { href: "/sales", label: "Sales & Invoices", icon: ReceiptIndianRupeeIcon, any: ["invoices.view"], group: "main", shortcut: "s" },
   { href: "/purchases", label: "Purchases", icon: ShoppingCartIcon, any: ["purchases.view"], group: "main", shortcut: "p" },
   { href: "/inventory", label: "Products & Inventory", icon: BoxesIcon, any: ["products.view", "stock.view"], group: "main", shortcut: "i" },
+  { href: "/manufacturing", label: "Manufacturing", icon: FactoryIcon, any: ["stock.view"], group: "main" },
+  { href: "/pricing", label: "Pricing & Schemes", icon: TagsIcon, any: ["products.view"], group: "main" },
+  { href: "/catalogue", label: "WhatsApp catalogue", icon: MessageCircleIcon, any: ["business.settings", "invoices.view"], group: "main" },
   { href: "/customers", label: "Customers", icon: UsersIcon, any: ["customers.view"], group: "main", shortcut: "c" },
   { href: "/suppliers", label: "Suppliers", icon: TruckIcon, any: ["suppliers.view"], group: "main" },
   { href: "/accounting", label: "Accounting", icon: BookOpenIcon, any: ["accounting.view", "expenses.view"], group: "money", shortcut: "a" },
   { href: "/payments", label: "Banking & Payments", icon: WalletIcon, any: ["payments.view"], group: "money" },
+  { href: "/claims", label: "Expense claims", icon: ReceiptIcon, any: ["expenses.claim", "expenses.manage"], group: "money" },
+  { href: "/staff", label: "Staff & Salary", icon: IdCardIcon, any: ["payroll.manage", "attendance.mark"], group: "money" },
   { href: "/gst", label: "GST & Tax", icon: LandmarkIcon, any: ["gst.view"], group: "money", shortcut: "t" },
   { href: "/reports", label: "Reports", icon: BarChart3Icon, any: ["reports.view", "accounting.view"], group: "money", shortcut: "r" },
   { href: "/documents", label: "Documents", icon: FileTextIcon, group: "manage" },
+  { href: "/licences", label: "Licences", icon: ShieldCheckIcon, group: "manage" },
   { href: "/automation", label: "Automation", icon: BotIcon, group: "manage" },
   { href: "/integrations", label: "Integrations", icon: PlugIcon, any: ["integrations.manage"], group: "manage" },
   { href: "/developer", label: "Developer API", icon: CodeXmlIcon, any: ["developer.manage"], group: "manage" },

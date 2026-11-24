@@ -30,6 +30,7 @@
     {% if seller.address_line1 %}<div>{{ seller.address_line1 }}</div>{% endif %}
     {% if seller.city %}<div>{{ seller.city }} {{ seller.pincode or "" }}</div>{% endif %}
     {% if seller.gstin %}<div>GSTIN {{ seller.gstin }}</div>{% endif %}
+    {% for l in seller.licences or [] %}<div>{{ l.label }} {{ l.number }}</div>{% endfor %}
     {% if seller.phone %}<div>Ph {{ seller.phone }}</div>{% endif %}
     {% if cfg.header_text %}<div>{{ cfg.header_text }}</div>{% endif %}
     <hr>
@@ -63,6 +64,7 @@
   {% if cfg.show_amount_in_words %}<div>{{ words }}</div>{% endif %}
   {% if upi_qr %}<div class="c"><img class="qr" src="{{ upi_qr }}" alt="UPI"><br>Scan to pay</div>{% endif %}
   {% if irn_qr %}<div class="c"><img class="qr" src="{{ irn_qr }}" alt="IRN"><br>IRN {{ doc.irn }}</div>{% endif %}
+  {% if doc.eway_bill_no %}<div class="c">E-way bill {{ doc.eway_bill_no }}</div>{% endif %}
   <hr>
   <div class="c">{{ cfg.footer_text or "Thank you!" }}</div>
   <div class="c">{{ copy }}</div>

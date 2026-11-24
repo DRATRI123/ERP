@@ -135,6 +135,7 @@ class JournalSource(enum.StrEnum):
     ASSET = "asset"  # capitalisation / disposal
     OPENING = "opening"
     CLOSING = "closing"
+    PAYROLL = "payroll"
 
 
 class JournalEntry(UUIDPrimaryKey, Base):

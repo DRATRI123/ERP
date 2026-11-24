@@ -69,6 +69,7 @@ class LineIn(BaseModel):
     itc_eligible: bool = True
     batch_no: Annotated[str, StringConstraints(strip_whitespace=True, max_length=60)] | None = None
     expiry_date: date | None = None
+    mrp: MoneyIn | None = Field(None, description="Purchases: MRP printed on this batch")
     serials: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]] | None = None
     source_line_id: uuid.UUID | None = None
     custom_fields: dict[str, Any] | None = None
@@ -229,6 +230,11 @@ class DocumentOut(DocumentSummaryOut):
     irn: str | None
     irn_ack_no: str | None
     irn_ack_date: datetime | None
+    eway_bill_no: str | None = None
+    eway_bill_date: datetime | None = None
+    eway_valid_until: datetime | None = None
+    vehicle_no: str | None = None
+    transport_distance_km: int | None = None
     finalized_at: datetime | None
     cancelled_at: datetime | None
     cancel_reason: str | None

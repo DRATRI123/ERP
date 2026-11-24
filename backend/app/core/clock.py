@@ -18,3 +18,8 @@ def _zone(name: str) -> ZoneInfo:
 
 def local_today() -> date:
     return datetime.now(_zone(get_settings().timezone)).date()
+
+
+def local_date(moment: datetime) -> date:
+    """The business-calendar date of an aware moment (e.g. a UTC timestamp)."""
+    return moment.astimezone(_zone(get_settings().timezone)).date()

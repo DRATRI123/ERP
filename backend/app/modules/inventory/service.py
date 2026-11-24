@@ -37,6 +37,7 @@ _PREFIX = {
     StockDocumentKind.ADJUSTMENT: "ADJ",
     StockDocumentKind.TRANSFER: "TRF",
     StockDocumentKind.COUNT: "PC",
+    StockDocumentKind.PRODUCTION: "MFG",
 }
 
 # ---------------------------------------------------------------------------- warehouses

@@ -1,6 +1,6 @@
 "use client";
 
-import { BookPlusIcon, ReceiptIcon } from "lucide-react";
+import { BookPlusIcon, DownloadIcon, ReceiptIcon } from "lucide-react";
 import { useState } from "react";
 
 import { DataTable, StaticTable, type Column } from "@/components/data/data-table";
@@ -9,6 +9,8 @@ import { ErrorState, TableSkeleton } from "@/components/data/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { openFile } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExpenseDialog } from "@/features/accounting/expense-dialog";
 import { JournalDialog, type Account } from "@/features/accounting/journal-dialog";
@@ -20,7 +22,7 @@ interface Expense { id: string; number: string; expense_date: string; descriptio
 const TYPES = ["asset", "liability", "equity", "income", "expense"];
 
 export default function AccountingPage() {
-  const { can, isOwner } = useBusiness();
+  const { base, can, isOwner } = useBusiness();
   const [journal, setJournal] = useState(false);
   const [expense, setExpense] = useState(false);
   const accounts = useBizQuery<Account[]>(["accounts"], "/accounting/accounts", { with_balances: true });
@@ -46,6 +48,11 @@ export default function AccountingPage() {
       <PageHeader title="Accounting" description="Double-entry books, posted automatically from every invoice, purchase, payment and stock movement."
         actions={<>
           {(isOwner || can("expenses.manage")) && <Button variant="outline" onClick={() => setExpense(true)}><ReceiptIcon /> Record expense</Button>}
+          {(isOwner || can("data.export")) && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline"><DownloadIcon /> Tally</Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => openFile(`${base}/accounting/export/tally`, { what: "masters" }, "tally-masters.xml")}>Masters (ledgers & parties)</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => openFile(`${base}/accounting/export/tally`, { what: "vouchers" }, "tally-vouchers.xml")}>Vouchers — this financial year</DropdownMenuItem>
+            </DropdownMenuContent></DropdownMenu>}
           {post && <Button onClick={() => setJournal(true)}><BookPlusIcon /> Manual journal</Button>}
         </>} />
       <Tabs defaultValue="accounts">

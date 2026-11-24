@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 
 from app.api.deps import DB, CurrentPrincipal, require
-from app.core.errors import NotFound
+from app.core.errors import NotFound, PermissionDenied
 from app.modules.access.models import Membership, MembershipStatus
 from app.modules.access.service import BusinessAccess, get_business_access
 from app.modules.businesses.models import Business, BusinessStatus
@@ -40,3 +40,12 @@ def overview(p: CurrentPrincipal, db: DB) -> list[dict]:
         except NotFound:
             continue
     return service.overview(db, accesses)
+
+
+@router.get("/dashboard/combined")
+def combined(p: CurrentPrincipal, db: DB, period: str = Query("month", pattern="^(today|month|year)$")) -> dict:
+    """Owner only: all active businesses side by side with totals (sales, profit, cash, dues, stock)."""
+    if not p.user.owner:
+        raise PermissionDenied("Only the owner sees the combined view")
+    ids = db.scalars(select(Business.id).where(Business.status == BusinessStatus.ACTIVE).order_by(Business.name)).all()
+    return service.combined(db, [get_business_access(db, p.user, bid) for bid in ids], period=period)

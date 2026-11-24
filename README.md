@@ -60,6 +60,15 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   suppliers, accounting, payments, GST returns, reports, invoice designer (drag-and-drop), users and
   roles, integrations, developer API and webhooks, settings, 2FA, backups and system health. Dark
   mode, mobile layout, global search (Ctrl K), live updates. See [docs/frontend.md](docs/frontend.md).
+* **Health-sector features — complete:** batches sold first-expiry-first with expired stock
+  blocked, per-batch MRP, expiry alerts and one-click expiry returns to suppliers; a licence
+  register (drug, FSSAI, AYUSH…) printed on invoices with renewal reminders; customer price lists,
+  "10 + 1" and quantity-discount schemes, and credit hold; reorder suggestions from sales speed that
+  become draft purchase orders; daily/weekly/monthly summary e-mails; an owner's page with every
+  business side by side; manufacturing with recipes, true batch costing and quality-control release;
+  staff attendance and salaries with commission; expense claims with bill photos and petty cash;
+  e-way bill JSON for the GST portal; export of masters and vouchers to Tally; a WhatsApp
+  catalogue link where buyers order from their phone. See [docs/roadmap.md](docs/roadmap.md).
 * **Document library and automation — complete:** a versioned file library with folders, tags,
   trash and permission-aware attachments on invoices, parties and products; your own
   "when this happens, do that" rules (overdue reminders, big-sale alerts, low-stock e-mails,

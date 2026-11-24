@@ -63,6 +63,27 @@ TRIGGERS: dict[str, dict[str, Any]] = {
         {"key": "sku", "label": "SKU", "type": "text"}, {"key": "name", "label": "Product name", "type": "text"},
         {"key": "on_hand", "label": "On hand", "type": "number"}],
         "vars": ["sku", "name", "on_hand", "reorder_level"]},
+    "batch.expiring": {"label": "A batch in stock nears expiry (90, 60, 30 days)", "fields": [
+        {"key": "days_left", "label": "Days to expiry", "type": "number"},
+        {"key": "name", "label": "Product name", "type": "text"}, {"key": "sku", "label": "SKU", "type": "text"},
+        {"key": "quantity", "label": "Quantity in stock", "type": "number"}],
+        "vars": ["name", "sku", "batch_no", "expiry_date", "days_left", "quantity", "mrp"]},
+    "batch.expired": {"label": "A batch in stock expires", "fields": [
+        {"key": "name", "label": "Product name", "type": "text"}, {"key": "sku", "label": "SKU", "type": "text"},
+        {"key": "quantity", "label": "Quantity in stock", "type": "number"}],
+        "vars": ["name", "sku", "batch_no", "expiry_date", "quantity", "mrp"]},
+    "licence.expiring": {"label": "A licence nears expiry (90, 60, 30 days)", "fields": [
+        {"key": "days_left", "label": "Days to expiry", "type": "number"},
+        {"key": "kind", "label": "Licence type", "type": "choice", "choices": [
+            "drug_retail", "drug_wholesale", "ayush_manufacturing", "fssai", "gst", "trade", "shop_establishment",
+            "udyam", "iec", "pollution", "fire", "other"]}],
+        "vars": ["name", "number", "expiry_date", "days_left"]},
+    "licence.expired": {"label": "A licence expires", "fields": [
+        {"key": "name", "label": "Licence name", "type": "text"}],
+        "vars": ["name", "number", "expiry_date"]},
+    "order.received": {"label": "An order arrives from the WhatsApp catalogue", "fields": [
+        {"key": "grand_total", "label": "Order value (₹)", "type": "number"}, {"key": "name", "label": "Buyer name", "type": "text"}],
+        "vars": ["name", "phone", "grand_total", "lines"]},
     "customer.created": {"label": "A customer is added", "fields": [
         {"key": "name", "label": "Name", "type": "text"}, {"key": "city", "label": "City", "type": "text"}],
         "vars": ["name", "phone", "email"]},

@@ -169,6 +169,14 @@ class Document(UUIDPrimaryKey, Timestamps, Base):
     irn_ack_no: Mapped[str | None] = mapped_column(String(30))
     irn_ack_date: Mapped[datetime | None] = mapped_column(UTCDateTime)
     irn_signed_qr: Mapped[str | None] = mapped_column(Text)
+    # E-way bill (goods moved worth over ₹50,000): recorded after generating it on the portal.
+    eway_bill_no: Mapped[str | None] = mapped_column(String(12))
+    eway_bill_date: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    eway_valid_until: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    vehicle_no: Mapped[str | None] = mapped_column(String(15))
+    transporter_id: Mapped[str | None] = mapped_column(String(15))
+    transporter_name: Mapped[str | None] = mapped_column(String(100))
+    transport_distance_km: Mapped[int | None] = mapped_column()
     overdue_notified_at: Mapped[datetime | None] = mapped_column(UTCDateTime)  # invoice.overdue sent
 
     created_by_id: Mapped[uuid.UUID] = mapped_column(

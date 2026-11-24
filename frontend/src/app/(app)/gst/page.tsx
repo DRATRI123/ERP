@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { MoneyTable, type MCol } from "@/components/data/money-table";
 import { PageHeader } from "@/components/data/page-header";
+import { EwayPanel } from "@/features/gst/eway-panel";
 import { ErrorState, TableSkeleton } from "@/components/data/states";
 import { PeriodPicker, PRESETS } from "@/components/pickers/period";
 import { Badge } from "@/components/ui/badge";
@@ -44,7 +45,7 @@ export default function GstPage() {
         actions={<PeriodPicker value={period} onChange={setPeriod} />} />
       <Tabs defaultValue="gstr1">
         <TabsList className="h-auto flex-wrap"><TabsTrigger value="gstr1">GSTR-1</TabsTrigger><TabsTrigger value="gstr3b">GSTR-3B</TabsTrigger>
-          <TabsTrigger value="hsn">HSN summary</TabsTrigger><TabsTrigger value="sales">Sales register</TabsTrigger><TabsTrigger value="purchases">Purchase register</TabsTrigger></TabsList>
+          <TabsTrigger value="hsn">HSN summary</TabsTrigger><TabsTrigger value="sales">Sales register</TabsTrigger><TabsTrigger value="purchases">Purchase register</TabsTrigger><TabsTrigger value="eway">E-way bills</TabsTrigger></TabsList>
         <TabsContent value="gstr1" className="space-y-4">
           {g1.isLoading ? <Card><TableSkeleton /></Card> : g1.error ? <Card><ErrorState error={g1.error} /></Card> : g1.data && <>
             <div className="flex items-center justify-between"><Badge variant="warning">{String(g1.data.status)}</Badge>
@@ -83,6 +84,7 @@ export default function GstPage() {
             </Card>
           </TabsContent>
         ))}
+        <TabsContent value="eway"><EwayPanel /></TabsContent>
       </Tabs>
     </>
   );

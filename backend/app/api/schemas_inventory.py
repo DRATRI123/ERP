@@ -198,6 +198,16 @@ class BatchOut(ORM):
     batch_no: str
     mfg_date: date | None
     expiry_date: date | None
+    mrp: Decimal | None = None
+
+
+class AvailableBatchOut(BaseModel):
+    batch_id: uuid.UUID
+    batch_no: str
+    expiry_date: date | None
+    mrp: Decimal | None
+    quantity: Decimal
+    days_left: int | None
 
 
 class SerialOut(ORM):

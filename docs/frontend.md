@@ -68,6 +68,48 @@ ERP_E2E_EMAIL=… ERP_E2E_PASSWORD=… node e2e/smoke.mjs   # against a running 
 CI runs these plus `npm audit`, and an end-to-end job that installs with `setup.sh`, starts with
 `start.sh` and drives a real sale in Chromium (stock, payment and books verified through the API).
 
+## Expiry, licences, pricing
+
+* **Billing:**
+  * Purchase lines of batch-tracked products ask for the batch number, expiry and MRP.
+  * Sales lines offer a batch picker that defaults to *Auto (first expiry)*.
+  * Rates come from the customer's price list unless you type one.
+  * Scheme free goods appear as green rows.
+  * Picking a customer shows their dues, overdue amount, limit, hold and price list.
+* **Inventory → Expiry:** stock expired and expiring within 30/60/90 days, the batches, and
+  *Draft debit note* to return them to the supplier.
+* **Licences:** the register, with status, days left, the certificate, and whether the licence
+  prints on invoices.
+* **Manufacturing:**
+  * Recipes: materials with wastage, overhead, shelf life and QC.
+  * *Record production* with a live material plan, showing shortages and cost per unit.
+  * Runs list with a QC badge. A side panel shows costs, the materials used, release/reject
+    and cancel.
+* **Staff & Salary:**
+  * An attendance grid: click a day to cycle absent, half day, leave, holiday, present.
+  * Salary runs: calculate a month, type bonuses and deductions, post to the books, mark paid.
+  * Employees.
+* **Expense claims:**
+  * A new claim takes a photo of the bill (the phone camera opens directly).
+  * Approvers see the queue and approve and pay from petty cash in one step.
+  * A petty cash balance card, with a top-up.
+* **GST → E-way bills:** pick the invoices, enter the distance and the vehicle, download the
+  portal JSON, then save each e-way bill number.
+* **Accounting → Tally:** download the masters or this year's vouchers.
+* **WhatsApp catalogue:**
+  * Settings: title, welcome text, your WhatsApp number, categories, minimum order, stock display.
+  * The link, with a QR code, copy, share on WhatsApp, and replace.
+  * Incoming orders, each linking to its draft sales order.
+  * The buyer's page `/shop/{token}` is public, made for phones and outside the app shell:
+    search, add/remove, send the order, then continue on WhatsApp.
+* **All businesses** (owner): combined totals, a per-business table and a six-month chart; pick
+  a period at the top.
+* **Inventory → Reorder:** what to buy, how long the stock lasts and from whom. Pick the
+  quantities and create the purchase orders.
+* **Reports → Scheduled e-mails:** schedules with a preview and *Send now*.
+* **Pricing & Schemes:** price lists (base ± %, fixed prices and slabs, linked customers) and
+  schemes (free goods or discount, by product or category, with dates).
+
 ## Documents and automation
 
 * **Documents** is the file library. It has a folder tree, drag-and-drop upload (several files at

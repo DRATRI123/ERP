@@ -244,7 +244,10 @@ def retry_delivery(db: Session, access: BusinessAccess, d: WebhookDelivery) -> W
 
 def emit_overdue(db: Session, *, today: datetime | None = None) -> int:
     """Daily: one invoice.overdue event per unpaid invoice past its due date."""
-    day = (today or datetime.now(UTC)).date()
+    from app.core.clock import local_date, local_today
+
+    # Due dates are business-calendar dates (India), not UTC dates.
+    day = local_date(today) if today is not None else local_today()
     docs = list(db.scalars(select(Document).where(
         Document.doc_type == DocType.SALES_INVOICE, Document.status == DocStatus.FINAL,
         Document.balance_due > 0, Document.due_date < day, Document.overdue_notified_at.is_(None)).limit(1000)))

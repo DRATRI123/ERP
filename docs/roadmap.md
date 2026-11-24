@@ -26,6 +26,103 @@ PostgreSQL.
   `setup.sh` / `start.sh` (macOS, Linux); tested from a fresh clone in CI.
 * Docker image for the web app; Caddy routes everything else to it.
 
+## Health-sector business features — what exists
+
+* **Batch and expiry control:**
+  * Sales lines without a batch get the batch that expires first, and are split across batches
+    when one is not enough (as pharmacy bills show it).
+  * Expired batches cannot be sold or delivered.
+  * The MRP typed on a purchase line is kept per batch and printed on sales of that batch.
+  * Daily `batch.expiring` (90/60/30 days) and `batch.expired` events feed automation rules.
+  * Inventory → Expiry shows expired and expiring stock, and drafts the debit note to return it
+    against the purchase bill it came from.
+* **Licence register:**
+  * Drug, FSSAI, AYUSH, trade and other licences, with certificate files.
+  * Licences marked for printing appear on every invoice while valid.
+  * `licence.expiring` / `licence.expired` events feed renewal reminders.
+  * Permission: `licences.manage`.
+* **Price lists and schemes:**
+  * Customer price lists: a base (selling, wholesale, MRP or purchase) ± a percentage, plus fixed
+    prices with quantity breaks.
+  * Trade schemes: buy X get Y free (repeating), and quantity discounts, for a product or a
+    category, with dates.
+  * Schemes apply automatically on sales documents; free goods leave stock at zero value.
+* **Credit control:**
+  * A per-customer credit hold (only full-payment sales; `credit_limit.override` can bypass it).
+  * A credit panel in billing shows dues, overdue amount, limit and price list.
+* **Smart reordering** (Inventory → Reorder):
+  * The suggested quantity is daily sales × (lead days + cover days) − on hand − open purchase
+    orders, and never less than the product's own reorder level asks for.
+  * The supplier and price come from the last purchase bill.
+  * One click creates one draft purchase order per supplier.
+* **Scheduled reports** (Reports → Scheduled e-mails):
+  * A daily, weekly or monthly e-mail with sales (vs the previous period), cash by mode, dues,
+    profit, best sellers, low stock, expiry and licences due.
+  * It goes to up to 10 addresses through the connected Gmail or SMTP.
+  * Preview it, or send it now. Failures are shown on the schedule.
+* **Manufacturing** (permission `production.manage`):
+  * Recipes are bills of materials with wastage %, overhead per batch, shelf life and optional
+    quality control.
+  * A plan shows the materials needed, what is in stock, the shortages and the estimated cost
+    per unit.
+  * A production run is one stock document. Materials leave stock (first expiry first, rounded
+    up to each unit's precision) at their stock value. The finished batch arrives at material
+    cost + overhead, with its expiry set from the shelf life.
+  * The books get Dr Inventory / Cr Production Overhead Absorbed for the overhead. That account
+    is created automatically in existing businesses.
+  * A QC hold blocks sales of the batch until it is released. Rejecting a batch writes it off.
+    Cancelling a run reverses it exactly.
+* **Staff and salary** (`payroll.manage`; `attendance.mark` for whoever marks attendance):
+  * Employees on monthly salary or daily wage, with an optional % commission on their own sales
+    (linked to their login as salesperson).
+  * Attendance is marked by exception: unmarked days are present, absent is unpaid, a half day
+    is half paid, and leave and holidays are paid.
+  * A monthly salary run prorates pay by paid days (and by joining or leaving date), and adds
+    commission and bonus minus deductions.
+  * Posting it charges Salaries & Wages, credits Advances for recoveries, and credits Salaries
+    Payable. Paying clears Salaries Payable from cash or bank.
+  * Bank and PAN details are visible only with `payroll.manage`.
+* **Expense claims and petty cash:**
+  * Every staff role can submit a claim (`expenses.claim`) with a photo of the bill, and sees
+    only their own claims.
+  * Approvers (`expenses.manage`) approve and pay in one step from petty cash, cash or bank,
+    which records a normal expense; or they reject with a reason. Nobody approves their own claim.
+  * Petty cash is its own account, topped up from the till or the bank, with its balance and
+    waiting claims shown.
+* **E-way bills** (GST → E-way bills):
+  * Lists final invoices, challans and purchase returns moving goods worth over ₹50,000 without
+    an e-way bill.
+  * Builds the portal's bulk-generation JSON, with transport details and validated vehicle
+    numbers.
+  * Records the 12-digit number the portal returns, with validity of 1 day per 200 km to
+    midnight IST, and prints it on the invoice.
+  * The ERP does not call the NIC API itself: that needs a GSP account.
+* **Tally export** (Accounting → Tally; `accounting.view` + `data.export`):
+  * TallyPrime / Tally.ERP 9 *Import Data* XML for masters: ledgers under the right Tally groups,
+    plus customers and suppliers with GSTIN and state.
+  * Vouchers for any period: one per journal entry, typed Sales, Purchase, Receipt, Payment,
+    Contra, Credit/Debit Note or Journal, in Tally's sign convention, balanced and XML-escaped.
+* **WhatsApp catalogue:**
+  * One secret link per business (a 32-byte token, replaceable at once), with a QR code for the
+    counter.
+  * Buyers browse on their phone: the chosen categories, with price, MRP, GST and in/out of stock
+    only (no stock figures or costs).
+  * An order becomes a **draft sales order** (matched to an existing customer by mobile number,
+    so their price list applies), and WhatsApp opens with the order summary addressed to the
+    business.
+  * Limits: 5 orders an hour per phone and 10 per IP, at most 50 lines, whole quantities up to
+    1,000, an optional minimum order, and a honeypot field.
+  * The `order.received` event feeds automation (e.g. an e-mail alert). Nothing is invoiced until
+    staff confirm.
+  * The two public routes are on the security audit's allow-list.
+* **All businesses** (owner only, `GET /dashboard/combined?period=today|month|year`):
+  * Sales with growth, book net profit, cash and bank balances, receivables and payables with
+    overdue amounts, and stock value.
+  * Shown per business and in total, for today, this month or this financial year.
+  * A six-month sales chart. Clicking a business opens its dashboard.
+* Fixed: the daily overdue scan used the UTC date, so invoices became overdue a day late after
+  midnight IST. It now uses the business date.
+
 ## Document library and automation — what exists
 
 * **Document library** (`/businesses/{id}/files`): folders, tags, notes, versions, trash with
@@ -147,7 +244,7 @@ PostgreSQL.
   detection, session list/revoke, login history.
 * Businesses (create/edit/archive/restore), auto-created head office, financial year and roles.
 * Branches, financial years, GSTIN/PAN/state-code validation.
-* 42 permission codes (two added in Phase 2; 45 since the document library and automation), 7 built-in roles, custom roles, per-member grant/deny overrides,
+* 42 permission codes (two added in Phase 2; 51 now, with files, automation, licences, production, payroll, attendance and expense claims), 7 built-in roles, custom roles, per-member grant/deny overrides,
   branch scoping, 30-user cap, anti-escalation rules, business-isolation via 404.
 * Audit log (per business and owner-wide), transactional outbox, structured errors/logs,
   request ids, DB integrity check and verified online backup.

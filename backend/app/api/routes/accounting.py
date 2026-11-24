@@ -8,7 +8,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy import select
 
 from app.api.deps import DB, Access, OwnerAccess, require
@@ -393,3 +393,30 @@ def integrity(access: View, db: DB) -> dict:
     """Cross-checks: every journal balances; the Inventory account equals stock valuation."""
     problems = reports.verify_books(db, access.business.id)
     return {"ok": not problems, "problems": problems}
+
+
+# ---------------------------------------------------------------------------- Tally
+
+
+@router.get("/export/tally", tags=["accounting reports"], response_class=Response)
+def tally_export(access: Annotated[BusinessAccess, Depends(require("accounting.view", "data.export"))], db: DB,
+                 what: str = Query("vouchers", pattern="^(masters|vouchers)$"),
+                 date_from: date | None = None, date_to: date | None = None) -> Response:
+    """Tally XML for *Import → Masters* (ledgers, parties) or *Import → Transactions* (vouchers)."""
+    from app.modules.accounting import tally
+
+    if what == "masters":
+        xml, n = tally.masters(db, access), None
+        name = "tally-masters"
+    else:
+        today = local_today()
+        start = date_from or date(today.year if today.month >= 4 else today.year - 1, 4, 1)
+        end = date_to or today
+        if end < start:
+            raise ValidationFailed("The period ends before it starts")
+        xml, n = tally.vouchers(db, access, date_from=start, date_to=end)
+        name = f"tally-vouchers-{start:%Y%m%d}-{end:%Y%m%d}"
+    headers = {"Content-Disposition": f'attachment; filename="{name}.xml"', "X-Content-Type-Options": "nosniff"}
+    if n is not None:
+        headers["X-Voucher-Count"] = str(n)
+    return Response(xml, media_type="application/xml", headers=headers)

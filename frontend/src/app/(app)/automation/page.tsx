@@ -55,6 +55,16 @@ const TEMPLATES: { icon: React.ComponentType<{ className?: string }>; title: str
   { icon: PackageMinusIcon, title: "Low-stock alert", text: "E-mail purchasing when a product reaches its reorder level.",
     draft: { name: "Low-stock alert", is_active: true, trigger: "stock.low", conditions: [], delay_minutes: 0, action: "notify_email",
       action_config: { to: [], subject: "Reorder {name}", body: "{name} ({sku}) is down to {on_hand}. Reorder level: {reorder_level}." } } },
+  { icon: PackageMinusIcon, title: "Expiry alert", text: "E-mail me when a batch in stock is 30 days from expiry.",
+    draft: { name: "Batch expiry alert", is_active: true, trigger: "batch.expiring", conditions: [{ field: "days_left", op: "lte", value: "30" }],
+      delay_minutes: 0, action: "notify_email", action_config: { to: [], subject: "{name} batch {batch_no} expires {expiry_date}",
+        body: "{quantity} units of {name} (batch {batch_no}, MRP {mrp}) expire in {days_left} days.\nSell first or return to the supplier: Inventory → Expiry." } } },
+  { icon: AlarmClockIcon, title: "Licence renewal", text: "E-mail me 90, 60 and 30 days before any licence expires.",
+    draft: { name: "Licence renewal reminder", is_active: true, trigger: "licence.expiring", conditions: [], delay_minutes: 0, action: "notify_email",
+      action_config: { to: [], subject: "Renew {name} — {days_left} days left", body: "{name} ({number}) expires on {expiry_date}. Start the renewal now." } } },
+  { icon: SendIcon, title: "New online order", text: "E-mail me the moment an order arrives from the WhatsApp catalogue.",
+    draft: { name: "New catalogue order", is_active: true, trigger: "order.received", conditions: [], delay_minutes: 0, action: "notify_email",
+      action_config: { to: [], subject: "New order from {name} — ₹{grand_total}", body: "{name} ({phone}) ordered {lines} items worth ₹{grand_total}.\nOpen WhatsApp catalogue → Online orders to confirm it." } } },
   { icon: HandHeartIcon, title: "Welcome e-mail", text: "Greet every new customer who has an e-mail address.",
     draft: { name: "Welcome new customers", is_active: true, trigger: "customer.created", conditions: [], delay_minutes: 0, action: "notify_email",
       action_config: { to: ["customer"], subject: "Welcome to {business}", body: "Namaste {name},\n\nThank you for choosing {business}. We look forward to serving you.\n\nWarm regards,\n{business}" } } },
@@ -132,7 +142,7 @@ function Rules() {
           )}
         <div>
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground"><SparklesIcon className="size-4" /> {rules.data?.length ? "Start from a template" : "Start with one of these"}</h2>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {TEMPLATES.map((t) => (
               <button key={t.title} disabled={!catalog.data} onClick={() => open(t.draft)} className="rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 disabled:opacity-60">
                 <t.icon className="mb-2 size-5 text-primary" /><p className="font-medium">{t.title}</p><p className="text-sm text-muted-foreground">{t.text}</p>

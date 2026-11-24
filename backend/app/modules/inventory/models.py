@@ -27,6 +27,7 @@ from sqlalchemy import (
     Date,
     ForeignKey,
     Index,
+    Integer,
     String,
     Text,
     UniqueConstraint,
@@ -74,6 +75,12 @@ class Batch(UUIDPrimaryKey, Timestamps, Base):
     batch_no: Mapped[str] = mapped_column(String(60), nullable=False)
     mfg_date: Mapped[date | None] = mapped_column(Date)
     expiry_date: Mapped[date | None] = mapped_column(Date)
+    # MRP printed on this batch's pack (may differ between batches of one product).
+    mrp: Mapped[Decimal | None] = mapped_column(Money())
+    # Smallest expiry-alert stage already announced (90, 60, 30 days; 0 = expired).
+    expiry_alert_stage: Mapped[int | None] = mapped_column(Integer)
+    # Quality-control hold: a manufactured batch cannot be sold until released.
+    on_hold: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
 class SerialStatus(enum.StrEnum):
@@ -106,6 +113,7 @@ class StockDocumentKind(enum.StrEnum):
     ADJUSTMENT = "adjustment"
     TRANSFER = "transfer"
     COUNT = "count"
+    PRODUCTION = "production"  # materials out, finished goods in (manufacturing)
 
 
 class StockDocumentStatus(enum.StrEnum):

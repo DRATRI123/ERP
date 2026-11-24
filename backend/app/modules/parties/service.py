@@ -30,7 +30,7 @@ from app.modules.parties.models import (
 PARTY_FIELDS = [
     "code", "name", "is_customer", "is_supplier", "gst_type", "gstin", "pan", "state_code",
     "contact_person", "phone", "email", "customer_group_id", "supplier_group_id",
-    "credit_limit", "credit_days", "notes", "attributes", "is_active",
+    "credit_limit", "credit_days", "notes", "attributes", "is_active", "credit_hold", "price_list_id",
 ]
 ADDRESS_FIELDS = ["kind", "label", "address_line1", "address_line2", "city", "state_code",
                   "pincode", "country", "is_default"]
@@ -158,6 +158,10 @@ def _normalise(db: Session, access: BusinessAccess, data: dict[str, Any], curren
         get_group(db, access, data["customer_group_id"], PartyRole.CUSTOMER)
     if data.get("supplier_group_id"):
         get_group(db, access, data["supplier_group_id"], PartyRole.SUPPLIER)
+    if data.get("price_list_id"):
+        from app.modules.pricing.service import get_price_list
+
+        get_price_list(db, access, data["price_list_id"])
 
 
 def _sync_default(p: Party, addr: PartyAddress) -> None:

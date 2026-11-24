@@ -169,3 +169,78 @@ def overview(db: Session, accesses: list[BusinessAccess]) -> list[dict[str, Any]
                         "receivable": str(due), "receivable_overdue": str(overdue)})
         out.append(row)
     return out
+
+
+# ---------------------------------------------------------------------------- owner's combined view
+
+
+def _period(period: str, today: date) -> tuple[date, date, date, date]:
+    """(from, to) of the period and of the same-length period before it."""
+    if period == "today":
+        start = today
+    elif period == "year":  # Indian financial year
+        start = date(today.year if today.month >= 4 else today.year - 1, 4, 1)
+    else:
+        start = today.replace(day=1)
+    length = (today - start).days
+    prev_end = start - timedelta(days=1)
+    if period == "month":
+        prev_start = prev_end.replace(day=1)
+        prev_to = min(prev_start + timedelta(days=length), prev_end)
+    elif period == "year":
+        prev_start = date(start.year - 1, 4, 1)
+        prev_to = min(prev_start + timedelta(days=length), prev_end)
+    else:
+        prev_start = prev_to = prev_end
+    return start, today, prev_start, prev_to
+
+
+def combined(db: Session, accesses: list[BusinessAccess], *, period: str = "month") -> dict[str, Any]:
+    """Every business side by side plus totals: sales, profit, cash, dues and stock — the owner's page."""
+    from app.modules.accounting.models import Account, AccountSubtype
+    from app.modules.accounting.reports import _sums, profit_and_loss
+    from app.modules.inventory.reports import valuation
+
+    today = local_today()
+    start, end, prev_start, prev_to = _period(period, today)
+    keys = ("sales", "sales_prev", "purchases", "net_profit", "cash", "bank", "receivable", "receivable_overdue",
+            "payable", "payable_overdue", "stock_value")
+    totals = dict.fromkeys(keys, ZERO)
+    rows = []
+    months = []
+    for i in range(5, -1, -1):  # the last six calendar months, oldest first
+        y, m = divmod(today.year * 12 + today.month - 1 - i, 12)
+        months.append(date(y, m + 1, 1))
+    for a in accesses:
+        bid = a.business.id
+        row: dict[str, Any] = {"business_id": str(bid), "name": a.business.name}
+        sales = _net_total(db, a, SALES_PLUS, SALES_MINUS, start, end)
+        prev = _net_total(db, a, SALES_PLUS, SALES_MINUS, prev_start, prev_to)
+        purchases = _net_total(db, a, PURCHASE_PLUS, PURCHASE_MINUS, start, end)
+        rec, rec_over, _ = _outstanding(db, a, SALES_PLUS)
+        pay, pay_over, _ = _outstanding(db, a, PURCHASE_PLUS)
+        pl = profit_and_loss(db, bid, date_from=start, date_to=end)
+        accounts = {acc.id: acc for acc in db.scalars(select(Account).where(
+            Account.business_id == bid, Account.subtype.in_([AccountSubtype.CASH, AccountSubtype.BANK])))}
+        money = {"cash": ZERO, "bank": ZERO}
+        for aid, (dr, cr) in _sums(db, bid, account_ids=list(accounts) or [bid]).items():
+            money["cash" if accounts[aid].subtype == AccountSubtype.CASH else "bank"] += dr - cr
+        _, stock = valuation(db, a)
+        vals = {"sales": sales, "sales_prev": prev, "purchases": purchases, "net_profit": Decimal(pl["net_profit"]),
+                "cash": money["cash"], "bank": money["bank"], "receivable": rec, "receivable_overdue": rec_over,
+                "payable": pay, "payable_overdue": pay_over, "stock_value": stock}
+        for k in keys:
+            totals[k] += vals[k]
+        trend = []
+        for m in months:
+            nxt = (m + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            trend.append({"month": m.isoformat(), "sales": str(_net_total(db, a, SALES_PLUS, SALES_MINUS, m, min(nxt, today)))})
+        row.update({k: str(v) for k, v in vals.items()})
+        row["growth_percent"] = str(((sales - prev) * 100 / prev).quantize(Decimal("0.1"))) if prev else None
+        row["trend"] = trend
+        rows.append(row)
+    growth = ((totals["sales"] - totals["sales_prev"]) * 100 / totals["sales_prev"]).quantize(Decimal("0.1")) \
+        if totals["sales_prev"] else None
+    return {"period": period, "from": start.isoformat(), "to": end.isoformat(),
+            "totals": {**{k: str(v) for k, v in totals.items()}, "growth_percent": str(growth) if growth is not None else None},
+            "businesses": rows}

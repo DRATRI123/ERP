@@ -43,3 +43,31 @@ def test_dashboard_sections_follow_permissions(api, owner_headers):
     assert "purchases" in d  # inventory managers see purchases
     ov = api.c.get("/api/v1/dashboard/overview", headers=h).json()
     assert [r["business_id"] for r in ov] == [s.bid] and "sales_month" not in ov[0]
+
+
+def test_owner_combined_view(api, owner_headers):
+    from decimal import Decimal
+
+    from tests.conftest import USER_PASSWORD, Shop
+    from tests.test_billing import customer, invoice, stocked
+
+    a, b = Shop(api, owner_headers, name="Combined A"), Shop(api, owner_headers, name="Combined B")
+    pa = stocked(a, "ca", selling_price="1000")
+    invoice(a, [{"product_id": pa, "quantity": "2"}], payments=[{"mode": "cash", "amount": "2000"}])
+    pb = stocked(b, "cb", selling_price="500")
+    invoice(b, [{"product_id": pb}], party_id=customer(b)["id"])
+    out = api.c.get("/api/v1/dashboard/combined", headers=owner_headers, params={"period": "month"}).json()
+    rows = {r["name"]: r for r in out["businesses"]}
+    ra, rb = rows["Combined A"], rows["Combined B"]
+    assert Decimal(ra["sales"]) == 2000 and Decimal(ra["cash"]) >= 2000 and Decimal(ra["stock_value"]) > 0
+    assert Decimal(rb["sales"]) == 500 and Decimal(rb["receivable"]) == 500 and len(rb["trend"]) == 6
+    months = [t["month"] for t in rb["trend"]]
+    assert len({m[:7] for m in months}) == 6 and months == sorted(months)  # six distinct calendar months
+    assert Decimal(out["totals"]["sales"]) == sum(Decimal(r["sales"]) for r in out["businesses"])
+    assert Decimal(out["totals"]["stock_value"]) == sum(Decimal(r["stock_value"]) for r in out["businesses"])
+    assert api.c.get("/api/v1/dashboard/combined", headers=owner_headers, params={"period": "week"}).status_code == 422
+
+    m = a.post("/members", {"email": "combo@example.com", "full_name": "C", "role_id": a.post(
+        "/roles", {"name": "Viewer", "permissions": ["business.view", "invoices.view"]})["id"]})
+    api.c.post("/api/v1/auth/accept-invite", json={"token": m["invite_token"], "password": USER_PASSWORD})
+    assert api.c.get("/api/v1/dashboard/combined", headers=api.auth("combo@example.com", USER_PASSWORD)).status_code == 403

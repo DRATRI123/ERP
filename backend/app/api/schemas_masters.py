@@ -249,6 +249,8 @@ class PartyCommon(BaseModel):
     credit_limit: MoneyIn | None = None
     credit_days: int | None = Field(None, ge=0, le=3650)
     notes: str | None = Field(None, max_length=5000)
+    credit_hold: bool = False
+    price_list_id: uuid.UUID | None = None
 
 
 class PartyIn(PartyCommon):
@@ -286,6 +288,8 @@ class PartyOut(ORM):
     credit_limit: Decimal | None
     credit_days: int | None
     notes: str | None
+    credit_hold: bool = False
+    price_list_id: uuid.UUID | None = None
     attributes: dict[str, Any]
     is_active: bool
     archived_at: datetime | None

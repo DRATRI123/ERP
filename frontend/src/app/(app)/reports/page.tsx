@@ -1,14 +1,16 @@
 "use client";
 
-import { DownloadIcon, PrinterIcon } from "lucide-react";
+import { DownloadIcon, MailIcon, PrinterIcon } from "lucide-react";
 import { useState } from "react";
 
 import { MoneyTable, type MCol } from "@/components/data/money-table";
+import Link from "next/link";
+
 import { PageHeader } from "@/components/data/page-header";
 import { ErrorState, TableSkeleton } from "@/components/data/states";
 import { PeriodPicker, PRESETS } from "@/components/pickers/period";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useBizQuery } from "@/hooks/use-business";
@@ -128,7 +130,8 @@ export default function ReportsPage() {
   const groups = [...new Set(REPORTS.map((r) => r.group))];
   return (
     <>
-      <PageHeader title="Reports" description="Statements and registers, straight from the books." />
+      <PageHeader title="Reports" description="Statements and registers, straight from the books."
+        actions={<Link href="/reports/scheduled" className={buttonVariants({ variant: "outline" })}><MailIcon /> Scheduled e-mails</Link>} />
       <div className="grid gap-5 lg:grid-cols-[220px_1fr]">
         <nav className="space-y-4" aria-label="Reports">
           {groups.map((g) => (
