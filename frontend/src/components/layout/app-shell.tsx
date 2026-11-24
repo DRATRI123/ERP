@@ -1,0 +1,75 @@
+"use client";
+
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+
+import { CommandPalette } from "@/components/layout/command-palette";
+import { Sidebar, SidebarContent } from "@/components/layout/sidebar";
+import { Topbar } from "@/components/layout/topbar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, Sheet } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useGlobalShortcuts } from "@/hooks/use-shortcuts";
+import { useRealtime } from "@/hooks/use-realtime";
+import { restoreSession } from "@/lib/session";
+import { useAuth } from "@/stores/auth";
+
+const SHORTCUTS: [string, string][] = [
+  ["Ctrl K  or  /", "Search and jump anywhere"], ["Alt N", "New invoice"], ["G then D", "Dashboard"],
+  ["G then S", "Sales & invoices"], ["G then P", "Purchases"], ["G then I", "Products & inventory"],
+  ["G then C", "Customers"], ["G then A", "Accounting"], ["G then T", "GST"], ["G then R", "Reports"],
+  ["[", "Collapse / expand sidebar"], ["F2  (billing)", "Focus product search"], ["F4  (billing)", "Choose customer"],
+  ["F9  (billing)", "Save & finalize"], ["Esc", "Close dialogs"],
+];
+
+/** Route protection + layout for every signed-in page. */
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const status = useAuth((s) => s.status);
+  const router = useRouter();
+  const path = usePathname();
+  const [mobileNav, setMobileNav] = useState(false);
+  const [search, setSearch] = useState(false);
+  const [help, setHelp] = useState(false);
+  const live = useRealtime();
+
+  useEffect(() => {
+    if (status === "unknown") void restoreSession();
+    else if (status === "signed-out") router.replace(`/login?next=${encodeURIComponent(path)}`);
+  }, [status, router, path]);
+  useEffect(() => setMobileNav(false), [path]);
+
+  const openSearch = useCallback(() => setSearch(true), []);
+  const openHelp = useCallback(() => setHelp(true), []);
+  useGlobalShortcuts({ openSearch, openHelp });
+
+  if (status !== "signed-in") {
+    return (
+      <div className="flex min-h-dvh">
+        <div className="hidden w-64 border-r bg-sidebar p-4 lg:block"><Skeleton className="h-8 w-32" /><Skeleton className="mt-6 h-11" />
+          {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="mt-3 h-7" />)}</div>
+        <div className="flex-1 p-6"><Skeleton className="h-9 w-64" /><div className="mt-6 grid gap-4 sm:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}</div></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-dvh">
+      <Sidebar />
+      <Sheet open={mobileNav} onOpenChange={setMobileNav}><SidebarContent onNavigate={() => setMobileNav(false)} /></Sheet>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Topbar onMenu={() => setMobileNav(true)} onSearch={openSearch} onHelp={openHelp} live={live} />
+        <main className="mx-auto w-full max-w-[1400px] flex-1 animate-in px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+      </div>
+      <CommandPalette open={search} onOpenChange={setSearch} />
+      <Dialog open={help} onOpenChange={setHelp}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Keyboard shortcuts</DialogTitle></DialogHeader>
+          <div className="divide-y text-sm">
+            {SHORTCUTS.map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between py-2"><span>{v}</span><kbd className="rounded border bg-muted px-2 py-0.5 text-xs">{k}</kbd></div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
