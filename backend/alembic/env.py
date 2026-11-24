@@ -40,10 +40,25 @@ def run_migrations_online() -> None:
 
 
 def _run(connection) -> None:  # type: ignore[no-untyped-def]
+    sqlite = connection.dialect.name == "sqlite"
+    if sqlite:
+        # Batch migrations rebuild tables (copy, DROP, rename). With foreign keys enforced,
+        # dropping a table that other rows reference fails, so enforcement is paused for the
+        # run, and the result is verified with foreign_key_check before it is committed.
+        # The PRAGMA only works outside a transaction, hence the raw DBAPI connection.
+        connection.connection.dbapi_connection.execute("PRAGMA foreign_keys=OFF")
     context.configure(connection=connection, target_metadata=metadata, render_as_batch=True,
                       compare_type=True)
-    with context.begin_transaction():
-        context.run_migrations()
+    try:
+        with context.begin_transaction():
+            context.run_migrations()
+            if sqlite:
+                broken = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
+                if broken:
+                    raise RuntimeError(f"Migration left foreign key violations: {broken[:10]}")
+    finally:
+        if sqlite:
+            connection.connection.dbapi_connection.execute("PRAGMA foreign_keys=ON")
 
 
 if context.is_offline_mode():

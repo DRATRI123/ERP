@@ -76,8 +76,20 @@ def create_app() -> FastAPI:
 
     install_error_handlers(app)
 
-    from app.api.routes import access, audit, auth, businesses, health, users
+    from app.api.routes import (
+        access,
+        audit,
+        auth,
+        businesses,
+        catalog,
+        health,
+        inventory,
+        parties,
+        users,
+    )
 
-    for module in (auth, businesses, access, users, audit, health):
-        app.include_router(module.router, prefix=API_PREFIX)
+    for router in (auth.router, businesses.router, access.router, users.router,
+                   catalog.router, parties.customers, parties.suppliers, inventory.router,
+                   audit.router, health.router):
+        app.include_router(router, prefix=API_PREFIX)
     return app

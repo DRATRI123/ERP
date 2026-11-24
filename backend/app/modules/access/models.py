@@ -44,6 +44,13 @@ class Role(UUIDPrimaryKey, Timestamps, Base):
 
     @property
     def permission_codes(self) -> set[str]:
+        # System roles always reflect the code catalog, so permissions added in later releases
+        # reach businesses created earlier without a data migration.
+        if self.is_system:
+            from app.modules.access.catalog import SYSTEM_ROLE_BY_CODE
+
+            tpl = SYSTEM_ROLE_BY_CODE.get(self.code)
+            return set(tpl.permissions) if tpl else set()
         return {p.permission_code for p in self.permissions}
 
 

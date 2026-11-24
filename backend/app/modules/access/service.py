@@ -137,7 +137,6 @@ def seed_system_roles(db: Session, business_id: uuid.UUID) -> dict[str, Role]:
             name=tpl.name,
             description=tpl.description,
             is_system=True,
-            permissions=[RolePermission(permission_code=c) for c in sorted(tpl.permissions)],
         )
         db.add(role)
         roles[tpl.code] = role

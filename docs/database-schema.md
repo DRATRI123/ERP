@@ -92,12 +92,36 @@ Append-only: `business_id` (NULL for account-level events), actor, `action`
 `event_type`, aggregate type/id, JSON `payload`, `published_at`, `attempts`, `last_error`.
 Indexed on `(published_at, created_at)` for the relay's "next unpublished" query.
 
+## Phase 2 tables
+
+| Table | Purpose |
+|---|---|
+| `units` | Unit of measure per business: code, GST UQC, allowed quantity decimals (0–3) |
+| `categories` | Product categories, nested via `parent_id` (cycles rejected) |
+| `brands` | Brands per business |
+| `products` | Goods or services: SKU and barcode (unique per business), HSN/SAC, prices (`Money`), GST/cess `Rate` (9,4), tracking flags, reorder level/qty, `attributes` JSON, archive |
+| `party_groups` | Customer or supplier groups |
+| `parties` | Customers and/or suppliers (`CHECK is_customer OR is_supplier`), GST type, GSTIN, PAN, place-of-supply state, contacts, credit limit/days |
+| `party_addresses` | Billing / shipping addresses with one default per kind |
+| `warehouses` | Stock locations, each in a branch; `MAIN` created with the business |
+| `batches` | Batch number (unique per product), mfg and expiry dates |
+| `serial_numbers` | One row per unit of a serial-tracked product: status, current warehouse, batch |
+| `stock_documents` / `stock_document_lines` | Opening, adjustment, transfer and count documents, numbered `OS/2026-27/0001` etc.; cancelled documents stay with `status = cancelled` |
+| `stock_ledger` | **Append-only** signed movements with value and running balance; `reverses_entry_id` (unique) links a reversal to its original |
+| `stock_balances` | Current quantity/value per product × warehouse × `batch_key` (`CHECK quantity >= 0`) |
+| `cost_layers` / `layer_consumptions` | FIFO receipt layers (remaining quantity and value) and which layers each issue consumed |
+| `stock_entry_serials` | Serial numbers moved by each ledger entry |
+| `number_series` | Next number per business and series key, row-locked when allocating |
+
+`businesses.inventory_valuation` (`weighted_average` | `fifo`) was added in migration `0002`.
+`batch_key` is the batch id as text or `''`: a NOT NULL key keeps the unique constraint
+effective on both databases (NULLs never collide in unique constraints).
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |
 |---|---|
-| 2 – Masters | `warehouses`, `units`, `categories`, `brands`, `products`, `product_prices`, `parties` (customers/suppliers), `party_addresses`, `party_groups`, `price_lists`, `stock_ledger` (append-only movements), `stock_balances`, `batches`, `serial_numbers` |
-| 3 – Billing & GST | `document_series` (per business/branch/FY/type numbering), `documents` + `document_lines` (one model for invoice, quotation, challan, credit/debit note, purchase bill…), `document_taxes`, `tax_rates` (versioned, effective-dated), `hsn_codes`, `invoice_templates` |
+| 3 – Billing & GST | `price_lists` + `price_list_items`, `documents` + `document_lines` (one model for invoice, quotation, challan, credit/debit note, purchase bill…), `document_taxes`, `tax_rates` (versioned, effective-dated), `hsn_codes`, `invoice_templates` |
 | 4 – Accounting | `accounts` (chart of accounts tree), `journal_entries` + `journal_lines` (DB-enforced balance at posting), `payments`, `payment_allocations`, `bank_accounts`, `bank_statement_lines`, `cost_centres`, `fixed_assets` |
 | 5/6 – Integrations & API | `integrations`, `integration_credentials` (encrypted), `api_clients`, `api_keys` (hashed, scoped), `api_request_logs`, `webhook_endpoints`, `webhook_deliveries`, `idempotency_keys` |
 | 8 – Platform | `custom_domains`, `files`, `file_versions`, `automation_rules`, `automation_runs`, `backup_runs` |

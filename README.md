@@ -12,9 +12,12 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
 
 ## Status
 
-**Phase 1 backend: complete.** Authentication, owner, multi-business management, branches,
-financial years, users, roles, permissions, audit trail and outbox. Next up: the Next.js frontend
-shell, then Phase 2 (products, parties, inventory).
+* **Phase 1 backend — complete:** authentication, owner, multi-business management, branches,
+  financial years, users, roles, permissions, audit trail, outbox.
+* **Phase 2 backend — complete:** products, units, categories, brands, customers & suppliers,
+  warehouses, and a stock engine with weighted-average/FIFO valuation, batches & expiry, serial
+  numbers, opening stock, adjustments, transfers, physical counts and reversals.
+* Next: Phase 3 (invoice engine, GST, printing). The Next.js frontend is still to be built.
 
 ## Running the backend
 

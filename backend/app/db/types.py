@@ -56,6 +56,10 @@ class ScaledDecimal(TypeDecorator[Decimal]):
         self._quantum = Decimal(1).scaleb(-scale)
         self._factor = Decimal(10) ** scale
 
+    def __repr__(self) -> str:
+        # Alembic renders column types with repr(); keep precision/scale in migrations.
+        return f"ScaledDecimal(precision={self.precision}, scale={self.scale})"
+
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(BigInteger())

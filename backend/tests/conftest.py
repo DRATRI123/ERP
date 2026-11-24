@@ -11,7 +11,10 @@ from __future__ import annotations
 import os
 import secrets
 import tempfile
+import uuid
 from collections.abc import Iterator
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 _TMP = Path(tempfile.mkdtemp(prefix="erp-tests-"))
@@ -78,6 +81,12 @@ def engine() -> Iterator[Engine]:
 def _clean_db(engine: Engine) -> Iterator[None]:
     yield
     with engine.begin() as conn:
+        # Self-referencing rows (reversal entries, sub-categories) are unlinked first; SQLite
+        # checks foreign keys row by row while a single DELETE runs.
+        for table in metadata.sorted_tables:
+            for fk in table.foreign_keys:
+                if fk.column.table is table and fk.parent.nullable:
+                    conn.execute(table.update().values({fk.parent.name: None}))
         for table in reversed(metadata.sorted_tables):
             conn.execute(table.delete())
 
@@ -163,3 +172,83 @@ def owner(engine: Engine):
 @pytest.fixture
 def owner_headers(api: Api, owner) -> dict[str, str]:
     return api.auth(OWNER_EMAIL, OWNER_PASSWORD)
+
+
+# ---------------------------------------------------------------------------- Phase 2 helpers
+
+
+class Shop:
+    """One business with products and warehouses, driven through the HTTP API."""
+
+    def __init__(self, api: Api, headers: dict[str, str], valuation: str = "weighted_average"):
+        self.api, self.h = api, headers
+        self.biz = api.create_business(headers, name=f"Shop {valuation}",
+                                       inventory_valuation=valuation)
+        self.bid = self.biz["id"]
+        self.base = f"/api/v1/businesses/{self.bid}"
+        self.units = {u["code"]: u["id"] for u in self.get("/units")}
+        self.main = next(w for w in self.get("/warehouses") if w["code"] == "MAIN")["id"]
+        self.ho = self.get("/branches")[0]["id"]
+
+    def get(self, path: str, headers: dict | None = None, **params):
+        r = self.api.c.get(self.base + path, headers=headers or self.h, params=params)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    def post(self, path: str, body: dict, expect: int = 201, headers: dict | None = None):
+        r = self.api.c.post(self.base + path, json=body, headers=headers or self.h)
+        assert r.status_code == expect, r.text
+        return r.json()
+
+    def product(self, sku: str, unit: str = "NOS", **kw) -> dict:
+        return self.post("/products", {"name": sku.title(), "sku": sku,
+                                       "unit_id": self.units[unit], **kw})
+
+    def warehouse(self, code: str, branch_id: str | None = None) -> str:
+        return self.post("/warehouses", {"code": code, "name": code,
+                                         "branch_id": branch_id or self.ho})["id"]
+
+    def opening(self, lines: list[dict], warehouse: str | None = None, **kw):
+        return self.post("/inventory/opening-stock", {
+            "warehouse_id": warehouse or self.main, "doc_date": TODAY, "lines": lines, **kw})
+
+    def adjust(self, lines: list[dict], warehouse: str | None = None, reason: str = "correction",
+               expect: int = 201, headers: dict | None = None, **kw):
+        return self.post("/inventory/adjustments", {
+            "warehouse_id": warehouse or self.main, "doc_date": TODAY, "reason": reason,
+            "lines": lines, **kw}, expect=expect, headers=headers)
+
+    def transfer(self, src: str, dst: str, lines: list[dict], expect: int = 201):
+        return self.post("/inventory/transfers", {
+            "from_warehouse_id": src, "to_warehouse_id": dst, "doc_date": TODAY,
+            "lines": lines}, expect=expect)
+
+    def cancel(self, doc_id: str, expect: int = 200):
+        return self.post(f"/inventory/documents/{doc_id}/cancel", {"reason": "test cancel"},
+                         expect=expect)
+
+    def stock(self, product_id: str, warehouse: str | None = None) -> tuple[Decimal, Decimal]:
+        """(quantity, value) summed over batches."""
+        rows = self.get("/inventory/balances", product_id=product_id,
+                        warehouse_id=warehouse or self.main, include_zero=True)["items"]
+        return (sum((Decimal(r["quantity"]) for r in rows), Decimal(0)),
+                sum((Decimal(r["value"]) for r in rows), Decimal(0)))
+
+    def assert_consistent(self, db) -> None:
+        from app.modules.inventory.engine import verify_balances
+
+        db.expire_all()
+        assert verify_balances(db, uuid.UUID(self.bid)) == []
+
+
+TODAY = date.today().isoformat()
+
+
+@pytest.fixture
+def shop(api, owner_headers) -> Shop:
+    return Shop(api, owner_headers)
+
+
+@pytest.fixture
+def fifo_shop(api, owner_headers) -> Shop:
+    return Shop(api, owner_headers, valuation="fifo")

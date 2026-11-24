@@ -16,7 +16,12 @@ from pydantic import (
 )
 
 from app.modules.access.models import MembershipStatus
-from app.modules.businesses.models import BranchKind, BusinessStatus, GstRegistrationType
+from app.modules.businesses.models import (
+    BranchKind,
+    BusinessStatus,
+    GstRegistrationType,
+    InventoryValuation,
+)
 from app.modules.gst.gstin import validate_gstin, validate_pan, validate_state_code
 from app.modules.users.models import UserStatus
 
@@ -156,6 +161,7 @@ class BusinessCreateIn(AddressIn):
     email: EmailStr | None = None
     base_currency: Annotated[str, StringConstraints(pattern=r"^[A-Z]{3}$")] = "INR"
     fy_start_month: int = Field(4, ge=1, le=12)
+    inventory_valuation: InventoryValuation = InventoryValuation.WEIGHTED_AVERAGE
     settings: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -173,6 +179,7 @@ class BusinessUpdateIn(BaseModel):
     city: str | None = Field(None, max_length=100)
     state_code: StateCode | None = None
     pincode: Annotated[str, StringConstraints(pattern=r"^[0-9]{6}$")] | None = None
+    inventory_valuation: InventoryValuation | None = None
     settings: dict[str, Any] | None = None
 
 
@@ -187,6 +194,7 @@ class BusinessOut(ORM):
     email: str | None
     base_currency: str
     fy_start_month: int
+    inventory_valuation: InventoryValuation
     address_line1: str | None
     address_line2: str | None
     city: str | None

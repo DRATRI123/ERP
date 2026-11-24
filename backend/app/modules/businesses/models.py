@@ -49,6 +49,11 @@ class AddressMixin:
     country: Mapped[str] = mapped_column(String(2), default="IN", nullable=False)
 
 
+class InventoryValuation(enum.StrEnum):
+    WEIGHTED_AVERAGE = "weighted_average"
+    FIFO = "fifo"
+
+
 class Business(UUIDPrimaryKey, Timestamps, AddressMixin, Base):
     __tablename__ = "businesses"
     __table_args__ = (
@@ -69,6 +74,13 @@ class Business(UUIDPrimaryKey, Timestamps, AddressMixin, Base):
     base_currency: Mapped[str] = mapped_column(String(3), default="INR", nullable=False)
     fy_start_month: Mapped[int] = mapped_column(Integer, default=4, nullable=False)
     settings: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    # Locked once the business has any stock movement (changing it would invalidate costs).
+    inventory_valuation: Mapped[InventoryValuation] = mapped_column(
+        str_enum(InventoryValuation, 20),
+        default=InventoryValuation.WEIGHTED_AVERAGE,
+        server_default=InventoryValuation.WEIGHTED_AVERAGE.value,
+        nullable=False,
+    )
     status: Mapped[BusinessStatus] = mapped_column(
         str_enum(BusinessStatus, 16),
         default=BusinessStatus.ACTIVE,

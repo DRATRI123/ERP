@@ -26,7 +26,7 @@ from app.modules.users.models import User
 BUSINESS_FIELDS = [
     "name", "legal_name", "gstin", "pan", "gst_registration_type", "phone", "email",
     "base_currency", "fy_start_month", "address_line1", "address_line2", "city", "state_code",
-    "pincode", "country", "settings",
+    "pincode", "country", "settings", "inventory_valuation",
 ]
 BRANCH_FIELDS = [
     "code", "name", "kind", "gstin", "phone", "is_active", "address_line1", "address_line2",
@@ -113,6 +113,12 @@ def create_business(db: Session, *, actor: User, data: dict[str, Any], today: da
     db.add(head)
     access_service.seed_system_roles(db, business.id)
     db.flush()
+    from app.modules.catalog.service import seed_units
+    from app.modules.inventory.service import create_default_warehouse
+
+    seed_units(db, business.id)
+    create_default_warehouse(db, business.id, head.id)
+    db.flush()
 
     access = BusinessAccess(actor, business, None, frozenset(), True, frozenset())
     create_financial_year(db, access, containing=today)
@@ -134,6 +140,13 @@ def update_business(db: Session, access: BusinessAccess, data: dict[str, Any]) -
         if list_financial_years(db, business.id):
             raise ValidationFailed(
                 "The financial-year start month cannot change once financial years exist"
+            )
+    if data.get("inventory_valuation", business.inventory_valuation) != business.inventory_valuation:
+        from app.modules.inventory.service import has_stock_activity
+
+        if has_stock_activity(db, business.id):
+            raise ValidationFailed(
+                "The inventory valuation method cannot change once stock has been recorded"
             )
     before = audit.snapshot(business, BUSINESS_FIELDS)
     for k, v in data.items():

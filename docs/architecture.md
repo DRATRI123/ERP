@@ -54,6 +54,10 @@ backend/
       audit/     append-only audit trail
       events/    transactional outbox
       gst/       GSTIN/PAN/state-code validation (grows into the GST engine in Phase 3)
+      catalog/   units, categories, brands, products
+      parties/   customers & suppliers, groups, addresses
+      inventory/ warehouses, stock engine, documents, reports
+      numbering/ gap-free document number series
     cli.py       migrate, create-owner, db-check, db-backup
   alembic/       versioned migrations (the only way schema changes)
   tests/         one suite, runs on SQLite and PostgreSQL
@@ -98,7 +102,33 @@ call `db.commit()` once at the end of a successful request; anything uncommitted
 * Login, logout and refresh-reuse events go to `login_events`; administrative actions go to
   `audit_logs`.
 
-## 5. Reliability patterns
+## 5. Inventory engine
+
+All stock changes go through `inventory/engine.py` (`StockEngine.post`). Phase 3 sales and
+purchase documents will post through the same engine with their own `source_type`.
+
+* **Ledger + balances**: `stock_ledger` is append-only (signed quantity, value at cost, running
+  balance). `stock_balances` holds the current quantity/value per product × warehouse × batch
+  and always equals the ledger sum (`verify_balances` checks this; every inventory test runs it).
+* **Valuation**: weighted average or FIFO, chosen per business and locked once stock exists.
+  FIFO keeps `cost_layers` with remaining quantity *and* remaining value, so issuing the last
+  unit of a layer takes exactly what is left. Rounding therefore never leaves residue.
+  `layer_consumptions` record which layers each issue used.
+* **Reversal, not deletion**: cancelling a document posts mirror entries. A reversed issue
+  restores the exact layers (with original receipt dates) it consumed; a reversed receipt
+  removes exactly its own layers and is refused if they have already been issued.
+* **Transfers** issue from the source and receive at the destination with the same value; under
+  FIFO the individual layers travel with the stock.
+* **Concurrency**: balance rows, cost layers, serials and number-series rows are locked
+  (`SELECT … FOR UPDATE` with `populate_existing`, so a session never acts on a stale cached
+  copy) in a fixed order to avoid deadlocks. A test fires concurrent issues at the same stock
+  on both databases and asserts no overselling and no duplicate document numbers.
+* **Batches & serials**: batch-tracked products require a batch on every movement; serial-tracked
+  products require exactly one serial per unit, and each serial's movements are recorded.
+* **Cost visibility**: purchase prices, unit costs and values are returned only to users with
+  `stock_value.view`; everyone else sees quantities.
+
+## 6. Reliability patterns
 
 * **Transactional outbox** – domain events (`business.created`, later `invoice.created`, …) are
   inserted into `outbox_events` in the same transaction as the change. A relay (Phase 7) publishes
@@ -111,7 +141,7 @@ call `db.commit()` once at the end of a successful request; anything uncommitted
 * **Structured logs** – one JSON line per request with method, path, status, duration and
   request id.
 
-## 6. Database strategy (SQLite first, PostgreSQL ready)
+## 7. Database strategy (SQLite first, PostgreSQL ready)
 
 See [database-schema.md](database-schema.md) for the schema itself.
 
@@ -132,6 +162,10 @@ See [database-schema.md](database-schema.md) for the schema itself.
   writers queue instead of failing on a lock upgrade; GET requests use a deferred `BEGIN`, so
   readers never block. SQLite still serializes writes — fine for a few dozen users, and the
   reason for the PostgreSQL phase.
+* Migrations on SQLite pause foreign-key enforcement while batch operations rebuild tables,
+  then run `PRAGMA foreign_key_check` and refuse to commit if anything is broken. A test
+  upgrades a database holding Phase 1 data to prove upgrades work on real data, not just on
+  empty schemas.
 * Backups: `python -m app.cli db-backup` uses SQLite's online backup API (safe while running)
   and integrity-checks the copy before reporting success.
 * The same test suite runs against PostgreSQL by setting `ERP_TEST_DATABASE_URL`; CI runs both.
@@ -145,7 +179,7 @@ decimal sums per column, trial balance, stock balances, customer outstanding and
 totals → run the test suite against the new database → cut over in a maintenance window.
 No dual writes.
 
-## 7. API conventions
+## 8. API conventions
 
 * REST + JSON under `/api/v1`, OpenAPI 3 at `/api/v1/openapi.json`, docs at `/api/v1/docs`.
 * `limit`/`offset` pagination returning `{items, total, limit, offset}`.

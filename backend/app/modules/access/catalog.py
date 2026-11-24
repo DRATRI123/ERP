@@ -47,7 +47,9 @@ PERMISSIONS: tuple[Permission, ...] = (
     _P("products.view", "Inventory", "View products"),
     _P("products.manage", "Inventory", "Create and edit products"),
     _P("stock.view", "Inventory", "View stock levels"),
-    _P("stock.edit", "Inventory", "Adjust and transfer stock"),
+    _P("stock.edit", "Inventory", "Post opening stock, adjustments, transfers and counts"),
+    _P("stock_value.view", "Inventory", "View purchase prices, stock cost and valuation"),
+    _P("warehouses.manage", "Inventory", "Create and edit warehouses"),
     # Parties
     _P("customers.view", "Parties", "View customers"),
     _P("customers.manage", "Parties", "Create and edit customers"),
@@ -108,6 +110,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
             "invoices.create", "invoices.edit", "invoices.cancel",
             "purchases.create", "purchases.edit", "purchases.approve",
             "products.manage", "stock.edit", "customers.manage", "suppliers.manage",
+            "warehouses.manage",
             "payments.create", "expenses.manage", "data.export",
         ),
     ),
@@ -137,7 +140,8 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Products, stock levels, transfers and adjustments",
         _codes(
             "business.view", "products.view", "products.manage", "stock.view", "stock.edit",
-            "purchases.view", "suppliers.view", "reports.view",
+            "stock_value.view", "warehouses.manage", "purchases.view", "suppliers.view",
+            "reports.view",
         ),
     ),
     RoleTemplate(
@@ -147,8 +151,8 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         _codes(
             "business.view", "purchases.view", "purchases.create", "purchases.edit",
             "purchases.approve", "suppliers.view", "suppliers.manage",
-            "supplier_balances.view", "products.view", "stock.view", "payments.view",
-            "reports.view",
+            "supplier_balances.view", "products.view", "stock.view", "stock_value.view",
+            "payments.view", "reports.view",
         ),
     ),
     RoleTemplate(

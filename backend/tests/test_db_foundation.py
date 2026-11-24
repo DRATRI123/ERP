@@ -165,3 +165,54 @@ def test_sqlite_backup_is_consistent_and_verified(engine, tmp_path: Path, owner)
 def test_integrity_check_passes(engine):
     report = check_integrity(engine)
     assert report.ok, report.problems
+
+
+def test_phase2_migration_backfills_existing_businesses(engine):
+    """A business created under Phase 1 (schema 0001) gets units, a MAIN warehouse and loses
+    its stored system-role permission rows when upgraded to 0002."""
+    import sqlalchemy as sa
+
+    cfg = alembic_config()
+    command.downgrade(cfg, "0001")
+    now = datetime.now(UTC)
+    biz, branch, role = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    ts = UTCDateTime()
+
+    def common() -> list:
+        return [sa.column("created_at", ts), sa.column("updated_at", ts)]
+
+    try:
+        _insert_phase1_rows(engine, sa, common, now, biz, branch, role)
+    finally:
+        command.upgrade(cfg, "head")  # never leave the shared test schema downgraded
+    with engine.connect() as conn:
+        units = conn.execute(text("SELECT count(*) FROM units")).scalar()
+        wh = conn.execute(text("SELECT code FROM warehouses")).scalars().all()
+        perms = conn.execute(text("SELECT count(*) FROM role_permissions")).scalar()
+        valuation = conn.execute(text("SELECT inventory_valuation FROM businesses")).scalar()
+    assert (units, wh, perms, valuation) == (12, ["MAIN"], 0, "weighted_average")
+
+
+def _insert_phase1_rows(engine, sa, common, now, biz, branch, role) -> None:
+    with engine.begin() as conn:
+        conn.execute(sa.table("businesses", sa.column("id", sa.Uuid()), sa.column("name"),
+                              sa.column("gst_registration_type"), sa.column("base_currency"),
+                              sa.column("fy_start_month"), sa.column("settings", sa.JSON()),
+                              sa.column("status"), sa.column("country"), *common()).insert().values(
+            id=biz, name="Old Co", gst_registration_type="regular", base_currency="INR",
+            fy_start_month=4, settings={}, status="active", country="IN",
+            created_at=now, updated_at=now))
+        conn.execute(sa.table("branches", sa.column("id", sa.Uuid()), sa.column("business_id", sa.Uuid()),
+                              sa.column("code"), sa.column("name"), sa.column("kind"),
+                              sa.column("is_active", sa.Boolean()), sa.column("country"),
+                              *common()).insert().values(
+            id=branch, business_id=biz, code="HO", name="Head Office", kind="head_office",
+            is_active=True, country="IN", created_at=now, updated_at=now))
+        conn.execute(sa.table("roles", sa.column("id", sa.Uuid()), sa.column("business_id", sa.Uuid()),
+                              sa.column("code"), sa.column("name"), sa.column("is_system", sa.Boolean()),
+                              *common()).insert().values(
+            id=role, business_id=biz, code="accountant", name="Accountant", is_system=True,
+            created_at=now, updated_at=now))
+        conn.execute(sa.table("role_permissions", sa.column("role_id", sa.Uuid()),
+                              sa.column("permission_code")).insert().values(
+            role_id=role, permission_code="gst.view"))
