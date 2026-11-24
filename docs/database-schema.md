@@ -142,6 +142,17 @@ effective on both databases (NULLs never collide in unique constraints).
 
 `payments.account_id` (migration `0004`) records which cash/bank account money moved through.
 
+## Phase 5 tables
+
+| Table | Purpose |
+|---|---|
+| `integrations` | Provider, name, status, non-secret config, **encrypted** credentials, last test/sync/error |
+| `integration_logs` | Every outbound call and inbound webhook: operation, success, HTTP status, detail, duration |
+| `outbound_messages` | E-mail/WhatsApp/SMS queue: recipient, document to attach, status, attempts, next attempt, provider id |
+| `payment_links` | Gateway links per invoice with amount paid and status |
+| `gateway_payments` | Each confirmed gateway payment (unique per provider payment id) and the ERP receipt it became |
+| `webhook_receipts` | Replay protection: provider event ids processed once |
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |

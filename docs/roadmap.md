@@ -8,9 +8,9 @@ PostgreSQL.
 | 1 | Foundation: architecture, repo, SQLite + SQLAlchemy + Alembic, auth, owner, multi-business, users, roles & permissions, audit, outbox | **Backend done**. Frontend shell still to do |
 | 2 | Products, customers, suppliers, warehouses, inventory ledger | **Backend done**. Frontend screens still to do |
 | 3 | Invoice engine, numbering series, GST, returns, printing | **Backend done**. Visual designer UI still to do |
-| 4 | Double-entry accounting, ledgers, banking, financial reports | **Backend done** (169 tests in total) |
-| 5 | Integrations: WhatsApp, Gmail/SMTP, SMS, payment gateways, Google, Shopify | Next |
-| 6 | Developer platform: API keys & scopes, webhooks, idempotency, rate limits | — |
+| 4 | Double-entry accounting, ledgers, banking, financial reports | **Backend done** |
+| 5 | Integrations: WhatsApp, Gmail/SMTP, SMS, payment gateways, Google, Shopify | **Backend done** (185 tests in total); live verification with your accounts pending — see [integrations.md](integrations.md) |
+| 6 | Developer platform: API keys & scopes, webhooks, idempotency, rate limits | Next |
 | 7 | Node.js realtime + webhook delivery, Redis, Rust workers (where benchmarks justify) | — |
 | 8 | Custom domains, SSL, encryption at rest, monitoring, backups, deployment | — |
 | 9 | SQLite → PostgreSQL migration utility and cutover | — |

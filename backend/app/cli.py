@@ -91,6 +91,43 @@ def cmd_accounting_backfill(_: argparse.Namespace) -> int:
     return status
 
 
+def cmd_worker(args: argparse.Namespace) -> int:
+    """Send queued e-mails / WhatsApp / SMS. Run under systemd or Docker alongside the API."""
+    import time
+
+    from app.db.session import SessionLocal
+    from app.modules.integrations.outbox import process_due
+
+    while True:
+        db = SessionLocal()
+        try:
+            stats = process_due(db)
+        finally:
+            db.close()
+        if any(stats.values()):
+            print(f"worker: {stats}", flush=True)
+        if args.once:
+            return 0
+        time.sleep(args.interval)
+
+
+def cmd_rotate_encryption(_: argparse.Namespace) -> int:
+    """After prepending a new key to ERP_ENCRYPTION_KEYS: re-encrypt every stored secret."""
+    from sqlalchemy import select
+
+    from app.core.crypto import reencrypt
+    from app.db.session import session_scope
+    from app.modules.integrations.models import Integration
+
+    n = 0
+    with session_scope() as db:
+        for i in db.scalars(select(Integration).where(Integration.credentials_encrypted.is_not(None))):
+            i.credentials_encrypted = reencrypt(i.credentials_encrypted)
+            n += 1
+    print(f"Re-encrypted credentials of {n} integration(s) with the primary key")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="erp")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -115,6 +152,14 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("accounting-backfill",
                        help="Post journals for earlier invoices, payments and stock documents")
     p.set_defaults(func=cmd_accounting_backfill)
+
+    p = sub.add_parser("worker", help="Send queued messages (loop)")
+    p.add_argument("--once", action="store_true")
+    p.add_argument("--interval", type=int, default=15)
+    p.set_defaults(func=cmd_worker)
+
+    p = sub.add_parser("rotate-encryption", help="Re-encrypt stored secrets with the newest key")
+    p.set_defaults(func=cmd_rotate_encryption)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

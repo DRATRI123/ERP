@@ -161,7 +161,19 @@ purchase documents will post through the same engine with their own `source_type
 * Reports read the journal only. Period reports exclude year-closing entries; position
   reports include them. `verify_books` re-checks the cross-subsystem invariants on demand.
 
-## 8. Reliability patterns
+## 8. Integrations
+
+* Connectors are thin functions per provider (`integrations/providers/`) using one HTTP client
+  factory with timeouts; tests swap in a simulated transport.
+* Credentials are Fernet-encrypted with a rotatable key list and are write-only via the API.
+* Outbound messages are queued in the database and sent by `python -m app.cli worker` with
+  exponential backoff — billing never waits on, or fails because of, a provider.
+* Inbound webhooks are unauthenticated endpoints that verify the provider's HMAC signature over
+  the raw body (plus timestamp windows where the provider sends one) and de-duplicate by event
+  id. Money is only recorded from verified events, exactly once.
+* Details per provider: [integrations.md](integrations.md).
+
+## 9. Reliability patterns
 
 * **Transactional outbox** – domain events (`business.created`, later `invoice.created`, …) are
   inserted into `outbox_events` in the same transaction as the change. A relay (Phase 7) publishes
@@ -174,7 +186,7 @@ purchase documents will post through the same engine with their own `source_type
 * **Structured logs** – one JSON line per request with method, path, status, duration and
   request id.
 
-## 9. Database strategy (SQLite first, PostgreSQL ready)
+## 10. Database strategy (SQLite first, PostgreSQL ready)
 
 See [database-schema.md](database-schema.md) for the schema itself.
 
@@ -212,7 +224,7 @@ decimal sums per column, trial balance, stock balances, customer outstanding and
 totals → run the test suite against the new database → cut over in a maintenance window.
 No dual writes.
 
-## 10. API conventions
+## 11. API conventions
 
 * REST + JSON under `/api/v1`, OpenAPI 3 at `/api/v1/openapi.json`, docs at `/api/v1/docs`.
 * `limit`/`offset` pagination returning `{items, total, limit, offset}`.

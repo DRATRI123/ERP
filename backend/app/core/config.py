@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     pdf_no_sandbox: bool = False
     cors_origins: list[str] = []
 
+    # Fernet keys for credentials at rest; first one encrypts (see app/core/crypto.py).
+    encryption_keys: list[str] = []
+    # Public base URL of this ERP (webhook and OAuth callback URLs are built from it).
+    public_base_url: str = "http://localhost:8000"
+
     @field_validator("database_url")
     @classmethod
     def _resolve_sqlite_path(cls, v: str) -> str:

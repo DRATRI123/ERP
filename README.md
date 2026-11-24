@@ -25,7 +25,11 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   invoice, purchase, payment, stock movement and expense; manual journals, opening balances,
   fixed assets & depreciation, bank reconciliation, year closing; trial balance, ledgers,
   day/cash/bank book, aging, P&L, balance sheet and cash flow.
-* Next: Phase 5 (integrations). The Next.js frontend is still to be built.
+* **Phase 5 backend — complete:** integration center with encrypted credentials; e-mail
+  (SMTP/Gmail), WhatsApp Cloud API, MSG91 SMS, Razorpay & Cashfree payment links with verified
+  webhooks, Google Drive backups, Shopify import, CSV/Excel import & export, Tally XML export.
+  See [docs/integrations.md](docs/integrations.md) for setup.
+* Next: Phase 6 (developer API platform). The Next.js frontend is still to be built.
 
 After upgrading a database that already has invoices or stock from earlier phases, run
 `python -m app.cli accounting-backfill` once to post their journals.

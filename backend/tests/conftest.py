@@ -23,6 +23,8 @@ os.environ["ERP_SECRET_KEY"] = secrets.token_urlsafe(48)
 if Path("/opt/pw-browsers/chromium").exists():  # PDF rendering in this environment
     os.environ.setdefault("ERP_PDF_CHROMIUM_PATH", "/opt/pw-browsers/chromium")
     os.environ.setdefault("ERP_PDF_NO_SANDBOX", "true")
+os.environ["ERP_ENCRYPTION_KEYS"] = '["%s"]' % __import__("cryptography.fernet", fromlist=["Fernet"]).Fernet.generate_key().decode()
+os.environ["ERP_PUBLIC_BASE_URL"] = "https://erp.test"
 os.environ["ERP_DATABASE_URL"] = os.environ.get(
     "ERP_TEST_DATABASE_URL", f"sqlite:///{_TMP / 'test.db'}"
 )
