@@ -141,7 +141,8 @@ def create_payment(db: Session, access: BusinessAccess, *, direction: PaymentDir
                           "allocations": [{"document_id": d.id, "amount": a.amount}
                                           for d, a in zip(touched, pay.allocations, strict=True)]})
     post_payment(db, access.business, pay, user_id=access.user.id)
-    payload = {"id": pay.id, "number": number, "direction": direction.value, "amount": amount,
+    payload = {"id": pay.id, "number": number, "branch_id": pay.branch_id, "direction": direction.value,
+               "amount": amount,
                "mode": mode.value, "party_id": party_id, "payment_date": payment_date}
     events.emit(db, "payment.created", aggregate_type="payment", aggregate_id=pay.id,
                 business_id=access.business.id, payload=payload)

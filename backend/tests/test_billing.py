@@ -586,3 +586,29 @@ def test_concurrent_finalization_unique_numbers_no_oversell(api, owner_headers, 
     assert len(numbers) == len(set(numbers)) == 6
     assert s.stock(p)[0] == D("0")
     s.assert_consistent(db)
+
+
+def test_batch_print_single_pdf(bshop):
+    from app.modules.billing.printing import chromium_path
+
+    p = stocked(bshop, "batch", selling_price="10")
+    ids = [invoice(bshop, [{"product_id": p}], payments=[{"mode": "cash", "amount": "10"}])["id"] for _ in range(3)]
+    r = bshop.api.c.post(f"{bshop.base}/documents/print-batch", headers=bshop.h, json={"document_ids": ids})
+    if chromium_path() is None:
+        assert r.status_code == 503
+        return
+    assert r.status_code == 200 and r.content[:5] == b"%PDF-"
+    assert r.content.count(b"/Type /Page\n") + r.content.count(b"/Type/Page") >= 3 or b"/Count 3" in r.content
+    other = bshop.post("/invoice-templates", {"name": "Thermal", "doc_types": ["sales_invoice"], "is_default": True,
+                                              "config": {"paper": "thermal_80"}})
+    assert other["is_default"]
+    br = bshop.post("/branches", {"code": "B2", "name": "Two"})
+    bshop.post("/invoice-templates", {"name": "B2 A5", "branch_id": br["id"], "doc_types": ["sales_invoice"],
+                                      "is_default": True, "config": {"paper": "a5"}})
+    wh = bshop.warehouse("W2", br["id"])
+    bshop.opening([{"product_id": p, "quantity": "5", "unit_cost": "1"}], warehouse=wh)
+    b2 = invoice(bshop, [{"product_id": p}], payments=[{"mode": "cash", "amount": "10"}], branch_id=br["id"],
+                 warehouse_id=wh)
+    r = bshop.api.c.post(f"{bshop.base}/documents/print-batch", headers=bshop.h,
+                         json={"document_ids": [ids[0], b2["id"]]})
+    assert r.status_code == 422 and "template" in r.json()["error"]["message"]

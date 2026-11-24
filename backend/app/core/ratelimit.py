@@ -1,7 +1,8 @@
-"""Per-application rate limiting (sliding one-minute window, in process memory).
+"""Per-application rate limiting over a sliding one-minute window.
 
-Good for a single API process. With several workers or servers each enforces its own window;
-Phase 7 moves the counters to Redis so the limit is shared.
+With ``ERP_REDIS_URL`` set the window lives in Redis (a sorted set per application), so the
+limit is shared by every API process and server. Without Redis, or if Redis is unreachable,
+each process keeps its own window in memory (fail-open to the local limit, never to unlimited).
 """
 
 from __future__ import annotations
@@ -33,4 +34,58 @@ class RateLimiter:
             self._hits.clear()
 
 
-limiter = RateLimiter()
+# Runs atomically inside Redis: trim the window, check, and record in one step, so concurrent
+# requests from many API processes can never slip past the limit together.
+_SLIDING_WINDOW = """
+local key, now, window, limit, member = KEYS[1], tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3]), ARGV[4]
+redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
+local count = redis.call('ZCARD', key)
+if count >= limit then
+  local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+  return {0, 0, oldest[2] or tostring(now)}
+end
+redis.call('ZADD', key, now, member)
+redis.call('EXPIRE', key, math.ceil(window) + 5)
+return {1, limit - count - 1, '0'}
+"""
+
+
+class RedisRateLimiter:
+    def __init__(self, fallback: RateLimiter) -> None:
+        self.fallback = fallback
+        self._script = None
+
+    def hit(self, key: str, limit: int, window: float = 60.0, now: float | None = None) -> tuple[bool, int, int]:
+        import uuid
+
+        import redis
+
+        from app.core.redis import get_redis
+
+        client = get_redis()
+        if client is None:
+            return self.fallback.hit(key, limit, window, now)
+        now = time.time() if now is None else now
+        try:
+            if self._script is None:
+                self._script = client.register_script(_SLIDING_WINDOW)
+            allowed, remaining, oldest = self._script(
+                keys=[f"erp:ratelimit:{key}"], args=[now, window, limit, f"{now}:{uuid.uuid4().hex[:8]}"],
+                client=client)
+        except redis.RedisError:
+            return self.fallback.hit(key, limit, window, now)
+        if allowed:
+            return True, int(remaining), 0
+        return False, 0, max(1, int(float(oldest) + window - now) + 1)
+
+    def reset(self) -> None:
+        self.fallback.reset()
+        from app.core.redis import get_redis
+
+        client = get_redis()
+        if client is not None:
+            for k in client.scan_iter("erp:ratelimit:*"):
+                client.delete(k)
+
+
+limiter = RedisRateLimiter(RateLimiter())

@@ -187,7 +187,19 @@ purchase documents will post through the same engine with their own `source_type
 * Outgoing webhooks fan out from the transactional outbox in the worker, are HMAC-signed,
   retried with backoff, blocked from private/internal addresses, and can never roll back data.
 
-## 10. Reliability patterns
+## 10. Real-time and Redis
+
+* The worker relays the transactional outbox to the Redis Stream `erp:events` (at-least-once,
+  in commit order, capped length). Redis down = events wait in the outbox; nothing is lost.
+* `services/realtime` (Node.js, TypeScript, `ws`, `ioredis`) follows the stream and pushes
+  events to WebSocket clients after checking business, permission and branch per connection;
+  identity comes from the Python API, re-checked every minute. Clients resume from their last
+  stream id after a reconnect.
+* With `ERP_REDIS_URL` set, API rate limits use an atomic Lua sliding window in Redis, shared by
+  all API processes (falls back to per-process limits if Redis is unreachable).
+* Rust: benchmarked, not justified yet — [ADR 0001](adr/0001-rust-services.md).
+
+## 11. Reliability patterns
 
 * **Transactional outbox** – domain events (`business.created`, later `invoice.created`, …) are
   inserted into `outbox_events` in the same transaction as the change. A relay (Phase 7) publishes
@@ -200,7 +212,7 @@ purchase documents will post through the same engine with their own `source_type
 * **Structured logs** – one JSON line per request with method, path, status, duration and
   request id.
 
-## 11. Database strategy (SQLite first, PostgreSQL ready)
+## 12. Database strategy (SQLite first, PostgreSQL ready)
 
 See [database-schema.md](database-schema.md) for the schema itself.
 
@@ -238,7 +250,7 @@ decimal sums per column, trial balance, stock balances, customer outstanding and
 totals → run the test suite against the new database → cut over in a maintenance window.
 No dual writes.
 
-## 12. API conventions
+## 13. API conventions
 
 * REST + JSON under `/api/v1`, OpenAPI 3 at `/api/v1/openapi.json`, docs at `/api/v1/docs`.
 * `limit`/`offset` pagination returning `{items, total, limit, offset}`.

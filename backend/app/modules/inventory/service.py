@@ -235,7 +235,9 @@ def _emit(db: Session, access: BusinessAccess, doc: StockDocument, posted: list[
     changes = [{"product_id": p.entry.product_id, "warehouse_id": p.entry.warehouse_id,
                 "batch_id": p.entry.batch_id, "quantity": p.entry.quantity,
                 "balance_quantity": p.entry.balance_quantity} for p in posted]
+    wh = db.get(Warehouse, doc.warehouse_id)
     base = {"document_id": doc.id, "number": doc.number, "kind": doc.kind.value,
+            "branch_id": wh.branch_id if wh else None,
             "status": doc.status.value, "changes": changes}
     events.emit(db, "stock.updated", aggregate_type="stock_document", aggregate_id=doc.id,
                 business_id=access.business.id, payload=base)

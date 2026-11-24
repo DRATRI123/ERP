@@ -9,6 +9,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 
 from app.api.deps import DB, Access, require
@@ -51,7 +52,7 @@ from app.modules.billing.models import (
     PaymentDirection,
     PaymentStatus,
 )
-from app.modules.billing.printing import Paper, TemplateConfig, html_to_pdf, render_html
+from app.modules.billing.printing import Paper, TemplateConfig, combine_html, html_to_pdf, render_html
 from app.modules.gst import einvoice
 from app.modules.parties.models import Party
 
@@ -193,6 +194,36 @@ def convert_document(document_id: uuid.UUID, body: ConvertIn, access: Access, db
                           {"doc_date": body.doc_date} if body.doc_date else None)
     db.commit()
     return _out(doc)
+
+
+class PrintBatchIn(BaseModel):
+    document_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+    template_id: uuid.UUID | None = None
+    paper: Paper | None = None
+
+
+@router.post("/documents/print-batch", responses={200: {"content": {"application/pdf": {}}}})
+def print_batch(body: PrintBatchIn, access: Access, db: DB) -> Response:
+    """Many documents → one PDF in a single render (bulk printing, month-end copies)."""
+    docs = [service.get_document(db, access, d) for d in dict.fromkeys(body.document_ids)]
+    if body.template_id:
+        cfg = TemplateConfig.model_validate(template_service.get_template(db, access, body.template_id).config)
+    else:
+        configs = {template_service.resolve(db, access.business.id, d.branch_id, d.doc_type).model_dump_json()
+                   for d in docs}
+        if len(configs) > 1:
+            raise ValidationFailed("These documents use different print templates; pass template_id "
+                                   "or print them in separate batches")
+        cfg = TemplateConfig.model_validate_json(configs.pop())
+    if body.paper:
+        cfg = cfg.model_copy(update={"paper": body.paper})
+    pdf = html_to_pdf(combine_html([render_html(d, cfg, business_name=access.business.name) for d in docs]))
+    audit.record(db, action="documents.printed", entity_type="document", entity_id=docs[0].id,
+                 business_id=access.business.id, actor_id=access.user.id,
+                 changes={"count": len(docs), "format": "pdf"})
+    db.commit()
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="documents-{len(docs)}.pdf"'})
 
 
 @router.get("/documents/{document_id}/print", response_class=HTMLResponse,

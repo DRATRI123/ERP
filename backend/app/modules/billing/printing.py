@@ -217,6 +217,19 @@ def render_html(doc: Document, config: TemplateConfig, *, business_name: str) ->
     )
 
 
+def combine_html(pages: list[str]) -> str:
+    """Join rendered documents that share one template into a single printable HTML: one head
+    (styles, @page size), each document starting on a new page. One Chromium run then prints
+    them all — the browser start-up (~1 s) is paid once instead of per document."""
+    if len(pages) == 1:
+        return pages[0]
+    head = pages[0].split("<body>", 1)[0]
+    bodies = [p.split("<body>", 1)[1].rsplit("</body>", 1)[0] for p in pages]
+    joined = "".join(f'<div style="page-break-before: always">{b}</div>' if i else f"<div>{b}</div>"
+                     for i, b in enumerate(bodies))
+    return f"{head}<body>{joined}</body></html>"
+
+
 class PdfUnavailable(AppError):
     status_code = 503
     code = "pdf_unavailable"

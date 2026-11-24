@@ -106,6 +106,15 @@ def cmd_worker(args: argparse.Namespace) -> int:
         try:
             stats = process_due(db)
             stats["webhooks_queued"] = fan_out(db)
+            from app.core.redis import get_redis
+
+            if get_redis() is not None:
+                from app.modules.events.relay import publish_pending
+
+                try:
+                    stats["events_streamed"] = publish_pending(db, get_redis())
+                except Exception as exc:  # noqa: BLE001 - Redis down: retried next loop
+                    print(f"worker: event relay failed: {exc}", flush=True)
             stats.update({f"webhook_{k}": v for k, v in deliver_due(db).items()})
             if datetime.now(UTC).hour == 3 or args.once:  # daily overdue scan (idempotent)
                 stats["overdue_events"] = emit_overdue(db)

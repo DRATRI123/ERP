@@ -677,7 +677,7 @@ def finalize(db: Session, access: BusinessAccess, doc: Document, *,
 
 def _emit(db: Session, doc: Document, what: str) -> None:
     payload = {"id": doc.id, "doc_type": doc.doc_type.value, "number": doc.number,
-               "status": doc.status.value, "party_id": doc.party_id, "doc_date": doc.doc_date,
+               "branch_id": doc.branch_id, "status": doc.status.value, "party_id": doc.party_id, "doc_date": doc.doc_date,
                "grand_total": doc.grand_total, "balance_due": doc.balance_due}
     kind = {"created": "finalized", "cancelled": "cancelled", "updated": "updated"}[what]
     events.emit(db, f"document.{kind}", aggregate_type="document", aggregate_id=doc.id,

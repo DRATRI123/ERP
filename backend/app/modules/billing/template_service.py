@@ -53,6 +53,8 @@ def save_template(db: Session, access: BusinessAccess, t: InvoiceTemplate | None
         data["config"] = TemplateConfig.model_validate(data["config"]).model_dump(mode="json")
     if "doc_types" in data:
         data["doc_types"] = sorted({DocType(x).value for x in data["doc_types"]})
+    if data.get("branch_id") is not None:  # arrives as text from the JSON-mode dump
+        data["branch_id"] = uuid.UUID(str(data["branch_id"]))
     _check_branch(db, access, data.get("branch_id"))
     created = t is None
     if t is None:

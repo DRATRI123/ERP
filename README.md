@@ -32,7 +32,12 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
 * **Phase 6 backend — complete:** API applications with scoped, hashed, rotatable keys; OAuth 2.0
   client-credentials tokens; per-app rate limits; idempotency keys; API request logs and usage;
   signed outgoing webhooks with retries, rotation and auto-disable. See [docs/api.md](docs/api.md).
-* Next: Phase 7 (Node.js real-time, Redis). The Next.js frontend is still to be built.
+* **Phase 7 — complete:** Node.js real-time service (`services/realtime`) fed by a Redis Stream
+  from the transactional outbox, with permission/branch filtering, presence, resume and live
+  session revocation; Redis-shared rate limits; batch PDF printing. Rust was benchmarked and not
+  needed yet — see [docs/adr/0001-rust-services.md](docs/adr/0001-rust-services.md).
+* Next: Phase 8 (infrastructure: domains, SSL, backups, monitoring, deployment). The Next.js
+  frontend is still to be built.
 
 After upgrading a database that already has invoices or stock from earlier phases, run
 `python -m app.cli accounting-backfill` once to post their journals.

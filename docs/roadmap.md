@@ -11,8 +11,8 @@ PostgreSQL.
 | 4 | Double-entry accounting, ledgers, banking, financial reports | **Backend done** |
 | 5 | Integrations: WhatsApp, Gmail/SMTP, SMS, payment gateways, Google, Shopify | **Backend done** (185 tests in total); live verification with your accounts pending — see [integrations.md](integrations.md) |
 | 6 | Developer platform: API keys & scopes, webhooks, idempotency, rate limits | **Backend done** (197 tests in total) — see [api.md](api.md) |
-| 7 | Node.js realtime + webhook delivery, Redis, Rust workers (where benchmarks justify) | Next |
-| 8 | Custom domains, SSL, encryption at rest, monitoring, backups, deployment | — |
+| 7 | Node.js realtime + webhook delivery, Redis, Rust workers (where benchmarks justify) | **Done** — real-time service, Redis stream + shared rate limits, batch PDF; Rust measured and not needed ([ADR 0001](adr/0001-rust-services.md)) |
+| 8 | Custom domains, SSL, encryption at rest, monitoring, backups, deployment | Next |
 | 9 | SQLite → PostgreSQL migration utility and cutover | — |
 | 10 | Load/security testing, restore drills, production docs | — |
 

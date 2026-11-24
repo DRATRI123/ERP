@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     pdf_no_sandbox: bool = False
     cors_origins: list[str] = []
 
+    # Redis (Phase 7): event stream for the real-time service and shared rate limits.
+    # Optional: without it the API still works, rate limits are per process and the
+    # real-time service receives nothing.
+    redis_url: str | None = None
+    event_stream: str = "erp:events"
+    event_stream_maxlen: int = 100_000
+
     # Fernet keys for credentials at rest; first one encrypts (see app/core/crypto.py).
     encryption_keys: list[str] = []
     # Public base URL of this ERP (webhook and OAuth callback URLs are built from it).

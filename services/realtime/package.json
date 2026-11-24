@@ -1,0 +1,23 @@
+{
+  "name": "erp-realtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Real-time event delivery (WebSockets) for the private ERP",
+  "type": "module",
+  "main": "dist/src/index.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/src/index.js",
+    "test": "tsc -p . && node --test dist/test/*.test.js"
+  },
+  "dependencies": {
+    "ioredis": "5.4.2",
+    "ws": "8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.2",
+    "@types/ws": "8.5.13",
+    "typescript": "5.7.2"
+  }
+}
