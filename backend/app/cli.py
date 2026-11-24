@@ -92,7 +92,9 @@ def cmd_accounting_backfill(_: argparse.Namespace) -> int:
 
 
 def cmd_worker(args: argparse.Namespace) -> int:
-    """Send queued e-mails / WhatsApp / SMS. Run under systemd or Docker alongside the API."""
+    """Background jobs: queued e-mails / WhatsApp / SMS, outgoing webhooks, the real-time event
+    relay, backups, domain re-verification and security alerts. Run exactly one, under systemd
+    or Docker alongside the API."""
     import time
     from datetime import UTC, datetime
 
@@ -101,8 +103,10 @@ def cmd_worker(args: argparse.Namespace) -> int:
 
     while True:
         from app.modules.developer.webhooks import deliver_due, emit_overdue, fan_out
+        from app.modules.system import backups, domains, monitor, security
 
         db = SessionLocal()
+        stats: dict[str, object] = {}
         try:
             stats = process_due(db)
             stats["webhooks_queued"] = fan_out(db)
@@ -118,13 +122,104 @@ def cmd_worker(args: argparse.Namespace) -> int:
             stats.update({f"webhook_{k}": v for k, v in deliver_due(db).items()})
             if datetime.now(UTC).hour == 3 or args.once:  # daily overdue scan (idempotent)
                 stats["overdue_events"] = emit_overdue(db)
+            stats.update(security.deliver_alerts(db))
+            d = domains.reverify_due(db)
+            if d["checked"]:
+                stats["domains_checked"] = d["checked"]
+            monitor.heartbeat(db, "worker", {k: v for k, v in stats.items() if v})
+        except Exception as exc:  # noqa: BLE001 - keep the loop alive; the heartbeat shows health
+            db.rollback()
+            print(f"worker: loop failed: {exc!r}", flush=True)
         finally:
             db.close()
+        backup = backups.run_pending()  # own sessions; long-running
+        if backup:
+            stats["backup"] = backup
         if any(stats.values()):
             print(f"worker: {stats}", flush=True)
         if args.once:
             return 0
         time.sleep(args.interval)
+
+
+def cmd_backup(_: argparse.Namespace) -> int:
+    from app.modules.system.backups import run_backup
+
+    run = run_backup(trigger="cli")
+    if run.status.value != "succeeded":
+        print(f"Backup FAILED: {run.error}", file=sys.stderr)
+        return 2
+    print(f"Backup written and verified: {run.filename} ({run.size_bytes} bytes, sha256 {run.sha256})")
+    if run.error:
+        print(f"Warning: {run.error}", file=sys.stderr)
+    return 0
+
+
+def cmd_verify_backup(args: argparse.Namespace) -> int:
+    from app.core.errors import AppError
+    from app.modules.system.backups import verify_file
+
+    try:
+        header = verify_file(Path(args.file))
+    except AppError as exc:
+        print(f"INVALID: {exc.message}", file=sys.stderr)
+        return 2
+    print(f"OK: {header['dialect']} backup from {header['created_at']}, schema {header.get('revision')}")
+    return 0
+
+
+def cmd_restore(args: argparse.Namespace) -> int:
+    """Restore into ``--target`` (default: ERP_DATABASE_URL). Stop the API and worker first."""
+    from app.core.errors import AppError
+    from app.modules.system.backups import restore
+
+    target = args.target or get_settings().database_url
+    if not args.yes:
+        answer = input(f"Restore {args.file} into {target.split('@')[-1]}? Type RESTORE to continue: ")
+        if answer.strip() != "RESTORE":
+            print("Aborted")
+            return 1
+    try:
+        r = restore(Path(args.file), target, force=args.force)
+    except AppError as exc:
+        print(f"Restore FAILED: {exc.message}", file=sys.stderr)
+        return 2
+    print(f"Restored {r.dialect} backup from {r.created_at} (schema {r.revision}) into {r.target}")
+    print("Next: python -m app.cli migrate   (brings an older backup up to the current schema)")
+    return 0
+
+
+def cmd_backup_keygen(_: argparse.Namespace) -> int:
+    from app.modules.system.backupcrypt import generate_key
+
+    print(generate_key())
+    print("Store this key OUTSIDE the server (password manager + printed copy). "
+          "Without it, backups cannot be restored.", file=sys.stderr)
+    return 0
+
+
+def cmd_reset_mfa(args: argparse.Namespace) -> int:
+    """For the owner (or anyone) locked out of 2FA: needs shell access to the server."""
+    from app.db.session import session_scope
+    from app.modules.system.security import owner_reset_mfa
+    from app.modules.users.service import get_by_email, normalize_email
+
+    with session_scope() as db:
+        user = get_by_email(db, normalize_email(args.email))
+        if user is None:
+            print("No such user", file=sys.stderr)
+            return 1
+        owner_reset_mfa(db, target=user, actor=user)
+    print(f"Two-factor authentication switched off for {args.email}; all sessions signed out")
+    return 0
+
+
+def cmd_check_config(_: argparse.Namespace) -> int:
+    problems = get_settings().check_production()
+    for p in problems:
+        print(f"  - {p}")
+    print("Configuration OK for production" if not problems else "Fix the settings above before going live")
+    return 1 if problems else 0
 
 
 def cmd_rotate_encryption(_: argparse.Namespace) -> int:
@@ -161,7 +256,31 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("db-check", help="Run database integrity checks")
     p.set_defaults(func=cmd_db_check)
 
-    p = sub.add_parser("db-backup", help="Online, verified SQLite backup")
+    p = sub.add_parser("backup", help="Encrypted, verified backup into ERP_BACKUP_DIR")
+    p.set_defaults(func=cmd_backup)
+
+    p = sub.add_parser("verify-backup", help="Decrypt and check a backup file")
+    p.add_argument("file")
+    p.set_defaults(func=cmd_verify_backup)
+
+    p = sub.add_parser("restore", help="Restore an encrypted backup")
+    p.add_argument("file")
+    p.add_argument("--target", help="Database URL (default: ERP_DATABASE_URL)")
+    p.add_argument("--force", action="store_true", help="Replace an existing database")
+    p.add_argument("--yes", action="store_true", help="Do not ask for confirmation")
+    p.set_defaults(func=cmd_restore)
+
+    p = sub.add_parser("backup-keygen", help="Generate an ERP_BACKUP_KEY")
+    p.set_defaults(func=cmd_backup_keygen)
+
+    p = sub.add_parser("reset-mfa", help="Switch off two-factor authentication for a user")
+    p.add_argument("--email", required=True)
+    p.set_defaults(func=cmd_reset_mfa)
+
+    p = sub.add_parser("check-config", help="Check production settings")
+    p.set_defaults(func=cmd_check_config)
+
+    p = sub.add_parser("db-backup", help="Unencrypted SQLite copy (local use; prefer 'backup')")
     p.add_argument("--dest", default=str(BACKEND_DIR / "backups"))
     p.set_defaults(func=cmd_db_backup)
 
@@ -169,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
                        help="Post journals for earlier invoices, payments and stock documents")
     p.set_defaults(func=cmd_accounting_backfill)
 
-    p = sub.add_parser("worker", help="Send queued messages (loop)")
+    p = sub.add_parser("worker", help="Run background jobs (loop)")
     p.add_argument("--once", action="store_true")
     p.add_argument("--interval", type=int, default=15)
     p.set_defaults(func=cmd_worker)

@@ -78,3 +78,27 @@ def decode_access_token(token: str) -> dict[str, Any]:
     if claims.get("typ") != "access":
         raise jwt.InvalidTokenError("not an access token")
     return claims
+
+
+def password_fingerprint(password_hash: str | None) -> str:
+    return hashlib.sha256(f"mfa:{password_hash or ''}".encode()).hexdigest()[:24]
+
+
+def create_mfa_token(user_id: uuid.UUID, password_hash: str | None) -> tuple[str, int]:
+    """Proof that the password step succeeded, valid for a few minutes, usable only for the
+    second-factor step. Bound to the password version, so a password change voids it."""
+    settings = get_settings()
+    ttl = timedelta(minutes=settings.mfa_token_ttl_minutes)
+    now = datetime.now(UTC)
+    claims = {"iss": JWT_ISSUER, "sub": str(user_id), "typ": "mfa", "iat": now, "exp": now + ttl,
+              "jti": uuid.uuid4().hex,
+              "pwd": password_fingerprint(password_hash)}
+    return jwt.encode(claims, settings.secret_key, algorithm=JWT_ALGORITHM), int(ttl.total_seconds())
+
+
+def decode_mfa_token(token: str) -> dict[str, Any]:
+    claims = jwt.decode(token, get_settings().secret_key, algorithms=[JWT_ALGORITHM], issuer=JWT_ISSUER,
+                        options={"require": ["exp", "iat", "sub", "typ"]})
+    if claims.get("typ") != "mfa":
+        raise jwt.InvalidTokenError("not an MFA token")
+    return claims

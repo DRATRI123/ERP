@@ -49,14 +49,71 @@ class LoginIn(BaseModel):
 
 
 class RefreshIn(BaseModel):
-    refresh_token: str = Field(min_length=10, max_length=200)
+    # Optional when ERP_AUTH_COOKIE is on (the token then comes from the httpOnly cookie).
+    refresh_token: str | None = Field(None, min_length=10, max_length=200)
 
 
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
-    refresh_token: str
+    refresh_token: str | None = Field(None, description="Absent when the refresh token is set as a cookie")
+
+
+class LoginOut(BaseModel):
+    """Either tokens, or — with two-factor authentication on — ``mfa_required`` and a
+    short-lived ``mfa_token`` to send with the code to ``/auth/login/mfa``."""
+
+    access_token: str | None = None
+    token_type: str = "bearer"
+    expires_in: int | None = None
+    refresh_token: str | None = None
+    mfa_required: bool = False
+    mfa_token: str | None = None
+    mfa_expires_in: int | None = None
+
+
+class MfaLoginIn(BaseModel):
+    mfa_token: str = Field(min_length=20, max_length=2000)
+    code: str | None = Field(None, max_length=10)
+    recovery_code: str | None = Field(None, max_length=20)
+
+
+class PasswordConfirmIn(BaseModel):
+    password: Password
+
+
+class MfaCodeIn(BaseModel):
+    code: str = Field(min_length=6, max_length=10)
+
+
+class MfaConfirmIn(BaseModel):
+    password: Password
+    code: str = Field(min_length=6, max_length=10)
+
+
+class MfaSetupOut(BaseModel):
+    secret: str
+    otpauth_uri: str
+    qr_svg: str
+
+
+class RecoveryCodesOut(BaseModel):
+    recovery_codes: list[str] = Field(description="Shown once. Each code works once.")
+
+
+class MfaStatusOut(BaseModel):
+    enabled: bool
+    enabled_at: datetime | None
+    recovery_codes_left: int
+
+
+class SecurityEventOut(ORM):
+    id: uuid.UUID
+    kind: str
+    detail: dict[str, Any]
+    created_at: datetime
+    emailed_at: datetime | None
 
 
 class ChangePasswordIn(BaseModel):
@@ -101,6 +158,7 @@ class UserOut(ORM):
     status: UserStatus
     last_login_at: datetime | None
     created_at: datetime
+    mfa_enabled: bool = False
 
     @classmethod
     def of(cls, u: Any) -> UserOut:

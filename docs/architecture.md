@@ -100,7 +100,15 @@ call `db.commit()` once at the end of a successful request; anything uncommitted
   "sign out other devices" take effect immediately, not when the JWT expires.
 * Brute force: per-account lockout after 5 failures for 15 minutes; failed attempts are
   committed even though the request fails. Unknown e-mail and wrong password return the same
-  error and comparable timing. IP-level rate limiting is added with Redis in Phase 7/8.
+  error and comparable timing. Sign-in and token endpoints are also limited per client IP
+  (`ERP_LOGIN_IP_LIMIT` per 15 minutes, shared through Redis).
+* **Two-factor** (Phase 8): with TOTP on, a correct password returns only a 5-minute
+  `mfa_token` (JWT `typ: "mfa"`, bound to the password hash); `/auth/login/mfa` exchanges it
+  plus a code or recovery code for tokens. Wrong codes count towards the account lockout and a
+  correct password does not reset the counter while 2FA is pending. TOTP secrets are encrypted
+  with `ERP_ENCRYPTION_KEYS`; each time step is accepted once.
+* With `ERP_AUTH_COOKIE` the refresh token lives in an httpOnly, SameSite=strict cookie scoped
+  to `/api/v1/auth`, and `/auth/refresh` additionally requires the double-submit CSRF header.
 * Login, logout and refresh-reuse events go to `login_events`; administrative actions go to
   `audit_logs`.
 
@@ -258,3 +266,31 @@ No dual writes.
   inaccessible businesses and cross-business ids are `404`.
 * Planned for Phase 6: scoped API keys for external apps, idempotency keys on create
   endpoints, per-key rate limiting, HMAC-signed webhooks.
+
+## 14. Security and operations (Phase 8)
+
+```
+Internet ──► Caddy :443 ──┬─ /api/*  ─► api (uvicorn, 1 process)  ─┐
+  (TLS, HSTS,             ├─ /ws*    ─► realtime (Node)            ├─ internal network:
+   on-demand certs)       └─ ask ────► /system/tls-ask             │   Redis, PostgreSQL
+                                                                   │
+                               worker (messages, webhooks, relay, ─┘
+                               backups, domain checks, alerts)
+```
+
+* **Host header**: every request must name `ERP_ALLOWED_HOSTS`, an internal service name, or an
+  active custom domain (cached 30 s per process); otherwise 421. Probes (`/health`, `/ready`,
+  `/metrics`, `/system/tls-ask`) are exempt so Docker, Caddy and Prometheus can call them by IP.
+* **Certificates** only for allowed hosts and verified domains (Caddy asks the API first).
+* **Headers**: `default-src 'none'` CSP and `X-Frame-Options: DENY` on API responses (Swagger
+  gets a relaxed CSP; print previews keep their own), `nosniff`, `no-referrer`, COOP/CORP,
+  permissions policy, HSTS when `ERP_FORCE_HTTPS`.
+* **Encryption**: TLS in transit; application-level encryption of integration credentials and
+  2FA secrets (Fernet, rotatable) and of backups (AES-256-GCM, separate key); disk encryption is
+  the server's job.
+* **Backups** are taken by the worker only, so there is one writer of backup files; requests
+  just queue a run. A backup is reported successful only after the file has been decrypted again
+  and checked.
+* **Observability**: JSON logs with request ids, in-process Prometheus metrics, readiness, and
+  an owner health summary that turns the same signals into warnings.
+

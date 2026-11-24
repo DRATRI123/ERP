@@ -53,6 +53,64 @@ class Settings(BaseSettings):
     # Public base URL of this ERP (webhook and OAuth callback URLs are built from it).
     public_base_url: str = "http://localhost:8000"
 
+    # ------------------------------------------------------------------ Phase 8: security & ops
+    # Host names this server answers to (besides verified custom domains). Empty disables the
+    # Host-header check (development only; production refuses to start without it).
+    allowed_hosts: list[str] = []
+    # Docker-internal names other services use to call the API directly over HTTP (the
+    # real-time service calls http://api:8000). Allowed by the Host check, never redirected.
+    internal_hosts: list[str] = ["api", "localhost", "127.0.0.1", "::1"]
+    # Behind a TLS proxy: send HSTS and redirect plain-HTTP requests to HTTPS.
+    force_https: bool = False
+    # Shared secret Caddy appends to its on-demand TLS "ask" URL. Unset = endpoint disabled.
+    tls_ask_token: str | None = None
+    # Bearer token for Prometheus scraping of /metrics. Unset = endpoint disabled.
+    metrics_token: str | None = None
+    # Sign-in attempts allowed per client IP per 15 minutes (on top of per-account lockout).
+    login_ip_limit: int = 30
+    mfa_token_ttl_minutes: int = 5
+    # Keep the refresh token in an httpOnly cookie (with a double-submit CSRF token) instead of
+    # returning it in the JSON body. For the browser frontend.
+    auth_cookie: bool = False
+
+    # Encrypted backups: 32-byte key, base64 (``python -m app.cli backup-keygen``).
+    backup_key: str | None = None
+    backup_dir: str = "./data/backups"
+    # Minimum free disk space before readiness fails and backups refuse to run.
+    min_free_disk_mb: int = 500
+
+    # System e-mail (security alerts to users). Optional; without it alerts stay in-app.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_security: Literal["starttls", "ssl"] = "starttls"
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+
+    @field_validator("backup_dir")
+    @classmethod
+    def _resolve_backup_dir(cls, v: str) -> str:
+        path = Path(v)
+        return str(path if path.is_absolute() else (BACKEND_DIR / path).resolve())
+
+    @field_validator("allowed_hosts")
+    @classmethod
+    def _lower_hosts(cls, v: list[str]) -> list[str]:
+        return [h.strip().lower().rstrip(".") for h in v if h.strip()]
+
+    def check_production(self) -> list[str]:
+        """Settings that must be set before serving real traffic."""
+        problems = []
+        if not self.allowed_hosts:
+            problems.append("ERP_ALLOWED_HOSTS is empty")
+        if not self.force_https:
+            problems.append("ERP_FORCE_HTTPS is off")
+        if not self.encryption_keys:
+            problems.append("ERP_ENCRYPTION_KEYS is empty")
+        if not self.backup_key:
+            problems.append("ERP_BACKUP_KEY is empty")
+        return problems
+
     @field_validator("database_url")
     @classmethod
     def _resolve_sqlite_path(cls, v: str) -> str:

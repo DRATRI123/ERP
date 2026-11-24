@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import base64
-import json
 import re
 from email.message import EmailMessage
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
 
@@ -86,21 +86,39 @@ def gmail_send(config: dict[str, Any], creds: dict[str, Any], *, to: str, subjec
     return data["id"]
 
 
-def drive_upload(config: dict[str, Any], creds: dict[str, Any], *, filename: str, data: bytes,
-                 mime: str = "application/octet-stream") -> str:
-    meta: dict[str, Any] = {"name": filename}
+DRIVE_UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
+DRIVE_CHUNK = 8 * 1024 * 1024  # must be a multiple of 256 KiB
+
+
+def drive_upload_file(config: dict[str, Any], creds: dict[str, Any], *, path: Path,
+                      mime: str = "application/octet-stream") -> str:
+    """Resumable upload (any size, constant memory). Returns the Drive file id."""
+    meta: dict[str, Any] = {"name": path.name}
     if config.get("drive_folder_id"):
         meta["parents"] = [config["drive_folder_id"]]
-    boundary = "erp-backup-boundary"
-    body = (f"--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{json.dumps(meta)}\r\n"
-            f"--{boundary}\r\nContent-Type: {mime}\r\n\r\n").encode() + data + f"\r\n--{boundary}--".encode()
+    total = path.stat().st_size
     token = google_access_token(creds)
     with http_client(headers={"Authorization": f"Bearer {token}"}) as c:
-        out = check(c.post("https://www.googleapis.com/upload/drive/v3/files",
-                           params={"uploadType": "multipart"}, content=body,
-                           headers={"Content-Type": f"multipart/related; boundary={boundary}"}),
-                    what="Drive upload")
-    return out["id"]
+        start = c.post(DRIVE_UPLOAD, params={"uploadType": "resumable"}, json=meta,
+                       headers={"X-Upload-Content-Type": mime, "X-Upload-Content-Length": str(total)})
+        check(start, what="Drive upload start")
+        session_url = start.headers.get("location")
+        if not session_url or not session_url.startswith(DRIVE_UPLOAD):
+            raise IntegrationError("Drive did not return an upload session")
+        offset = 0
+        with path.open("rb") as f:
+            while True:
+                block = f.read(DRIVE_CHUNK)
+                end = offset + len(block) - 1
+                rng = f"bytes {offset}-{end}/{total}" if block else f"bytes */{total}"
+                resp = c.put(session_url, content=block, headers={"Content-Range": rng})
+                if resp.status_code == 308:  # chunk accepted, more expected
+                    offset = end + 1
+                    if not block:
+                        raise IntegrationError("Drive upload ended early")
+                    continue
+                out = check(resp, what="Drive upload")
+                return out["id"]
 
 
 # ---------------------------------------------------------------------------- Shopify

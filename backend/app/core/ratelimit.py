@@ -73,7 +73,7 @@ class RedisRateLimiter:
                 keys=[f"erp:ratelimit:{key}"], args=[now, window, limit, f"{now}:{uuid.uuid4().hex[:8]}"],
                 client=client)
         except redis.RedisError:
-            return self.fallback.hit(key, limit, window, now)
+            return self.fallback.hit(key, limit, window)  # the fallback keeps monotonic time
         if allowed:
             return True, int(remaining), 0
         return False, 0, max(1, int(float(oldest) + window - now) + 1)

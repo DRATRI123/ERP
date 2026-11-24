@@ -168,23 +168,24 @@ def shopify_products(integration_id: uuid.UUID, access: Manage, db: DB) -> dict:
 
 @router.post("/integrations/{integration_id}/drive-backup")
 def drive_backup(integration_id: uuid.UUID, access: Manage, db: DB) -> dict:
-    """Owner only: take a verified database backup and upload it to Google Drive."""
+    """Owner only: take an encrypted, verified database backup and upload it to Google Drive.
+    (Scheduled off-site copies are configured under /system/backups/settings.)"""
     if not access.is_owner:
         raise PermissionDenied("Only the owner can export database backups")
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    from app.db.maintenance import backup_sqlite
+    from app.modules.system.backups import backup_dir, create_backup
 
     i = svc.get_integration(db, access, integration_id)
     if "drive_backup" not in REGISTRY[i.provider].capabilities:
         raise ValidationFailed("This integration cannot store backups")
-    with TemporaryDirectory() as tmp, CallLog(db, i, "drive_backup") as log:
-        path = backup_sqlite(db.get_bind(), Path(tmp))
-        file_id = commerce.drive_upload(i.config, svc.credentials(i), filename=path.name, data=path.read_bytes())
+    with TemporaryDirectory(dir=backup_dir(), prefix=".drive-") as tmp, CallLog(db, i, "drive_backup") as log:
+        path, _ = create_backup(db.get_bind(), dest_dir=Path(tmp))
+        file_id = commerce.drive_upload_file(i.config, svc.credentials(i), path=path)
         log.detail = f"{path.name} → {file_id}"
     db.commit()
-    return {"ok": True, "file_id": file_id, "filename": path.name}
+    return {"ok": True, "file_id": file_id, "filename": path.name, "encrypted": True}
 
 
 # ---------------------------------------------------------------------------- documents

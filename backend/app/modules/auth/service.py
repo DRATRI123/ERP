@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hmac
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+import jwt
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -14,6 +16,9 @@ from app.core.context import client_ip_var, user_agent_var
 from app.core.errors import NotAuthenticated, TooManyRequests, ValidationFailed
 from app.core.security import (
     create_access_token,
+    create_mfa_token,
+    decode_mfa_token,
+    password_fingerprint,
     hash_password,
     hash_token,
     new_secret_token,
@@ -71,10 +76,27 @@ def _open_session(db: Session, user: User) -> IssuedTokens:
     return IssuedTokens(access, ttl, refresh, session.id)
 
 
-def login(db: Session, *, email: str, password: str) -> IssuedTokens:
-    """Authenticate. On failure the failure is committed before raising, so lockout counters
-    survive the request's rollback."""
+@dataclass(frozen=True)
+class MfaChallenge:
+    mfa_token: str
+    expires_in: int
+
+
+def _register_failure(db: Session, user: User, now: datetime) -> None:
     settings = get_settings()
+    user.failed_login_count += 1
+    if user.failed_login_count >= settings.login_max_failures:
+        user.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
+        user.failed_login_count = 0
+        from app.modules.system import security
+
+        security.record(db, user, "account_locked")
+
+
+def login(db: Session, *, email: str, password: str) -> IssuedTokens | MfaChallenge:
+    """Authenticate. On failure the failure is committed before raising, so lockout counters
+    survive the request's rollback. With two-factor authentication on, a correct password only
+    yields a short-lived challenge token for ``login_mfa``."""
     email_n = users.normalize_email(email)
     user = users.get_by_email(db, email_n)
     now = _now()
@@ -92,10 +114,7 @@ def login(db: Session, *, email: str, password: str) -> IssuedTokens:
     ok = verify_password(user.password_hash if user else None, password)
     if user is None or not ok:
         if user is not None:
-            user.failed_login_count += 1
-            if user.failed_login_count >= settings.login_max_failures:
-                user.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
-                user.failed_login_count = 0
+            _register_failure(db, user, now)
         fail("bad_credentials" if user else "unknown_user", NotAuthenticated(INVALID_CREDENTIALS))
     assert user is not None
 
@@ -103,14 +122,61 @@ def login(db: Session, *, email: str, password: str) -> IssuedTokens:
         fail(f"status_{user.status.value}", NotAuthenticated(
             "This account is not active", code="account_inactive"))
 
-    user.failed_login_count = 0
-    user.locked_until = None
-    user.last_login_at = now
     if password_needs_rehash(user.password_hash or ""):
         user.password_hash = hash_password(password)
+    from app.modules.system import security
+
+    if security.mfa_enabled(user):
+        # The failure counter is NOT reset here: otherwise knowing the password would allow
+        # unlimited guesses at the second factor.
+        _log_event(db, email=email_n, user=user, event="login_password", success=True)
+        token, ttl = create_mfa_token(user.id, user.password_hash)
+        return MfaChallenge(token, ttl)
+    return _complete_login(db, user, email_n)
+
+
+def _complete_login(db: Session, user: User, email_n: str) -> IssuedTokens:
+    from app.modules.system import security
+
+    if security.has_logged_in_before(db, user) and security.is_new_device(db, user):
+        security.record(db, user, "new_device_login")
+    user.failed_login_count = 0
+    user.locked_until = None
+    user.last_login_at = _now()
     tokens = _open_session(db, user)
     _log_event(db, email=email_n, user=user, event="login", success=True)
     return tokens
+
+
+def login_mfa(db: Session, *, mfa_token: str, code: str | None, recovery_code: str | None) -> IssuedTokens:
+    from app.modules.system import security
+
+    try:
+        claims = decode_mfa_token(mfa_token)
+    except jwt.PyJWTError as exc:
+        raise NotAuthenticated("The sign-in step has expired; enter your password again",
+                               code="mfa_token_invalid") from exc
+    user = db.get(User, uuid.UUID(claims["sub"]))
+    now = _now()
+    if (user is None or user.status != UserStatus.ACTIVE or not security.mfa_enabled(user)
+            or not hmac.compare_digest(password_fingerprint(user.password_hash), str(claims.get("pwd")))):
+        raise NotAuthenticated("The sign-in step has expired; enter your password again",
+                               code="mfa_token_invalid")
+    if user.locked_until is not None and user.locked_until > now:
+        raise TooManyRequests("Too many failed attempts. Try again later.", code="account_locked")
+
+    if code:
+        ok = security.check_code(user, code)
+    elif recovery_code:
+        ok = security.use_recovery_code(db, user, recovery_code)
+    else:
+        raise ValidationFailed("Enter the code from your authenticator app or a recovery code")
+    if not ok:
+        _register_failure(db, user, now)
+        _log_event(db, email=user.email, user=user, event="login", success=False, reason="bad_mfa_code")
+        db.commit()
+        raise NotAuthenticated("That code is not valid", code="invalid_mfa_code")
+    return _complete_login(db, user, user.email)
 
 
 def refresh(db: Session, refresh_token: str) -> IssuedTokens:
@@ -197,6 +263,9 @@ def change_password(
         raise ValidationFailed("New password must differ from the current password")
     _set_password(db, user, new)
     users.revoke_all_sessions(db, user.id, "password_changed", except_session=session_id)
+    from app.modules.system import security
+
+    security.record(db, user, "password_changed")
     audit.record(db, action="user.password_changed", entity_type="user", entity_id=user.id,
                  actor_id=user.id)
 

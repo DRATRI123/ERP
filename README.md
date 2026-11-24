@@ -9,6 +9,7 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
 * [Architecture](docs/architecture.md) – service boundaries, security model, database strategy
 * [Database schema](docs/database-schema.md) – tables, conventions, planned tables per phase
 * [Roadmap](docs/roadmap.md) – phases and current status
+* [Deployment](docs/deployment.md) – VPS setup, Docker Compose, Caddy, backups, monitoring
 
 ## Status
 
@@ -36,8 +37,14 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   from the transactional outbox, with permission/branch filtering, presence, resume and live
   session revocation; Redis-shared rate limits; batch PDF printing. Rust was benchmarked and not
   needed yet — see [docs/adr/0001-rust-services.md](docs/adr/0001-rust-services.md).
-* Next: Phase 8 (infrastructure: domains, SSL, backups, monitoring, deployment). The Next.js
-  frontend is still to be built.
+* **Phase 8 — complete (backend & deployment files):** TOTP two-factor sign-in with recovery
+  codes, new-device and security alerts, per-IP login limits, strict security headers / HSTS,
+  optional httpOnly refresh cookie with CSRF protection; custom domains verified by DNS TXT with
+  Host-header checks and Caddy on-demand TLS; AES-256-GCM encrypted, verified, scheduled backups
+  with GFS retention, Google Drive off-site copies and tested restores; readiness, Prometheus
+  metrics and an owner health page; Docker images and Compose stack. See
+  [docs/deployment.md](docs/deployment.md).
+* Next: Phase 9 (SQLite → PostgreSQL migration utility). The Next.js frontend is still to be built.
 
 After upgrading a database that already has invoices or stock from earlier phases, run
 `python -m app.cli accounting-backfill` once to post their journals.

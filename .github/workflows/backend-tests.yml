@@ -34,9 +34,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install Redis and the realtime service (for end-to-end tests)
+      - name: Install Redis, pg_dump and the realtime service (end-to-end and restore-drill tests)
         run: |
-          sudo apt-get update && sudo apt-get install -y redis-server
+          sudo apt-get update && sudo apt-get install -y redis-server postgresql-client
           cd ../services/realtime && npm ci && npm run build
       - run: pip install -e ".[dev,postgres]"
       - name: Run tests
@@ -60,3 +60,30 @@ jobs:
           cache-dependency-path: services/realtime/package-lock.json
       - run: npm ci
       - run: npm test
+
+  deploy:
+    # Builds the production images and validates the Compose and Caddy configuration.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        run: |
+          docker build -t erp-backend:ci backend
+          docker build -t erp-realtime:ci services/realtime
+      - name: Image smoke test (non-root, CLI, migrations on SQLite)
+        run: |
+          test "$(docker run --rm --entrypoint id erp-backend:ci -u)" = "10001"
+          docker run --rm -e ERP_SECRET_KEY=ci-secret-key-ci-secret-key-ci-secret-key \
+            -e ERP_DATABASE_URL=sqlite:////tmp/ci.db erp-backend:ci \
+            sh -c "python -m app.cli migrate && python -m app.cli backup-keygen >/dev/null && chromium --version"
+      - name: Validate Compose file
+        working-directory: deploy
+        run: cp .env.example .env && docker compose config --quiet && docker compose --profile postgres config --quiet
+        env:
+          POSTGRES_PASSWORD: ci
+          ERP_TLS_ASK_TOKEN: ci
+      - name: Validate Caddyfile
+        run: |
+          docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            -e ERP_PRIMARY_HOST=erp.example.com -e ERP_ACME_EMAIL=ci@example.com -e ERP_TLS_ASK_TOKEN=x \
+            caddy:2.8-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

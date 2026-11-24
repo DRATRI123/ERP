@@ -37,6 +37,11 @@ curl -X POST https://erp.example.com/api/v1/oauth/token \
   -d grant_type=client_credentials -d client_id=$APP_ID -d client_secret=$ERP_KEY -d "scope=customers:read"
 ```
 
+API keys are not affected by two-factor authentication: they are separate credentials with
+their own scopes, revocable at any time. Interactive sign-in for people (`/auth/login`) may
+answer `{"mfa_required": true, "mfa_token": …}`; send it with the authenticator code to
+`/auth/login/mfa`.
+
 ## 3. Conventions
 
 * **Errors** — `{"error": {"code", "message", "details", "request_id"}}`. 401 bad credentials,

@@ -12,9 +12,45 @@ PostgreSQL.
 | 5 | Integrations: WhatsApp, Gmail/SMTP, SMS, payment gateways, Google, Shopify | **Backend done** (185 tests in total); live verification with your accounts pending — see [integrations.md](integrations.md) |
 | 6 | Developer platform: API keys & scopes, webhooks, idempotency, rate limits | **Backend done** (197 tests in total) — see [api.md](api.md) |
 | 7 | Node.js realtime + webhook delivery, Redis, Rust workers (where benchmarks justify) | **Done** — real-time service, Redis stream + shared rate limits, batch PDF; Rust measured and not needed ([ADR 0001](adr/0001-rust-services.md)) |
-| 8 | Custom domains, SSL, encryption at rest, monitoring, backups, deployment | Next |
-| 9 | SQLite → PostgreSQL migration utility and cutover | — |
+| 8 | Custom domains, SSL, encryption at rest, monitoring, backups, deployment | **Done** (220 tests in total) — first real VPS deployment still to be done with [deployment.md](deployment.md) |
+| 9 | SQLite → PostgreSQL migration utility and cutover | Next |
 | 10 | Load/security testing, restore drills, production docs | — |
+
+## Phase 8 — what exists
+
+* **Two-factor sign-in** (RFC 6238 TOTP, any authenticator app): QR setup, confirm-to-enable,
+  10 single-use recovery codes, replay protection, wrong codes count towards account lockout,
+  short-lived challenge token bound to the password; owner/CLI reset for lost devices.
+* **Security events** (new device, lockout, 2FA changes, password change, recovery-code use)
+  visible to the user and e-mailed through optional system SMTP.
+* Per-IP limits on sign-in and token endpoints (Redis-shared); strict CSP, frame, COOP/CORP,
+  permissions policy and HSTS headers; HTTPS redirect; optional httpOnly + SameSite=strict
+  refresh-token cookie with double-submit CSRF token.
+* **Custom domains**: DNS TXT ownership proof, daily re-verification with auto-disable,
+  Host-header allow-list (421 for unknown hosts), Caddy on-demand TLS `ask` endpoint, optional
+  default business per domain (grants nothing).
+* **Backups**: SQLite backup API or `pg_dump`, chunked AES-256-GCM with authenticated header and
+  truncation detection, verification after writing (decrypt + checksum + integrity check), daily
+  schedule, manual runs via the worker, GFS retention, encrypted Google Drive off-site upload
+  (resumable), download, CLI `backup` / `verify-backup` / `restore`, restore drills in the test
+  suite on SQLite and PostgreSQL.
+* **Monitoring**: `/ready`, token-protected Prometheus `/metrics` (HTTP counters and latency
+  histograms, queue depth and age, worker heartbeat, backup age), owner `/system/health` with
+  plain-language warnings; worker heartbeat.
+* **Deployment**: backend and realtime Dockerfiles (non-root, read-only root filesystem),
+  Compose stack (Caddy, API, worker, realtime, Redis, optional PostgreSQL, internal network),
+  Caddyfile, deployment guide; CI builds the images and validates Compose and Caddy configs.
+
+## Phase 8 — deliberately deferred
+
+* Running on a real VPS: Docker images and the Caddyfile could not be built or run in the
+  development sandbox; CI builds and validates them, and [deployment.md](deployment.md) §8 lists
+  the checks for the first deployment.
+* WebAuthn / passkeys (TOTP covers 2FA now); forcing 2FA for every member (owner policy).
+* Point-in-time recovery for PostgreSQL (WAL archiving) — daily dumps for now.
+* Database-level encryption at rest: use full-disk encryption on the VPS; secrets inside the
+  database (integration credentials, 2FA secrets) are already encrypted by the application.
+* Alertmanager / Grafana dashboards (metrics are exposed; wiring them up is environment work).
 
 ## Phase 1 — what exists
 

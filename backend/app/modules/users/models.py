@@ -5,7 +5,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, Integer, String, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
@@ -43,7 +43,15 @@ class User(UUIDPrimaryKey, Timestamps, Base):
     locked_until: Mapped[datetime | None] = mapped_column(UTCDateTime)
     password_changed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    # Two-factor authentication (TOTP). The secret is encrypted at rest.
+    totp_secret_encrypted: Mapped[str | None] = mapped_column(Text)
+    totp_enabled_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
+    totp_last_step: Mapped[int | None] = mapped_column(BigInteger)  # replay protection
 
     @property
     def owner(self) -> bool:
         return bool(self.is_owner)
+
+    @property
+    def mfa_enabled(self) -> bool:
+        return self.totp_enabled_at is not None

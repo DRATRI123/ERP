@@ -14,6 +14,7 @@ from app.modules.integrations import models as integration_models  # noqa: F401
 from app.modules.inventory import models as inventory_models  # noqa: F401
 from app.modules.numbering import models as numbering_models  # noqa: F401
 from app.modules.parties import models as party_models  # noqa: F401
+from app.modules.system import models as system_models  # noqa: F401
 from app.modules.users import models as user_models  # noqa: F401
 
 metadata = Base.metadata

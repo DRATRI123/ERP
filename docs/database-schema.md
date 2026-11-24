@@ -166,6 +166,19 @@ effective on both databases (NULLs never collide in unique constraints).
 
 Also: `outbox_events.webhooks_dispatched_at`, `documents.overdue_notified_at`.
 
+## Phase 8 tables (migration 0007)
+
+| Table | Purpose |
+|---|---|
+| `custom_domains` | Hostname (unique, lower-case, IDNA), TXT verification token, status pending/active/disabled, last check and consecutive failures, optional default business |
+| `system_settings` | JSON values by key: backup schedule & retention, worker heartbeat |
+| `backup_runs` | Each backup: status queued/running/succeeded/failed, trigger, file name, size, SHA-256 of the encrypted file, verified flag, off-site reference, retention deletion time |
+| `security_events` | Per-user account events (new device, lockout, 2FA changes…) and e-mail delivery state |
+| `recovery_codes` | SHA-256 of each 2FA recovery code, used-at |
+
+Also on `users`: `totp_secret_encrypted` (Fernet), `totp_enabled_at`, `totp_last_step`
+(replay protection).
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |
@@ -173,4 +186,4 @@ Also: `outbox_events.webhooks_dispatched_at`, `documents.overdue_notified_at`.
 | 3+ – Billing extras | `price_lists` + `price_list_items`, `documents` + `document_lines` (one model for invoice, quotation, challan, credit/debit note, purchase bill…), `document_taxes`, `tax_rates` (versioned, effective-dated), `hsn_codes`, `invoice_templates` |
 | 4 – Accounting | `accounts` (chart of accounts tree), `journal_entries` + `journal_lines` (DB-enforced balance at posting), `payments`, `payment_allocations`, `bank_accounts`, `bank_statement_lines`, `cost_centres`, `fixed_assets` |
 | 5/6 – Integrations & API | `integrations`, `integration_credentials` (encrypted), `api_clients`, `api_keys` (hashed, scoped), `api_request_logs`, `webhook_endpoints`, `webhook_deliveries`, `idempotency_keys` |
-| 8 – Platform | `custom_domains`, `files`, `file_versions`, `automation_rules`, `automation_runs`, `backup_runs` |
+| Later – Platform | `files`, `file_versions`, `automation_rules`, `automation_runs` |

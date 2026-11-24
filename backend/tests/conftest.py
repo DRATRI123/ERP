@@ -25,6 +25,9 @@ if Path("/opt/pw-browsers/chromium").exists():  # PDF rendering in this environm
     os.environ.setdefault("ERP_PDF_NO_SANDBOX", "true")
 os.environ["ERP_ENCRYPTION_KEYS"] = '["%s"]' % __import__("cryptography.fernet", fromlist=["Fernet"]).Fernet.generate_key().decode()
 os.environ["ERP_PUBLIC_BASE_URL"] = "https://erp.test"
+os.environ["ERP_BACKUP_KEY"] = __import__("base64").urlsafe_b64encode(os.urandom(32)).decode()
+os.environ["ERP_BACKUP_DIR"] = str(_TMP / "backups")
+os.environ["ERP_MIN_FREE_DISK_MB"] = "1"
 os.environ["ERP_DATABASE_URL"] = os.environ.get(
     "ERP_TEST_DATABASE_URL", f"sqlite:///{_TMP / 'test.db'}"
 )
@@ -85,6 +88,11 @@ def engine() -> Iterator[Engine]:
 @pytest.fixture(autouse=True)
 def _clean_db(engine: Engine) -> Iterator[None]:
     yield
+    from app.core.ratelimit import limiter
+    from app.modules.system.domains import host_cache
+
+    limiter.reset()
+    host_cache.invalidate()
     with engine.begin() as conn:
         # Self-referencing rows (reversal entries, sub-categories) are unlinked first; SQLite
         # checks foreign keys row by row while a single DELETE runs.

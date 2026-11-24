@@ -418,11 +418,18 @@ def test_google_oauth_gmail_and_drive(ishop, fake, db, smtp):
     from app.core.config import get_settings
 
     if get_settings().is_sqlite:
-        fake.on("POST", "https://www.googleapis.com/upload/drive/v3/files", lambda r: {"id": "drive-file-1"})
+        session = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=u1"
+        fake.on("POST", "https://www.googleapis.com/upload/drive/v3/files",
+                lambda r: httpx.Response(200, headers={"Location": session}))
+        fake.on("PUT", session, lambda r: {"id": "drive-file-1"})
         out = ishop.post(f"/integrations/{r['id']}/drive-backup", {}, expect=200)
-        assert out["file_id"] == "drive-file-1"
-        up = fake.last("https://www.googleapis.com/upload/drive/v3/files")
-        assert b"SQLite format 3" in up.content and up.url.params["uploadType"] == "multipart"
+        assert out["file_id"] == "drive-file-1" and out["encrypted"] is True
+        start = [q for q in fake.requests if q.method == "POST" and "/upload/drive/" in str(q.url)][-1]
+        assert json.loads(start.content)["name"] == out["filename"]
+        up = fake.last(session)
+        # Only the encrypted file ever leaves the server.
+        assert up.content.startswith(b"ERPBK1\n") and b"SQLite format 3" not in up.content
+        assert up.headers["content-range"] == f"bytes 0-{len(up.content) - 1}/{len(up.content)}"
 
 
 # ---------------------------------------------------------------------------- Shopify

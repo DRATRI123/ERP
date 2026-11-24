@@ -1,0 +1,125 @@
+# Private ERP — single-server production stack.
+#
+#   cd deploy && cp .env.example .env   # fill in every value
+#   docker compose up -d --build
+#   docker compose exec api python -m app.cli create-owner --email you@example.com --name "Your Name"
+#
+# With PostgreSQL instead of SQLite: set ERP_DATABASE_URL in .env and add `--profile postgres`.
+name: erp
+
+x-backend: &backend
+  build: ../backend
+  image: erp-backend:latest
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    ERP_ENV: production
+    ERP_REDIS_URL: redis://redis:6379/0
+    ERP_BACKUP_DIR: /app/data/backups
+    ERP_PDF_NO_SANDBOX: "true"   # Chromium in a container; rendering is offline with JS disabled
+    FORWARDED_ALLOW_IPS: "*"     # the API port is not published: only Caddy can reach it
+    HOME: /tmp                   # Chromium profile scratch space (root filesystem is read-only)
+  volumes:
+    - erp-data:/app/data
+  # "egress" lets the API and worker reach SMTP, WhatsApp, payment gateways, Google, DNS and
+  # outgoing webhooks. Redis and PostgreSQL sit only on the internal network.
+  networks: [internal, egress]
+  depends_on:
+    redis:
+      condition: service_healthy
+  read_only: true
+  tmpfs: ["/tmp"]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+
+services:
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: ["python", "-m", "app.cli", "migrate"]
+    healthcheck: { disable: true }
+
+  api:
+    <<: *backend
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "app.cli", "worker", "--interval", "15"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    healthcheck: { disable: true }   # monitored through its heartbeat in /system/health
+
+  realtime:
+    build: ../services/realtime
+    image: erp-realtime:latest
+    restart: unless-stopped
+    environment:
+      RT_PORT: "8090"
+      ERP_API_URL: http://api:8000
+      ERP_REDIS_URL: redis://redis:6379/0
+    networks: [internal]
+    depends_on:
+      api: { condition: service_healthy }
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000", "--maxmemory-policy", "noeviction"]
+    volumes: [redis-data:/data]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    security_opt: ["no-new-privileges:true"]
+
+  postgres:
+    profiles: [postgres]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: erp
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: [pg-data:/var/lib/postgresql/data]
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp -d erp"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      ERP_PRIMARY_HOST: ${ERP_PRIMARY_HOST:?set ERP_PRIMARY_HOST in .env}
+      ERP_ACME_EMAIL: ${ERP_ACME_EMAIL:?set ERP_ACME_EMAIL in .env}
+      ERP_TLS_ASK_TOKEN: ${ERP_TLS_ASK_TOKEN:?set ERP_TLS_ASK_TOKEN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [internal, egress]
+    depends_on:
+      api: { condition: service_healthy }
+
+networks:
+  internal: { internal: true }   # no internet access: Redis, PostgreSQL, realtime
+  egress: {}
+
+volumes:
+  erp-data:
+  redis-data:
+  pg-data:
+  caddy-data:
+  caddy-config:
