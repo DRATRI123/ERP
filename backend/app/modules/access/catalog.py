@@ -37,7 +37,8 @@ PERMISSIONS: tuple[Permission, ...] = (
     _P("invoices.create", "Sales", "Create invoices"),
     _P("invoices.edit", "Sales", "Edit draft invoices"),
     _P("invoices.cancel", "Sales", "Cancel finalized invoices"),
-    _P("templates.manage", "Sales", "Configure invoice templates"),
+    _P("templates.manage", "Sales", "Configure invoice templates and numbering series"),
+    _P("credit_limit.override", "Sales", "Finalize sales beyond a customer's credit limit"),
     # Purchases
     _P("purchases.view", "Purchases", "View purchases"),
     _P("purchases.create", "Purchases", "Create purchases"),
@@ -110,7 +111,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
             "invoices.create", "invoices.edit", "invoices.cancel",
             "purchases.create", "purchases.edit", "purchases.approve",
             "products.manage", "stock.edit", "customers.manage", "suppliers.manage",
-            "warehouses.manage",
+            "warehouses.manage", "credit_limit.override",
             "payments.create", "expenses.manage", "data.export",
         ),
     ),

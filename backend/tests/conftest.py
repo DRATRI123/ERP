@@ -20,6 +20,9 @@ from pathlib import Path
 _TMP = Path(tempfile.mkdtemp(prefix="erp-tests-"))
 os.environ["ERP_ENV"] = "test"
 os.environ["ERP_SECRET_KEY"] = secrets.token_urlsafe(48)
+if Path("/opt/pw-browsers/chromium").exists():  # PDF rendering in this environment
+    os.environ.setdefault("ERP_PDF_CHROMIUM_PATH", "/opt/pw-browsers/chromium")
+    os.environ.setdefault("ERP_PDF_NO_SANDBOX", "true")
 os.environ["ERP_DATABASE_URL"] = os.environ.get(
     "ERP_TEST_DATABASE_URL", f"sqlite:///{_TMP / 'test.db'}"
 )
@@ -180,10 +183,11 @@ def owner_headers(api: Api, owner) -> dict[str, str]:
 class Shop:
     """One business with products and warehouses, driven through the HTTP API."""
 
-    def __init__(self, api: Api, headers: dict[str, str], valuation: str = "weighted_average"):
+    def __init__(self, api: Api, headers: dict[str, str], valuation: str = "weighted_average",
+                 **business):
         self.api, self.h = api, headers
-        self.biz = api.create_business(headers, name=f"Shop {valuation}",
-                                       inventory_valuation=valuation)
+        self.biz = api.create_business(headers, **{"name": f"Shop {valuation}",
+                                                   "inventory_valuation": valuation, **business})
         self.bid = self.biz["id"]
         self.base = f"/api/v1/businesses/{self.bid}"
         self.units = {u["code"]: u["id"] for u in self.get("/units")}

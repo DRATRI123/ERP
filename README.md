@@ -17,7 +17,11 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
 * **Phase 2 backend — complete:** products, units, categories, brands, customers & suppliers,
   warehouses, and a stock engine with weighted-average/FIFO valuation, batches & expiry, serial
   numbers, opening stock, adjustments, transfers, physical counts and reversals.
-* Next: Phase 3 (invoice engine, GST, printing). The Next.js frontend is still to be built.
+* **Phase 3 backend — complete:** 11 sales & purchase document types, GST engine
+  (CGST/SGST/UTGST/IGST, cess, inclusive pricing, RCM, composition, exports), versioned HSN
+  rates, conversions and returns, payments and credit limits, numbering series, printable
+  templates (A4–thermal, PDF, UPI QR), GSTR-1/3B preparation and e-invoice JSON.
+* Next: Phase 4 (double-entry accounting). The Next.js frontend is still to be built.
 
 ## Running the backend
 

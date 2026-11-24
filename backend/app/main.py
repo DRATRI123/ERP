@@ -80,8 +80,10 @@ def create_app() -> FastAPI:
         access,
         audit,
         auth,
+        billing,
         businesses,
         catalog,
+        gst,
         health,
         inventory,
         parties,
@@ -90,6 +92,7 @@ def create_app() -> FastAPI:
 
     for router in (auth.router, businesses.router, access.router, users.router,
                    catalog.router, parties.customers, parties.suppliers, inventory.router,
+                   billing.router, gst.router,
                    audit.router, health.router):
         app.include_router(router, prefix=API_PREFIX)
     return app

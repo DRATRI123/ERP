@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     password_min_length: int = 10
 
     sqlite_busy_timeout_ms: int = 5000
+
+    # PDF printing via headless Chromium. Leave empty to auto-detect on PATH.
+    pdf_chromium_path: str | None = None
+    # Needed when the server runs Chromium as root (typical in Docker). Rendering is offline
+    # with JavaScript disabled, which limits the exposure.
+    pdf_no_sandbox: bool = False
     cors_origins: list[str] = []
 
     @field_validator("database_url")

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'">
+<title>{{ title }} {{ doc.number or "Draft" }}</title>
+<style>
+  @page { size: {{ page_size }}; margin: 2mm; }
+  body { margin: 0; font-family: {{ cfg.font_family }}; font-size: {{ cfg.font_size_pt }}pt;
+         color: #000; background: #fff; }
+  .c { text-align: center; }
+  .r { text-align: right; }
+  hr { border: none; border-top: 1px dashed #000; margin: 3px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 1px 0; vertical-align: top; }
+  .b { font-weight: 700; }
+  .big { font-size: 1.2em; }
+  img.logo { max-width: 60%; max-height: 50px; }
+  img.qr { width: 70%; }
+  .copy { page-break-after: always; }
+  .copy:last-child { page-break-after: auto; }
+</style>
+</head>
+<body>
+{% for copy in cfg.copy_labels %}
+<div class="copy">
+  <div class="c">
+    {% if cfg.show_logo and cfg.logo_data_url %}<img class="logo" src="{{ cfg.logo_data_url }}" alt=""><br>{% endif %}
+    <div class="b big">{{ seller.name }}</div>
+    {% if seller.address_line1 %}<div>{{ seller.address_line1 }}</div>{% endif %}
+    {% if seller.city %}<div>{{ seller.city }} {{ seller.pincode or "" }}</div>{% endif %}
+    {% if seller.gstin %}<div>GSTIN {{ seller.gstin }}</div>{% endif %}
+    {% if seller.phone %}<div>Ph {{ seller.phone }}</div>{% endif %}
+    {% if cfg.header_text %}<div>{{ cfg.header_text }}</div>{% endif %}
+    <hr>
+    <div class="b">{{ title }}{% if cancelled %} — CANCELLED{% elif draft %} — DRAFT{% endif %}</div>
+  </div>
+  <table>
+    <tr><td>No: {{ doc.number or "DRAFT" }}</td><td class="r">{{ doc.doc_date.strftime("%d-%m-%Y") }}</td></tr>
+    <tr><td colspan="2">{{ buyer.name or doc.party_name or "Cash Sale" }}{% if buyer.gstin %} · {{ buyer.gstin }}{% endif %}</td></tr>
+  </table>
+  <hr>
+  <table>
+    {% for ln in doc.lines %}
+    <tr><td colspan="3">{{ ln.description }}</td></tr>
+    <tr><td>{{ ln.quantity | qty }} × {{ ln.unit_price | money }}</td>
+        <td class="r">{% if ln.gst_rate %}{{ ln.gst_rate | qty }}%{% endif %}</td>
+        <td class="r">{{ ln.line_total | money }}</td></tr>
+    {% endfor %}
+  </table>
+  <hr>
+  <table>
+    <tr><td>Taxable</td><td class="r">{{ doc.taxable_total | money }}</td></tr>
+    {% if doc.cgst_total %}<tr><td>CGST</td><td class="r">{{ doc.cgst_total | money }}</td></tr>{% endif %}
+    {% if doc.sgst_total %}<tr><td>{{ sgst_label }}</td><td class="r">{{ doc.sgst_total | money }}</td></tr>{% endif %}
+    {% if doc.igst_total %}<tr><td>IGST</td><td class="r">{{ doc.igst_total | money }}</td></tr>{% endif %}
+    {% if doc.cess_total %}<tr><td>Cess</td><td class="r">{{ doc.cess_total | money }}</td></tr>{% endif %}
+    {% if doc.round_off %}<tr><td>Round off</td><td class="r">{{ doc.round_off | money }}</td></tr>{% endif %}
+    <tr class="b big"><td>TOTAL</td><td class="r">₹{{ doc.grand_total | money }}</td></tr>
+    {% if doc.amount_paid %}<tr><td>Paid</td><td class="r">{{ doc.amount_paid | money }}</td></tr>
+    <tr class="b"><td>Balance</td><td class="r">{{ doc.balance_due | money }}</td></tr>{% endif %}
+  </table>
+  {% if cfg.show_amount_in_words %}<div>{{ words }}</div>{% endif %}
+  {% if upi_qr %}<div class="c"><img class="qr" src="{{ upi_qr }}" alt="UPI"><br>Scan to pay</div>{% endif %}
+  {% if irn_qr %}<div class="c"><img class="qr" src="{{ irn_qr }}" alt="IRN"><br>IRN {{ doc.irn }}</div>{% endif %}
+  <hr>
+  <div class="c">{{ cfg.footer_text or "Thank you!" }}</div>
+  <div class="c">{{ copy }}</div>
+</div>
+{% endfor %}
+</body>
+</html>

@@ -4,6 +4,7 @@ from app.db.base import Base
 from app.modules.access import models as access_models  # noqa: F401
 from app.modules.audit import models as audit_models  # noqa: F401
 from app.modules.auth import models as auth_models  # noqa: F401
+from app.modules.billing import models as billing_models  # noqa: F401
 from app.modules.businesses import models as business_models  # noqa: F401
 from app.modules.catalog import models as catalog_models  # noqa: F401
 from app.modules.events import models as event_models  # noqa: F401

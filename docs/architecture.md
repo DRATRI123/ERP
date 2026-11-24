@@ -58,6 +58,7 @@ backend/
       parties/   customers & suppliers, groups, addresses
       inventory/ warehouses, stock engine, documents, reports
       numbering/ gap-free document number series
+      billing/   documents, GST pricing, conversions, payments, series, templates, printing
     cli.py       migrate, create-owner, db-check, db-backup
   alembic/       versioned migrations (the only way schema changes)
   tests/         one suite, runs on SQLite and PostgreSQL
@@ -128,7 +129,25 @@ purchase documents will post through the same engine with their own `source_type
 * **Cost visibility**: purchase prices, unit costs and values are returned only to users with
   `stock_value.view`; everyone else sees quantities.
 
-## 6. Reliability patterns
+## 6. Billing engine
+
+* **One document model** (`documents` + `document_lines`) for all 11 sales and purchase types;
+  `billing/doctypes.py` declares per type: side, stock direction, whether it is reported to GST,
+  whether it is payable, what it may be converted from and which sources cap its quantities.
+* **Pure GST functions** (`gst/tax.py`) compute each line; the document layer decides place of
+  supply, inter/intra-state, UTGST and whether tax may be charged. Totals are always recomputed
+  on the server; client-sent totals are never trusted.
+* **Finalization is one transaction**: number allocation (row-locked series), buyer/seller
+  snapshot, stock posting through the inventory engine (`source_type = billing_document`),
+  counter payments, credit-limit check, audit and outbox events. Any failure rolls back all of
+  it — no number is consumed, no stock moves.
+* **Returns restock at the original issue cost** (following invoice → challan links), so a
+  sale and its return net to zero in stock value under both valuation methods.
+* **Printing** renders Jinja2 templates (autoescaped) to HTML; PDFs come from headless Chromium.
+  A CSP forbids scripts and network access in both.
+* **GST returns** are computed from finalized documents and labelled "prepared — not filed".
+
+## 7. Reliability patterns
 
 * **Transactional outbox** – domain events (`business.created`, later `invoice.created`, …) are
   inserted into `outbox_events` in the same transaction as the change. A relay (Phase 7) publishes
@@ -141,7 +160,7 @@ purchase documents will post through the same engine with their own `source_type
 * **Structured logs** – one JSON line per request with method, path, status, duration and
   request id.
 
-## 7. Database strategy (SQLite first, PostgreSQL ready)
+## 8. Database strategy (SQLite first, PostgreSQL ready)
 
 See [database-schema.md](database-schema.md) for the schema itself.
 
@@ -179,7 +198,7 @@ decimal sums per column, trial balance, stock balances, customer outstanding and
 totals → run the test suite against the new database → cut over in a maintenance window.
 No dual writes.
 
-## 8. API conventions
+## 9. API conventions
 
 * REST + JSON under `/api/v1`, OpenAPI 3 at `/api/v1/openapi.json`, docs at `/api/v1/docs`.
 * `limit`/`offset` pagination returning `{items, total, limit, offset}`.

@@ -117,11 +117,22 @@ Indexed on `(published_at, created_at)` for the relay's "next unpublished" query
 `batch_key` is the batch id as text or `''`: a NOT NULL key keeps the unique constraint
 effective on both databases (NULLs never collide in unique constraints).
 
+## Phase 3 tables
+
+| Table | Purpose |
+|---|---|
+| `documents` | Every sales/purchase document: type, status (`draft/final/cancelled`), number (unique per type, assigned on finalize), dates, party + frozen `party_snapshot` / `seller_snapshot`, place of supply, inter-state/UTGST flags, tax mode, reverse charge, warehouse, source document, supplier invoice no., landed cost, all totals, amount payable/paid, balance, payment status, IRN details, `client_ref` (unique) |
+| `document_lines` | Product or free-text line: HSN/SAC, unit/UQC, quantity, price, discounts, inclusive flag, tax category, GST/cess rate, ITC eligibility, computed taxable value and tax heads, batch/expiry, serials, `source_line_id` |
+| `document_series` | Numbering formats per type (and optionally branch) with placeholders; counters live in `number_series` per FY |
+| `payments` / `payment_allocations` | Receipts (in) and payments (out) with mode and reference; allocations settle documents |
+| `hsn_tax_rates` | Versioned GST/cess rate per HSN prefix with effective dates (overlaps rejected) |
+| `invoice_templates` | Print configuration per business / branch / document types, one default per scope |
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |
 |---|---|
-| 3 – Billing & GST | `price_lists` + `price_list_items`, `documents` + `document_lines` (one model for invoice, quotation, challan, credit/debit note, purchase bill…), `document_taxes`, `tax_rates` (versioned, effective-dated), `hsn_codes`, `invoice_templates` |
+| 3+ – Billing extras | `price_lists` + `price_list_items`, `documents` + `document_lines` (one model for invoice, quotation, challan, credit/debit note, purchase bill…), `document_taxes`, `tax_rates` (versioned, effective-dated), `hsn_codes`, `invoice_templates` |
 | 4 – Accounting | `accounts` (chart of accounts tree), `journal_entries` + `journal_lines` (DB-enforced balance at posting), `payments`, `payment_allocations`, `bank_accounts`, `bank_statement_lines`, `cost_centres`, `fixed_assets` |
 | 5/6 – Integrations & API | `integrations`, `integration_credentials` (encrypted), `api_clients`, `api_keys` (hashed, scoped), `api_request_logs`, `webhook_endpoints`, `webhook_deliveries`, `idempotency_keys` |
 | 8 – Platform | `custom_domains`, `files`, `file_versions`, `automation_rules`, `automation_runs`, `backup_runs` |
