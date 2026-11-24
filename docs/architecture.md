@@ -59,6 +59,7 @@ backend/
       inventory/ warehouses, stock engine, documents, reports
       numbering/ gap-free document number series
       billing/   documents, GST pricing, conversions, payments, series, templates, printing
+      accounting/ chart, journals, postings, expenses, assets, bank reconciliation, closing, reports
     cli.py       migrate, create-owner, db-check, db-backup
   alembic/       versioned migrations (the only way schema changes)
   tests/         one suite, runs on SQLite and PostgreSQL
@@ -147,7 +148,20 @@ purchase documents will post through the same engine with their own `source_type
   A CSP forbids scripts and network access in both.
 * **GST returns** are computed from finalized documents and labelled "prepared — not filed".
 
-## 7. Reliability patterns
+## 7. Accounting
+
+* `accounting/ledger.py` is the only code that creates journal rows. It nets lines, refuses
+  unbalanced or one-sided entries, refuses closed years, numbers entries per FY and records
+  `(source_type, source_id, source_event)` uniquely, so one business event can never be posted
+  twice.
+* `accounting/posting.py` turns business events into journals inside the same transaction.
+  Stock values are taken from the stock ledger, so **Inventory in the books always equals
+  stock valuation**; customer/supplier sub-ledgers are the receivable/payable control accounts
+  tagged by party, so **party ledgers always equal document outstanding**.
+* Reports read the journal only. Period reports exclude year-closing entries; position
+  reports include them. `verify_books` re-checks the cross-subsystem invariants on demand.
+
+## 8. Reliability patterns
 
 * **Transactional outbox** – domain events (`business.created`, later `invoice.created`, …) are
   inserted into `outbox_events` in the same transaction as the change. A relay (Phase 7) publishes
@@ -160,7 +174,7 @@ purchase documents will post through the same engine with their own `source_type
 * **Structured logs** – one JSON line per request with method, path, status, duration and
   request id.
 
-## 8. Database strategy (SQLite first, PostgreSQL ready)
+## 9. Database strategy (SQLite first, PostgreSQL ready)
 
 See [database-schema.md](database-schema.md) for the schema itself.
 
@@ -198,7 +212,7 @@ decimal sums per column, trial balance, stock balances, customer outstanding and
 totals → run the test suite against the new database → cut over in a maintenance window.
 No dual writes.
 
-## 9. API conventions
+## 10. API conventions
 
 * REST + JSON under `/api/v1`, OpenAPI 3 at `/api/v1/openapi.json`, docs at `/api/v1/docs`.
 * `limit`/`offset` pagination returning `{items, total, limit, offset}`.

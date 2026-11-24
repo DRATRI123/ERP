@@ -7,9 +7,9 @@ PostgreSQL.
 |---|---|---|
 | 1 | Foundation: architecture, repo, SQLite + SQLAlchemy + Alembic, auth, owner, multi-business, users, roles & permissions, audit, outbox | **Backend done**. Frontend shell still to do |
 | 2 | Products, customers, suppliers, warehouses, inventory ledger | **Backend done**. Frontend screens still to do |
-| 3 | Invoice engine, numbering series, GST, returns, printing | **Backend done** (150 tests in total). Visual designer UI still to do |
-| 4 | Double-entry accounting, ledgers, banking, financial reports | Next |
-| 5 | Integrations: WhatsApp, Gmail/SMTP, SMS, payment gateways, Google, Shopify | — |
+| 3 | Invoice engine, numbering series, GST, returns, printing | **Backend done**. Visual designer UI still to do |
+| 4 | Double-entry accounting, ledgers, banking, financial reports | **Backend done** (169 tests in total) |
+| 5 | Integrations: WhatsApp, Gmail/SMTP, SMS, payment gateways, Google, Shopify | Next |
 | 6 | Developer platform: API keys & scopes, webhooks, idempotency, rate limits | — |
 | 7 | Node.js realtime + webhook delivery, Redis, Rust workers (where benchmarks justify) | — |
 | 8 | Custom domains, SSL, encryption at rest, monitoring, backups, deployment | — |
@@ -27,6 +27,45 @@ PostgreSQL.
   branch scoping, 30-user cap, anti-escalation rules, business-isolation via 404.
 * Audit log (per business and owner-wide), transactional outbox, structured errors/logs,
   request ids, DB integrity check and verified online backup.
+
+## Phase 4 — what exists
+
+* **Chart of accounts** seeded per business (cash, bank, debtors, inventory, input/output GST
+  per head, RCM payable, creditors, capital, retained earnings, sales, COGS, expenses…),
+  extendable with custom and sub-accounts; system accounts are locked to their purpose.
+* **Automatic postings** in the same transaction as the business event: sales invoices,
+  debit/credit notes, delivery challans, purchase invoices (ITC, non-claimable tax, landed cost,
+  reverse charge), purchase returns, receipts, payments, advances, refunds, opening stock,
+  adjustments, counts, expenses, depreciation, asset purchase and disposal. Cancelling anything
+  posts an exact reversal. Round-off and stock price differences have their own accounts.
+* **Journal rules** enforced in one place: balanced or refused, one side per line, never into
+  a closed year, immutable once posted, reversal instead of edit, one posting per event.
+* **Manual journals** (with reversal) and **opening balances** (party-wise debtors/creditors,
+  difference to Opening Balance Equity). Manual postings to control accounts are refused so
+  sub-ledgers can never drift.
+* **Expense vouchers** with GST input credit, paid from cash/bank or owed to a supplier,
+  cost centres, cancellation.
+* **Fixed assets**: register, capitalisation, straight-line and written-down-value
+  depreciation (daily pro-rata, never below salvage, never doubled), disposal with gain/loss.
+* **Bank reconciliation**: CSV/JSON statement import (duplicate-safe), auto-matching by amount,
+  date window and reference, manual match/unmatch, reconciliation statement.
+* **Year end**: close a financial year (results to Retained Earnings, books locked, next year
+  created), owner-only reopen.
+* **Reports**: trial balance, general ledger, day book, cash book, bank book, customer and
+  supplier ledgers, receivable/payable aging (with advances), profit & loss (by branch / cost
+  centre), balance sheet, cash flow (direct method), and an integrity check.
+* **Cross-checks** after every accounting test: trial balance and balance sheet balance, every
+  journal balances, and the Inventory account equals the stock valuation.
+* `python -m app.cli accounting-backfill` posts journals for activity recorded before
+  accounting existed (idempotent).
+
+## Phase 4 — deliberately deferred
+
+* **Multi-currency** and **TDS/TCS** deductions.
+* **Budgets** and **cost-centre allocation rules** (lines are tagged; allocation is manual).
+* **Bank feeds** (live statement download) — via integrations in Phase 5.
+* **Applying a credit note directly against an invoice** without a payment — today the net is
+  correct in the books and outstanding reports; a settlement document can follow.
 
 ## Phase 3 — what exists
 

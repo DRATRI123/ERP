@@ -108,6 +108,7 @@ class CounterPaymentIn(BaseModel):
     mode: PaymentMode
     amount: MoneyIn
     reference: Annotated[str, StringConstraints(max_length=100)] | None = None
+    account_id: uuid.UUID | None = Field(None, description="Cash/bank account; default by mode")
 
 
 class FinalizeIn(BaseModel):
@@ -237,6 +238,7 @@ class PaymentIn(BaseModel):
     branch_id: uuid.UUID | None = None
     payment_date: date = Field(default_factory=date.today)
     mode: PaymentMode
+    account_id: uuid.UUID | None = Field(None, description="Cash/bank account; default by mode")
     amount: MoneyIn
     reference: Annotated[str, StringConstraints(max_length=100)] | None = None
     notes: Annotated[str, StringConstraints(max_length=500)] | None = None
@@ -256,6 +258,7 @@ class PaymentOut(ORM):
     party_id: uuid.UUID | None
     branch_id: uuid.UUID
     mode: PaymentMode
+    account_id: uuid.UUID | None
     amount: MoneyOut
     reference: str | None
     notes: str | None

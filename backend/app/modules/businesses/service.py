@@ -116,8 +116,11 @@ def create_business(db: Session, *, actor: User, data: dict[str, Any], today: da
     from app.modules.catalog.service import seed_units
     from app.modules.inventory.service import create_default_warehouse
 
+    from app.modules.accounting.chart import seed_chart
+
     seed_units(db, business.id)
     create_default_warehouse(db, business.id, head.id)
+    seed_chart(db, business.id)
     db.flush()
 
     access = BusinessAccess(actor, business, None, frozenset(), True, frozenset())

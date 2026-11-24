@@ -128,6 +128,20 @@ effective on both databases (NULLs never collide in unique constraints).
 | `hsn_tax_rates` | Versioned GST/cess rate per HSN prefix with effective dates (overlaps rejected) |
 | `invoice_templates` | Print configuration per business / branch / document types, one default per scope |
 
+## Phase 4 tables
+
+| Table | Purpose |
+|---|---|
+| `accounts` | Chart of accounts: code, name, type (asset/liability/equity/income/expense), subtype (drives statement placement), optional parent, `system_key` for accounts posted automatically, bank details |
+| `cost_centres` | Optional analysis dimension on journal lines |
+| `journal_entries` | Numbered per FY (`JV/2026-27/00001`); source type/id/event (unique), reference, narration, branch, `reverses_id` |
+| `journal_lines` | Account, debit **or** credit (`CHECK`), party (sub-ledger), cost centre; entry date copied for fast ledgers |
+| `expenses` | Expense vouchers with GST split, paid-from account or supplier |
+| `fixed_assets` / `depreciation_entries` | Asset register; one depreciation row per asset and period end (unique) |
+| `bank_statement_lines` | Imported statement lines, fingerprinted (unique per account), matched to one journal line |
+
+`payments.account_id` (migration `0004`) records which cash/bank account money moved through.
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |

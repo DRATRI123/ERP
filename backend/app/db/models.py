@@ -2,6 +2,7 @@
 
 from app.db.base import Base
 from app.modules.access import models as access_models  # noqa: F401
+from app.modules.accounting import models as accounting_models  # noqa: F401
 from app.modules.audit import models as audit_models  # noqa: F401
 from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.billing import models as billing_models  # noqa: F401

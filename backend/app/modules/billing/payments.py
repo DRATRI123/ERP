@@ -21,6 +21,9 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.modules.access.service import BusinessAccess
+from app.modules.accounting.models import JournalSource
+from app.modules.accounting.posting import cash_or_bank, post_payment
+from app.modules.accounting.posting import reverse as reverse_posting
 from app.modules.audit import service as audit
 from app.modules.billing.doctypes import DocType
 from app.modules.billing.models import (
@@ -78,7 +81,8 @@ def _apply(doc: Document, delta: Decimal) -> None:
 def create_payment(db: Session, access: BusinessAccess, *, direction: PaymentDirection,
                    party_id: uuid.UUID | None, payment_date: date, mode: PaymentMode,
                    amount: Decimal, reference: str | None, notes: str | None,
-                   allocations: list[dict[str, Any]], branch_id: uuid.UUID | None = None) -> Payment:
+                   allocations: list[dict[str, Any]], branch_id: uuid.UUID | None = None,
+                   account_id: uuid.UUID | None = None) -> Payment:
     _require(access, direction, "create")
     amount = q2(amount)
     if amount <= 0:
@@ -93,12 +97,14 @@ def create_payment(db: Session, access: BusinessAccess, *, direction: PaymentDir
     if branch is None or branch.business_id != access.business.id or not access.can_access_branch(branch.id):
         raise ValidationFailed("Branch not found or not accessible")
     fy = _fy(db, access.business.id, payment_date)
+    account = cash_or_bank(db, access.business.id, mode, account_id)
     prefix = "RCT" if direction == PaymentDirection.IN else "PAY"
     number = next_number(db, access.business.id, f"payment.{direction.value}/{fy.code}",
                          prefix=f"{prefix}/{fy.code}/")
     pay = Payment(business_id=access.business.id, branch_id=branch.id, financial_year_id=fy.id,
                   direction=direction, number=number, payment_date=payment_date,
-                  party_id=party_id, mode=mode, amount=amount, reference=reference, notes=notes,
+                  party_id=party_id, mode=mode, account_id=account.id, amount=amount,
+                  reference=reference, notes=notes,
                   created_by_id=access.user.id)
     db.add(pay)
     db.flush()
@@ -134,6 +140,7 @@ def create_payment(db: Session, access: BusinessAccess, *, direction: PaymentDir
                  changes={"number": number, "amount": amount, "mode": mode.value,
                           "allocations": [{"document_id": d.id, "amount": a.amount}
                                           for d, a in zip(touched, pay.allocations, strict=True)]})
+    post_payment(db, access.business, pay, user_id=access.user.id)
     payload = {"id": pay.id, "number": number, "direction": direction.value, "amount": amount,
                "mode": mode.value, "party_id": party_id, "payment_date": payment_date}
     events.emit(db, "payment.created", aggregate_type="payment", aggregate_id=pay.id,
@@ -149,14 +156,15 @@ def create_payment(db: Session, access: BusinessAccess, *, direction: PaymentDir
 
 
 def pay_document(db: Session, access: BusinessAccess, doc: Document, *, mode: PaymentMode,
-                 amount: Decimal, reference: str | None = None) -> Payment:
+                 amount: Decimal, reference: str | None = None,
+                 account_id: uuid.UUID | None = None) -> Payment:
     """Payment taken together with the document (e.g. at the billing counter)."""
     direction = next(d for d, types in SETTLES.items() if doc.doc_type in types)
     return create_payment(db, access, direction=direction, party_id=doc.party_id,
                           payment_date=doc.doc_date, mode=mode, amount=amount,
                           reference=reference, notes=f"Against {doc.number}",
                           allocations=[{"document_id": doc.id, "amount": amount}],
-                          branch_id=doc.branch_id)
+                          branch_id=doc.branch_id, account_id=account_id)
 
 
 def get_payment(db: Session, access: BusinessAccess, pid: uuid.UUID) -> Payment:
@@ -176,6 +184,8 @@ def cancel_payment(db: Session, access: BusinessAccess, pay: Payment, *, reason:
         assert doc is not None
         if doc.status == DocStatus.FINAL:
             _apply(doc, -a.amount)
+    reverse_posting(db, access.business, JournalSource.PAYMENT, pay.id, on=date.today(),
+                    user_id=access.user.id)
     pay.status = PaymentState.CANCELLED
     pay.cancelled_at = datetime.now(UTC)
     pay.cancel_reason = reason

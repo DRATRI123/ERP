@@ -273,6 +273,9 @@ class Payment(UUIDPrimaryKey, Timestamps, Base):
     party_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("parties.id", ondelete="RESTRICT"), index=True)
     mode: Mapped[PaymentMode] = mapped_column(str_enum(PaymentMode, 16), nullable=False)
+    # Cash/bank account the money moved through; default: Cash for cash, Bank otherwise.
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"))
     amount: Mapped[Decimal] = mapped_column(Money(), nullable=False)
     reference: Mapped[str | None] = mapped_column(String(100))  # UTR, cheque no., card ref
     notes: Mapped[str | None] = mapped_column(String(500))

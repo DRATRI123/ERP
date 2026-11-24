@@ -21,7 +21,14 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   (CGST/SGST/UTGST/IGST, cess, inclusive pricing, RCM, composition, exports), versioned HSN
   rates, conversions and returns, payments and credit limits, numbering series, printable
   templates (A4–thermal, PDF, UPI QR), GSTR-1/3B preparation and e-invoice JSON.
-* Next: Phase 4 (double-entry accounting). The Next.js frontend is still to be built.
+* **Phase 4 backend — complete:** double-entry books posted automatically from every
+  invoice, purchase, payment, stock movement and expense; manual journals, opening balances,
+  fixed assets & depreciation, bank reconciliation, year closing; trial balance, ledgers,
+  day/cash/bank book, aging, P&L, balance sheet and cash flow.
+* Next: Phase 5 (integrations). The Next.js frontend is still to be built.
+
+After upgrading a database that already has invoices or stock from earlier phases, run
+`python -m app.cli accounting-backfill` once to post their journals.
 
 ## Running the backend
 

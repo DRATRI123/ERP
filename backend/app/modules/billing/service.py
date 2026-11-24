@@ -645,6 +645,9 @@ def finalize(db: Session, access: BusinessAccess, doc: Document, *,
         StockEngine(db, access.business).post(movements, entry_date=doc.doc_date,
                                               source_type=SOURCE, source_id=doc.id)
     db.flush()
+    from app.modules.accounting.posting import post_document
+
+    post_document(db, access.business, doc, user_id=access.user.id)
 
     if payments:
         if not spec.payable:
@@ -713,6 +716,10 @@ def cancel(db: Session, access: BusinessAccess, doc: Document, *, reason: str, o
                           line_id=e.source_line_id) for e in reversed(entries)]
         StockEngine(db, access.business).post(moves, entry_date=on, source_type=SOURCE,
                                               source_id=doc.id)
+    from app.modules.accounting.models import JournalSource
+    from app.modules.accounting.posting import reverse as reverse_posting
+
+    reverse_posting(db, access.business, JournalSource.DOCUMENT, doc.id, on=on, user_id=access.user.id)
     doc.status = DocStatus.CANCELLED
     doc.cancelled_at = datetime.now(UTC)
     doc.cancelled_by_id = access.user.id

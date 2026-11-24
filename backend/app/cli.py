@@ -69,6 +69,28 @@ def cmd_db_backup(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_accounting_backfill(_: argparse.Namespace) -> int:
+    from sqlalchemy import select
+
+    from app.db.session import session_scope
+    from app.modules.accounting.backfill import backfill
+    from app.modules.accounting.reports import verify_books
+    from app.modules.businesses.models import Business
+
+    status = 0
+    with session_scope() as db:
+        for business in db.scalars(select(Business).order_by(Business.name)):
+            r = backfill(db, business)
+            print(f"{business.name}: {r.posted} posted, {r.reversed} reversed, {len(r.skipped)} skipped")
+            for s in r.skipped:
+                print(f"  - skipped {s}")
+            problems = verify_books(db, business.id)
+            for p in problems:
+                print(f"  ! {p}")
+                status = 2
+    return status
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="erp")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -89,6 +111,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("db-backup", help="Online, verified SQLite backup")
     p.add_argument("--dest", default=str(BACKEND_DIR / "backups"))
     p.set_defaults(func=cmd_db_backup)
+
+    p = sub.add_parser("accounting-backfill",
+                       help="Post journals for earlier invoices, payments and stock documents")
+    p.set_defaults(func=cmd_accounting_backfill)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

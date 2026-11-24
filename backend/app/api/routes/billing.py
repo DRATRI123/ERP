@@ -307,7 +307,7 @@ def create_payment(body: PaymentIn, access: Access, db: DB) -> PaymentOut:
         db, access, direction=body.direction, party_id=body.party_id,
         payment_date=body.payment_date, mode=body.mode, amount=body.amount,
         reference=body.reference, notes=body.notes, branch_id=body.branch_id,
-        allocations=[a.model_dump() for a in body.allocations])
+        account_id=body.account_id, allocations=[a.model_dump() for a in body.allocations])
     db.commit()
     return PaymentOut.model_validate(p)
 

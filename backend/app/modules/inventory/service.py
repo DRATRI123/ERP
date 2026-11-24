@@ -220,6 +220,9 @@ def _finish(db: Session, access: BusinessAccess, doc: StockDocument, engine: Sto
         raise ValidationFailed("The document changes no stock")
     before = {m.product.id: engine.on_hand(m.product.id) for m in movements}
     posted = engine.post(movements, entry_date=doc.doc_date, source_type=SOURCE, source_id=doc.id)
+    from app.modules.accounting.posting import post_stock_document
+
+    post_stock_document(db, access.business, doc, user_id=access.user.id)
     _emit(db, access, doc, posted, before, engine)
     audit.record(db, action=f"stock.{doc.kind.value}_posted", entity_type="stock_document",
                  entity_id=doc.id, business_id=access.business.id, actor_id=access.user.id,
@@ -413,6 +416,11 @@ def cancel_document(db: Session, access: BusinessAccess, doc: StockDocument, *, 
     if movements:
         before = {m.product.id: engine.on_hand(m.product.id) for m in movements}
         posted = engine.post(movements, entry_date=on, source_type=SOURCE, source_id=doc.id)
+        from app.modules.accounting.models import JournalSource
+        from app.modules.accounting.posting import reverse as reverse_posting
+
+        reverse_posting(db, access.business, JournalSource.STOCK, doc.id, on=on,
+                        user_id=access.user.id)
         _emit(db, access, doc, posted, before, engine)
     audit.record(db, action="stock.document_cancelled", entity_type="stock_document",
                  entity_id=doc.id, business_id=access.business.id, actor_id=access.user.id,
