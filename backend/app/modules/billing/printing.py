@@ -239,11 +239,23 @@ def chromium_path() -> str | None:
     configured = get_settings().pdf_chromium_path
     if configured:
         return configured if Path(configured).exists() else None
-    for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"):
+    for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "msedge"):
         found = shutil.which(name)
         if found:
             return found
-    return None
+    # Standard install locations: Microsoft Edge ships with every Windows 10/11 (Chromium-based);
+    # Chrome on Windows and macOS.
+    import os
+
+    candidates = [
+        Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / "Microsoft/Edge/Application/msedge.exe",
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Microsoft/Edge/Application/msedge.exe",
+        Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "Google/Chrome/Application/chrome.exe",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Google/Chrome/Application/chrome.exe",
+        Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+        Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+    ]
+    return next((str(c) for c in candidates if c.is_file()), None)
 
 
 def html_to_pdf(html: str) -> bytes:

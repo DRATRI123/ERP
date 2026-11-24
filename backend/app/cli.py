@@ -336,6 +336,17 @@ def cmd_compare_databases(args: argparse.Namespace) -> int:
     return 0 if not diffs else 2
 
 
+def cmd_owner_exists(_: argparse.Namespace) -> int:
+    """Exit code 0 when the owner account exists (used by setup scripts)."""
+    from sqlalchemy import select
+
+    from app.db.session import session_scope
+    from app.modules.users.models import User
+
+    with session_scope() as db:
+        return 0 if db.scalar(select(User.id).where(User.is_owner.is_(True))) else 1
+
+
 def cmd_check_config(_: argparse.Namespace) -> int:
     s = get_settings()
     problems = s.check_production()
@@ -434,6 +445,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--source", required=True)
     p.add_argument("--target", required=True)
     p.set_defaults(func=cmd_compare_databases)
+
+    p = sub.add_parser("owner-exists", help="Exit 0 if the owner account exists")
+    p.set_defaults(func=cmd_owner_exists)
 
     p = sub.add_parser("check-config", help="Check production settings")
     p.set_defaults(func=cmd_check_config)

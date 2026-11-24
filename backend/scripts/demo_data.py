@@ -42,8 +42,12 @@ CUSTOMERS = ["Sanjivani Clinic", "Dhanvantari Health Centre", "Arogya Pharmacy",
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--email", required=True)
-    ap.add_argument("--password", required=True)
+    ap.add_argument("--password", help="Omit to be asked (hidden)")
     args = ap.parse_args()
+    if not args.password:
+        import getpass
+
+        args.password = getpass.getpass("Owner password: ")
     random.seed(7)
     c = TestClient(create_app(), base_url="http://localhost")
     r = c.post("/api/v1/auth/login", json={"email": args.email, "password": args.password})
