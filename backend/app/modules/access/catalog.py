@@ -73,6 +73,9 @@ PERMISSIONS: tuple[Permission, ...] = (
     _P("data.export", "Reports", "Export data (PDF/Excel/CSV)"),
     _P("integrations.manage", "Platform", "Configure integrations"),
     _P("developer.manage", "Platform", "Manage API keys and webhooks"),
+    _P("files.view", "Files", "View and download files in the document library"),
+    _P("files.manage", "Files", "Upload, rename, move and delete files"),
+    _P("automation.manage", "Platform", "Create and change automation rules"),
 )
 
 PERMISSION_CODES: frozenset[str] = frozenset(p.code for p in PERMISSIONS)
@@ -112,7 +115,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
             "purchases.create", "purchases.edit", "purchases.approve",
             "products.manage", "stock.edit", "customers.manage", "suppliers.manage",
             "warehouses.manage", "credit_limit.override",
-            "payments.create", "expenses.manage", "data.export",
+            "payments.create", "expenses.manage", "data.export", "files.manage",
         ),
     ),
     RoleTemplate(
@@ -122,7 +125,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         _codes(
             *_VIEW_ALL - {"users.view"},
             "payments.create", "expenses.manage", "accounting.post", "gst.file",
-            "financial_years.manage", "data.export",
+            "financial_years.manage", "data.export", "files.manage",
         ),
     ),
     RoleTemplate(

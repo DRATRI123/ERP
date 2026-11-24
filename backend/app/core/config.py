@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     # returning it in the JSON body. For the browser frontend.
     auth_cookie: bool = False
 
+    # Document library: largest upload (files are stored in the database and in backups).
+    max_upload_mb: int = 25
+
     # Encrypted backups: 32-byte key, base64 (``python -m app.cli backup-keygen``).
     backup_key: str | None = None
     backup_dir: str = "./data/backups"

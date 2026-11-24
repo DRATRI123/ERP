@@ -168,6 +168,7 @@ def create_app() -> FastAPI:
         catalog,
         dashboard,
         developer,
+        files,
         gst,
         health,
         hooks,
@@ -181,7 +182,7 @@ def create_app() -> FastAPI:
     for router in (auth.router, businesses.router, access.router, users.router,
                    catalog.router, parties.customers, parties.suppliers, inventory.router,
                    billing.router, gst.router, accounting.router, integrations.router, hooks.router,
-                   developer.router, system.router, dashboard.router,
+                   developer.router, system.router, dashboard.router, files.router,
                    audit.router, health.router):
         app.include_router(router, prefix=API_PREFIX)
     return app

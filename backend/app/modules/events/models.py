@@ -34,5 +34,7 @@ class OutboxEvent(UUIDPrimaryKey, Base):
     published_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     # Set once outgoing webhook deliveries have been created for this event.
     webhooks_dispatched_at: Mapped[datetime | None] = mapped_column(UTCDateTime, index=True)
+    # Set once automation rules have been matched against this event.
+    automation_dispatched_at: Mapped[datetime | None] = mapped_column(UTCDateTime, index=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_error: Mapped[str | None] = mapped_column(String(500))
