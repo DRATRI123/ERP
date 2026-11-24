@@ -153,6 +153,19 @@ effective on both databases (NULLs never collide in unique constraints).
 | `gateway_payments` | Each confirmed gateway payment (unique per provider payment id) and the ERP receipt it became |
 | `webhook_receipts` | Replay protection: provider event ids processed once |
 
+## Phase 6 tables
+
+| Table | Purpose |
+|---|---|
+| `api_clients` | External applications: allowed businesses/branches, scopes, rate limit, acting user |
+| `api_keys` | Hashed keys (`erp_<prefix>_<secret>`), expiry, last use, revocation (future-dated during rotation) |
+| `api_request_logs` | Every API-key request: method, path, status, error code, duration, IP, request id |
+| `idempotency_records` | POST responses by caller + Idempotency-Key, kept 24 hours |
+| `webhook_endpoints` | Subscriber URL, event filters, encrypted signing secret (+ previous during rotation), status |
+| `webhook_deliveries` | One per endpoint × event: attempts, next attempt, response, error |
+
+Also: `outbox_events.webhooks_dispatched_at`, `documents.overdue_notified_at`.
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |

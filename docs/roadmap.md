@@ -10,8 +10,8 @@ PostgreSQL.
 | 3 | Invoice engine, numbering series, GST, returns, printing | **Backend done**. Visual designer UI still to do |
 | 4 | Double-entry accounting, ledgers, banking, financial reports | **Backend done** |
 | 5 | Integrations: WhatsApp, Gmail/SMTP, SMS, payment gateways, Google, Shopify | **Backend done** (185 tests in total); live verification with your accounts pending — see [integrations.md](integrations.md) |
-| 6 | Developer platform: API keys & scopes, webhooks, idempotency, rate limits | Next |
-| 7 | Node.js realtime + webhook delivery, Redis, Rust workers (where benchmarks justify) | — |
+| 6 | Developer platform: API keys & scopes, webhooks, idempotency, rate limits | **Backend done** (197 tests in total) — see [api.md](api.md) |
+| 7 | Node.js realtime + webhook delivery, Redis, Rust workers (where benchmarks justify) | Next |
 | 8 | Custom domains, SSL, encryption at rest, monitoring, backups, deployment | — |
 | 9 | SQLite → PostgreSQL migration utility and cutover | — |
 | 10 | Load/security testing, restore drills, production docs | — |

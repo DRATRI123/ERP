@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.deps import DB, Access, CurrentPrincipal, OwnerPrincipal, require
+from app.api.deps import DB, Access, AnyPrincipal, OwnerPrincipal, require
 from app.api.schemas import (
     BranchCreateIn,
     BranchOut,
@@ -26,9 +26,15 @@ router = APIRouter(prefix="/businesses", tags=["businesses"])
 
 @router.get("", response_model=list[BusinessOut])
 def list_businesses(
-    p: CurrentPrincipal, db: DB, include_archived: bool = Query(False)
+    p: AnyPrincipal, db: DB, include_archived: bool = Query(False)
 ) -> list[BusinessOut]:
     """Businesses the caller may access. Only the owner can see archived businesses."""
+    if p.is_api:
+        from app.modules.businesses.models import BusinessStatus
+
+        rows = [b for b in service.list_businesses(db, p.user, include_archived=False)
+                if str(b.id) in p.api_client.business_ids and b.status == BusinessStatus.ACTIVE]
+        return [BusinessOut.model_validate(b) for b in rows if "businesses:read" in p.api_scopes]
     rows = service.list_businesses(db, p.user, include_archived=include_archived)
     return [BusinessOut.model_validate(b) for b in rows]
 

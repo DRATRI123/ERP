@@ -169,6 +169,7 @@ class Document(UUIDPrimaryKey, Timestamps, Base):
     irn_ack_no: Mapped[str | None] = mapped_column(String(30))
     irn_ack_date: Mapped[datetime | None] = mapped_column(UTCDateTime)
     irn_signed_qr: Mapped[str | None] = mapped_column(Text)
+    overdue_notified_at: Mapped[datetime | None] = mapped_column(UTCDateTime)  # invoice.overdue sent
 
     created_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)

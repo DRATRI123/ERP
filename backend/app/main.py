@@ -65,13 +65,18 @@ def create_app() -> FastAPI:
             user_agent_var.reset(tokens[2])
             sqlite_write_intent.reset(tokens[3])
 
+    from app.api.middleware import api_middleware
+
+    app.middleware("http")(api_middleware)
+
     if settings.cors_origins:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origins,
             allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
             allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Idempotency-Key"],
-            expose_headers=["X-Request-ID"],
+            expose_headers=["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After",
+                            "Idempotent-Replayed"],
         )
 
     install_error_handlers(app)
@@ -84,6 +89,7 @@ def create_app() -> FastAPI:
         billing,
         businesses,
         catalog,
+        developer,
         gst,
         health,
         hooks,
@@ -96,6 +102,7 @@ def create_app() -> FastAPI:
     for router in (auth.router, businesses.router, access.router, users.router,
                    catalog.router, parties.customers, parties.suppliers, inventory.router,
                    billing.router, gst.router, accounting.router, integrations.router, hooks.router,
+                   developer.router,
                    audit.router, health.router):
         app.include_router(router, prefix=API_PREFIX)
     return app

@@ -29,7 +29,10 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   (SMTP/Gmail), WhatsApp Cloud API, MSG91 SMS, Razorpay & Cashfree payment links with verified
   webhooks, Google Drive backups, Shopify import, CSV/Excel import & export, Tally XML export.
   See [docs/integrations.md](docs/integrations.md) for setup.
-* Next: Phase 6 (developer API platform). The Next.js frontend is still to be built.
+* **Phase 6 backend — complete:** API applications with scoped, hashed, rotatable keys; OAuth 2.0
+  client-credentials tokens; per-app rate limits; idempotency keys; API request logs and usage;
+  signed outgoing webhooks with retries, rotation and auto-disable. See [docs/api.md](docs/api.md).
+* Next: Phase 7 (Node.js real-time, Redis). The Next.js frontend is still to be built.
 
 After upgrading a database that already has invoices or stock from earlier phases, run
 `python -m app.cli accounting-backfill` once to post their journals.

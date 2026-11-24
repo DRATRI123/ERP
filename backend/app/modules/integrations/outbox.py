@@ -146,6 +146,7 @@ def process_due(db: Session, *, now: datetime | None = None, limit: int = 50) ->
                 msg.next_attempt_at = now + BACKOFF[msg.attempts - 1]
                 stats["retrying"] += 1
         db.commit()
+    db.rollback()  # end the read transaction when nothing was due
     return stats
 
 

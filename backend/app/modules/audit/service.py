@@ -10,7 +10,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.core.context import client_ip_var, request_id_var
+from app.core.context import api_key_var, client_ip_var, request_id_var
 from app.modules.audit.models import AuditLog
 
 _REDACTED_FIELDS = {"password", "password_hash", "token", "token_hash", "refresh_token_hash"}
@@ -43,6 +43,13 @@ def diff(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _with_api(changes: dict[str, Any] | None) -> dict[str, Any] | None:
+    key = api_key_var.get()
+    if key is None:
+        return changes
+    return {**(changes or {}), "via_api_key": key}
+
+
 def record(
     db: Session,
     *,
@@ -59,7 +66,7 @@ def record(
         action=action,
         entity_type=entity_type,
         entity_id=str(entity_id) if entity_id is not None else None,
-        changes=jsonable(changes) if changes else None,
+        changes=_with_api(jsonable(changes) if changes else None),
         ip_address=client_ip_var.get(),
         request_id=request_id_var.get(),
     )

@@ -94,14 +94,21 @@ def cmd_accounting_backfill(_: argparse.Namespace) -> int:
 def cmd_worker(args: argparse.Namespace) -> int:
     """Send queued e-mails / WhatsApp / SMS. Run under systemd or Docker alongside the API."""
     import time
+    from datetime import UTC, datetime
 
     from app.db.session import SessionLocal
     from app.modules.integrations.outbox import process_due
 
     while True:
+        from app.modules.developer.webhooks import deliver_due, emit_overdue, fan_out
+
         db = SessionLocal()
         try:
             stats = process_due(db)
+            stats["webhooks_queued"] = fan_out(db)
+            stats.update({f"webhook_{k}": v for k, v in deliver_due(db).items()})
+            if datetime.now(UTC).hour == 3 or args.once:  # daily overdue scan (idempotent)
+                stats["overdue_events"] = emit_overdue(db)
         finally:
             db.close()
         if any(stats.values()):

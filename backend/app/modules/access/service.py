@@ -45,10 +45,13 @@ class BusinessAccess:
     permissions: frozenset[str]
     all_branches: bool
     branch_ids: frozenset[uuid.UUID]
+    # Set when the request comes from an API application acting for ``user``.
+    api_client_id: uuid.UUID | None = None
 
     @property
     def is_owner(self) -> bool:
-        return self.user.owner
+        # API applications never get owner powers, even when the owner created them.
+        return self.user.owner and self.api_client_id is None
 
     def can(self, code: str) -> bool:
         return code in self.permissions

@@ -173,7 +173,21 @@ purchase documents will post through the same engine with their own `source_type
   id. Money is only recorded from verified events, exactly once.
 * Details per provider: [integrations.md](integrations.md).
 
-## 9. Reliability patterns
+## 9. Developer platform
+
+* API applications authenticate with hashed keys or 15-minute OAuth client-credentials tokens.
+  A key becomes a `BusinessAccess` whose permissions are *scope permissions ∩ the creating
+  user's current permissions*, and never owner powers — so every existing check (isolation,
+  branches, cost visibility, immutability) applies to API calls unchanged.
+* Account, user, developer and owner endpoints accept signed-in users only.
+* Middleware adds rate-limit headers, logs API requests, records which key acted in the audit
+  trail, and implements Idempotency-Key replay for POSTs (scoped per verified caller).
+* Request DB sessions close as soon as the endpoint returns (`scope="function"`), so no
+  transaction outlives its request.
+* Outgoing webhooks fan out from the transactional outbox in the worker, are HMAC-signed,
+  retried with backoff, blocked from private/internal addresses, and can never roll back data.
+
+## 10. Reliability patterns
 
 * **Transactional outbox** – domain events (`business.created`, later `invoice.created`, …) are
   inserted into `outbox_events` in the same transaction as the change. A relay (Phase 7) publishes
@@ -186,7 +200,7 @@ purchase documents will post through the same engine with their own `source_type
 * **Structured logs** – one JSON line per request with method, path, status, duration and
   request id.
 
-## 10. Database strategy (SQLite first, PostgreSQL ready)
+## 11. Database strategy (SQLite first, PostgreSQL ready)
 
 See [database-schema.md](database-schema.md) for the schema itself.
 
@@ -224,7 +238,7 @@ decimal sums per column, trial balance, stock balances, customer outstanding and
 totals → run the test suite against the new database → cut over in a maintenance window.
 No dual writes.
 
-## 11. API conventions
+## 12. API conventions
 
 * REST + JSON under `/api/v1`, OpenAPI 3 at `/api/v1/openapi.json`, docs at `/api/v1/docs`.
 * `limit`/`offset` pagination returning `{items, total, limit, offset}`.

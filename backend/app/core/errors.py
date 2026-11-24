@@ -24,10 +24,12 @@ class AppError(Exception):
     status_code = 400
     code = "bad_request"
 
-    def __init__(self, message: str, *, details: Any = None, code: str | None = None) -> None:
+    def __init__(self, message: str, *, details: Any = None, code: str | None = None,
+                 headers: dict[str, str] | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.details = details
+        self.headers = headers
         if code:
             self.code = code
 
@@ -75,8 +77,10 @@ def _body(code: str, message: str, details: Any = None) -> dict[str, Any]:
 
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
-    async def _app_error(_: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(_body(exc.code, exc.message, exc.details), status_code=exc.status_code)
+    async def _app_error(request: Request, exc: AppError) -> JSONResponse:
+        request.state.error_code = exc.code
+        return JSONResponse(_body(exc.code, exc.message, exc.details), status_code=exc.status_code,
+                            headers=exc.headers)
 
     @app.exception_handler(RequestValidationError)
     async def _validation(_: Request, exc: RequestValidationError) -> JSONResponse:
