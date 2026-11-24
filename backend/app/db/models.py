@@ -1,0 +1,11 @@
+"""Import every model module so ``Base.metadata`` is complete (used by Alembic and tests)."""
+
+from app.db.base import Base
+from app.modules.access import models as access_models  # noqa: F401
+from app.modules.audit import models as audit_models  # noqa: F401
+from app.modules.auth import models as auth_models  # noqa: F401
+from app.modules.businesses import models as business_models  # noqa: F401
+from app.modules.events import models as event_models  # noqa: F401
+from app.modules.users import models as user_models  # noqa: F401
+
+metadata = Base.metadata
