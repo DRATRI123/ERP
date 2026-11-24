@@ -41,6 +41,17 @@ services:
 
   api:
     <<: *backend
+    environment:
+      ERP_ENV: production
+      ERP_REDIS_URL: redis://redis:6379/0
+      ERP_BACKUP_DIR: /app/data/backups
+      ERP_PDF_NO_SANDBOX: "true"
+      FORWARDED_ALLOW_IPS: "*"
+      HOME: /tmp
+      # One process per CPU core (load-tested: docs/performance.md). With PostgreSQL keep
+      # workers × (ERP_DB_POOL_SIZE + ERP_DB_MAX_OVERFLOW) under max_connections (check-config).
+      WEB_CONCURRENCY: ${ERP_API_WORKERS:-2}
+      ERP_API_WORKERS: ${ERP_API_WORKERS:-2}
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }

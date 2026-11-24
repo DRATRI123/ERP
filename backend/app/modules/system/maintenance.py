@@ -54,15 +54,16 @@ class _Cache:
             return self._value
         with self._lock:
             if time.monotonic() - self._at >= self.ttl:
-                from app.db.session import SessionLocal
+                from app.db.session import SessionLocal, read_only
 
-                db = SessionLocal()
-                try:
-                    self._value = get(db)
-                except Exception:  # noqa: BLE001 - table missing before migrations: not in maintenance
-                    self._value = {"enabled": False}
-                finally:
-                    db.close()
+                with read_only():
+                    db = SessionLocal()
+                    try:
+                        self._value = get(db)
+                    except Exception:  # noqa: BLE001 - table missing before migrations: not in maintenance
+                        self._value = {"enabled": False}
+                    finally:
+                        db.close()
                 self._at = time.monotonic()
         return self._value
 

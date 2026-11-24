@@ -47,7 +47,7 @@ def _bank(db: Session, access: BusinessAccess, account_id: uuid.UUID) -> Account
 def _date(v: str) -> date:
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y", "%d/%m/%y", "%d-%b-%Y", "%d %b %Y"):
         try:
-            return datetime.strptime(v.strip(), fmt).date()
+            return datetime.strptime(v.strip(), fmt).date()  # noqa: DTZ007 - a calendar date, no time
         except ValueError:
             continue
     raise ValidationFailed(f"Unrecognised date {v!r}")
@@ -148,7 +148,8 @@ def auto_match(db: Session, access: BusinessAccess, account_id: uuid.UUID) -> in
             continue
         ref = (st.reference or "").lower()
 
-        def score(c: tuple[JournalLine, JournalEntry]) -> tuple[int, int]:
+        def score(c: tuple[JournalLine, JournalEntry], ref: str = ref,
+                  st: BankStatementLine = st) -> tuple[int, int]:
             jl, je = c
             text = " ".join(filter(None, (je.source_ref, je.narration, jl.description))).lower()
             return (0 if ref and ref in text else 1, abs((jl.entry_date - st.txn_date).days))

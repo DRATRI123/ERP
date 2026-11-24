@@ -16,8 +16,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.types import str_enum
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
+from app.db.types import str_enum
 
 
 class Role(UUIDPrimaryKey, Timestamps, Base):

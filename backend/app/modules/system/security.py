@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import smtplib
 import ssl
@@ -203,10 +204,8 @@ def _smtp_send(to: str, subject: str, body: str) -> None:
             conn.login(s.smtp_username, s.smtp_password or "")
         conn.send_message(msg)
     finally:
-        try:
+        with contextlib.suppress(smtplib.SMTPException):
             conn.quit()
-        except smtplib.SMTPException:
-            pass
 
 
 def _alert_body(user: User, ev: SecurityEvent) -> str:

@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.clock import local_today
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.modules.access.service import BusinessAccess
 from app.modules.accounting.models import JournalSource
@@ -185,7 +186,7 @@ def cancel_payment(db: Session, access: BusinessAccess, pay: Payment, *, reason:
         assert doc is not None
         if doc.status == DocStatus.FINAL:
             _apply(doc, -a.amount)
-    reverse_posting(db, access.business, JournalSource.PAYMENT, pay.id, on=date.today(),
+    reverse_posting(db, access.business, JournalSource.PAYMENT, pay.id, on=local_today(),
                     user_id=access.user.id)
     pay.status = PaymentState.CANCELLED
     pay.cancelled_at = datetime.now(UTC)

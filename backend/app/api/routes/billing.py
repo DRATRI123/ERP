@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 
-from app.api.deps import DB, Access, require
+from app.api.deps import DB, Access, require, require_any
 from app.api.pagination import Page, PageParams, page_params, paginate
 from app.api.schemas_billing import (
     CancelIn,
@@ -37,6 +37,7 @@ from app.api.schemas_billing import (
     TemplateOut,
     TemplateUpdateIn,
 )
+from app.core.clock import local_today
 from app.core.errors import NotFound, PermissionDenied, ValidationFailed
 from app.modules.access.service import BusinessAccess
 from app.modules.audit import service as audit
@@ -52,13 +53,24 @@ from app.modules.billing.models import (
     PaymentDirection,
     PaymentStatus,
 )
-from app.modules.billing.printing import Paper, TemplateConfig, combine_html, html_to_pdf, render_html
+from app.modules.billing.printing import (
+    Paper,
+    TemplateConfig,
+    combine_html,
+    html_to_pdf,
+    render_html,
+)
 from app.modules.gst import einvoice
 from app.modules.parties.models import Party
 
 router = APIRouter(prefix="/businesses/{business_id}", tags=["billing"])
 
 ManageTemplates = Annotated[BusinessAccess, Depends(require("templates.manage"))]
+# Up-front checks; the service then demands the exact permission for the document's side.
+AnyCreate = Annotated[BusinessAccess, Depends(require_any("invoices.create", "purchases.create"))]
+AnyView = Annotated[BusinessAccess, Depends(require_any("invoices.view", "purchases.view"))]
+AnyCancel = Annotated[BusinessAccess, Depends(require_any("invoices.cancel", "purchases.approve"))]
+PaymentsCreate = Annotated[BusinessAccess, Depends(require("payments.create"))]
 # Never set to NULL from a PATCH: these columns are required.
 _REQUIRED = {"doc_date", "branch_id", "tax_mode", "price_tier", "prices_include_tax",
              "reverse_charge", "restock", "landed_cost", "custom_fields"}
@@ -115,7 +127,7 @@ def list_documents(
         stmt = stmt.where(Document.payment_status == payment_status)
     if overdue:
         stmt = stmt.where(Document.status == DocStatus.FINAL, Document.balance_due > 0,
-                          Document.due_date < date.today())
+                          Document.due_date < local_today())
     if date_from:
         stmt = stmt.where(Document.doc_date >= date_from)
     if date_to:
@@ -129,7 +141,7 @@ def list_documents(
 
 
 @router.post("/documents", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
-def create_document(body: DocumentIn, access: Access, db: DB) -> DocumentOut:
+def create_document(body: DocumentIn, access: AnyCreate, db: DB) -> DocumentOut:
     doc = service.create_draft(db, access, body.doc_type, _header(body, {"doc_type"}) | {
         "doc_date": body.doc_date}, _lines(body))  # type: ignore[arg-type]
     db.commit()
@@ -137,7 +149,7 @@ def create_document(body: DocumentIn, access: Access, db: DB) -> DocumentOut:
 
 
 @router.post("/documents/preview", response_model=DocumentOut)
-def preview_document(body: DocumentIn, access: Access, db: DB) -> DocumentOut:
+def preview_document(body: DocumentIn, access: AnyCreate, db: DB) -> DocumentOut:
     """Price and tax a document without saving anything (live totals while billing)."""
     with db.begin_nested() as sp:
         doc = service.create_draft(db, access, body.doc_type, _header(body, {"doc_type", "client_ref"})
@@ -178,16 +190,16 @@ def finalize_document(document_id: uuid.UUID, access: Access, db: DB,
 
 
 @router.post("/documents/{document_id}/cancel", response_model=DocumentOut)
-def cancel_document(document_id: uuid.UUID, body: CancelIn, access: Access, db: DB) -> DocumentOut:
+def cancel_document(document_id: uuid.UUID, body: CancelIn, access: AnyCancel, db: DB) -> DocumentOut:
     doc = service.cancel(db, access, service.get_document(db, access, document_id),
-                         reason=body.reason, on=body.cancel_date or date.today())
+                         reason=body.reason, on=body.cancel_date or local_today())
     db.commit()
     return _out(doc)
 
 
 @router.post("/documents/{document_id}/convert", response_model=DocumentOut,
              status_code=status.HTTP_201_CREATED)
-def convert_document(document_id: uuid.UUID, body: ConvertIn, access: Access, db: DB) -> DocumentOut:
+def convert_document(document_id: uuid.UUID, body: ConvertIn, access: AnyCreate, db: DB) -> DocumentOut:
     """Quotation → order → invoice, challan → invoice, invoice → credit/debit note, etc."""
     source = service.get_document(db, access, document_id)
     doc = service.convert(db, access, source, body.target,
@@ -203,7 +215,7 @@ class PrintBatchIn(BaseModel):
 
 
 @router.post("/documents/print-batch", responses={200: {"content": {"application/pdf": {}}}})
-def print_batch(body: PrintBatchIn, access: Access, db: DB) -> Response:
+def print_batch(body: PrintBatchIn, access: AnyView, db: DB) -> Response:
     """Many documents → one PDF in a single render (bulk printing, month-end copies)."""
     docs = [service.get_document(db, access, d) for d in dict.fromkeys(body.document_ids)]
     if body.template_id:
@@ -287,7 +299,7 @@ def party_outstanding(party_id: uuid.UUID, access: Access, db: DB,
         Document.business_id == access.business.id, Document.party_id == party_id,
         Document.status == DocStatus.FINAL, Document.doc_type.in_(types), Document.balance_due > 0)
         .order_by(Document.due_date, Document.doc_date)))
-    today = date.today()
+    today = local_today()
     sign = {t: (-1 if t in (DocType.CREDIT_NOTE, DocType.PURCHASE_RETURN) else 1) for t in types}
     overdue = sum((sign[d.doc_type] * d.balance_due for d in docs
                    if d.due_date and d.due_date < today and sign[d.doc_type] > 0), Decimal(0))
@@ -333,7 +345,7 @@ def list_payments(access: Access, db: DB, params: Annotated[PageParams, Depends(
 
 
 @router.post("/payments", response_model=PaymentOut, status_code=status.HTTP_201_CREATED, tags=["payments"])
-def create_payment(body: PaymentIn, access: Access, db: DB) -> PaymentOut:
+def create_payment(body: PaymentIn, access: PaymentsCreate, db: DB) -> PaymentOut:
     p = pay_service.create_payment(
         db, access, direction=body.direction, party_id=body.party_id,
         payment_date=body.payment_date, mode=body.mode, amount=body.amount,
@@ -349,7 +361,7 @@ def get_payment(payment_id: uuid.UUID, access: Access, db: DB) -> PaymentOut:
 
 
 @router.post("/payments/{payment_id}/cancel", response_model=PaymentOut, tags=["payments"])
-def cancel_payment(payment_id: uuid.UUID, body: PaymentCancelIn, access: Access, db: DB) -> PaymentOut:
+def cancel_payment(payment_id: uuid.UUID, body: PaymentCancelIn, access: PaymentsCreate, db: DB) -> PaymentOut:
     p = pay_service.cancel_payment(db, access, pay_service.get_payment(db, access, payment_id),
                                    reason=body.reason)
     db.commit()

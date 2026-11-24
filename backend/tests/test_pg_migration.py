@@ -48,7 +48,7 @@ def target_url(engine: Engine, tmp_path: Path):
         admin = create_engine(admin_url, isolation_level="AUTOCOMMIT")
         with admin.connect() as c:
             c.execute(text(f"CREATE DATABASE {name}"))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         pytest.skip(f"PostgreSQL not reachable for the migration test: {exc.__class__.__name__}")
     try:
         yield admin_url.set(database=name).render_as_string(hide_password=False)
@@ -165,7 +165,7 @@ def test_refuses_unmigrated_target_or_outdated_source(engine, target_url, monkey
             tx.transfer(engine, target)
         tx.upgrade_target(target_url)
         monkeypatch.setattr(tx, "_head", lambda: "9999")
-        with pytest.raises(tx.TransferError, match="Run `python -m app.cli migrate`"):
+        with pytest.raises(tx.TransferError, match=r"Run `python -m app\.cli migrate`"):
             tx.transfer(engine, target)
     finally:
         target.dispose()

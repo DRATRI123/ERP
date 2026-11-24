@@ -7,9 +7,17 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, PlainSerializer, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainSerializer,
+    StringConstraints,
+)
 
 from app.api.schemas_masters import HsnSac, MoneyIn, RateIn, scaled
+from app.core.clock import local_today
 from app.modules.billing.doctypes import DocType
 from app.modules.billing.models import (
     DocStatus,
@@ -93,7 +101,7 @@ class _Header(BaseModel):
 
 class DocumentIn(_Header):
     doc_type: DocType
-    doc_date: date = Field(default_factory=date.today)
+    doc_date: date = Field(default_factory=local_today)
     client_ref: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)] | None = Field(
         None, description="Your own id for this document; repeating a create with it is idempotent")
     lines: list[LineIn] = Field(min_length=1, max_length=500)
@@ -236,7 +244,7 @@ class PaymentIn(BaseModel):
     direction: PaymentDirection
     party_id: uuid.UUID | None = None
     branch_id: uuid.UUID | None = None
-    payment_date: date = Field(default_factory=date.today)
+    payment_date: date = Field(default_factory=local_today)
     mode: PaymentMode
     account_id: uuid.UUID | None = Field(None, description="Cash/bank account; default by mode")
     amount: MoneyIn

@@ -5,7 +5,9 @@
   "description": "Real-time event delivery (WebSockets) for the private ERP",
   "type": "module",
   "main": "dist/src/index.js",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -p .",
     "start": "node dist/src/index.js",
@@ -13,7 +15,7 @@
   },
   "dependencies": {
     "ioredis": "5.4.2",
-    "ws": "8.18.0"
+    "ws": "8.22.2"
   },
   "devDependencies": {
     "@types/node": "22.10.2",

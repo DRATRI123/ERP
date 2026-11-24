@@ -8,7 +8,7 @@ import hmac
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Self
 
 import httpx
 from sqlalchemy.orm import Session
@@ -80,7 +80,7 @@ class CallLog:
         self.http_status: int | None = None
         self.detail: str | None = None
 
-    def __enter__(self) -> CallLog:
+    def __enter__(self) -> Self:
         self.start = time.perf_counter()
         return self
 

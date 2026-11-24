@@ -147,6 +147,13 @@ def cmd_worker(args: argparse.Namespace) -> int:
         backup = backups.run_pending()  # own sessions; long-running
         if backup:
             stats["backup"] = backup
+        db = SessionLocal()
+        try:
+            due = backups.drill_due(db)
+        finally:
+            db.close()
+        if due and not args.once:
+            stats["restore_drill"] = "ok" if backups.restore_drill()["ok"] else "FAILED"
         if any(stats.values()):
             print(f"worker: {stats}", flush=True)
         if args.once:
@@ -199,6 +206,17 @@ def cmd_restore(args: argparse.Namespace) -> int:
     print(f"Restored {r.dialect} backup from {r.created_at} (schema {r.revision}) into {r.target}")
     print("Next: python -m app.cli migrate   (brings an older backup up to the current schema)")
     return 0
+
+
+def cmd_restore_drill(_: argparse.Namespace) -> int:
+    from app.modules.system.backups import restore_drill
+
+    r = restore_drill()
+    print(f"Restore drill {'OK' if r['ok'] else 'FAILED'}: backup {r.get('backup')}, "
+          f"{r.get('businesses', 0)} businesses, {r.get('rows', 0):,} rows, {r.get('seconds', 0)}s")
+    for p in r.get("problems") or []:
+        print(f"  ! {p}")
+    return 0 if r["ok"] else 2
 
 
 def cmd_backup_keygen(_: argparse.Namespace) -> int:
@@ -319,7 +337,20 @@ def cmd_compare_databases(args: argparse.Namespace) -> int:
 
 
 def cmd_check_config(_: argparse.Namespace) -> int:
-    problems = get_settings().check_production()
+    s = get_settings()
+    problems = s.check_production()
+    if not s.is_sqlite:
+        from sqlalchemy import text
+
+        from app.db.session import get_engine
+
+        with get_engine().connect() as c:
+            max_conn = int(c.execute(text("SHOW max_connections")).scalar())
+        need = s.api_workers * (s.db_pool_size + s.db_max_overflow) + (s.db_pool_size + s.db_max_overflow) + 10
+        print(f"PostgreSQL max_connections={max_conn}; this configuration may open up to {need}")
+        if need > max_conn:
+            problems.append(f"connection pool too large: {s.api_workers} API workers × "
+                            f"({s.db_pool_size}+{s.db_max_overflow}) + worker + headroom = {need} > {max_conn}")
     for p in problems:
         print(f"  - {p}")
     print("Configuration OK for production" if not problems else "Fix the settings above before going live")
@@ -373,6 +404,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--force", action="store_true", help="Replace an existing database")
     p.add_argument("--yes", action="store_true", help="Do not ask for confirmation")
     p.set_defaults(func=cmd_restore)
+
+    p = sub.add_parser("restore-drill", help="Restore the latest backup into a scratch database and check it")
+    p.set_defaults(func=cmd_restore_drill)
 
     p = sub.add_parser("backup-keygen", help="Generate an ERP_BACKUP_KEY")
     p.set_defaults(func=cmd_backup_keygen)

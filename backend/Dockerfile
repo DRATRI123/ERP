@@ -32,5 +32,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 ENTRYPOINT ["/usr/bin/tini", "--"]
 # --proxy-headers: trust X-Forwarded-For/Proto from Caddy only (FORWARDED_ALLOW_IPS is set to
 # the Docker network in docker-compose.yml), so client IPs and https detection are correct.
+# Worker processes come from WEB_CONCURRENCY (uvicorn reads it); see docs/performance.md.
+ENV WEB_CONCURRENCY=2
 CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", \
-     "--proxy-headers", "--workers", "1", "--no-server-header"]
+     "--proxy-headers", "--no-server-header"]

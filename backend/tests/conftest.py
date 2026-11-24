@@ -13,7 +13,6 @@ import secrets
 import tempfile
 import uuid
 from collections.abc import Iterator
-from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -23,7 +22,7 @@ os.environ["ERP_SECRET_KEY"] = secrets.token_urlsafe(48)
 if Path("/opt/pw-browsers/chromium").exists():  # PDF rendering in this environment
     os.environ.setdefault("ERP_PDF_CHROMIUM_PATH", "/opt/pw-browsers/chromium")
     os.environ.setdefault("ERP_PDF_NO_SANDBOX", "true")
-os.environ["ERP_ENCRYPTION_KEYS"] = '["%s"]' % __import__("cryptography.fernet", fromlist=["Fernet"]).Fernet.generate_key().decode()
+os.environ["ERP_ENCRYPTION_KEYS"] = '["{}"]'.format(__import__("cryptography.fernet", fromlist=["Fernet"]).Fernet.generate_key().decode())
 os.environ["ERP_PUBLIC_BASE_URL"] = "https://erp.test"
 os.environ["ERP_BACKUP_KEY"] = __import__("base64").urlsafe_b64encode(os.urandom(32)).decode()
 os.environ["ERP_BACKUP_DIR"] = str(_TMP / "backups")
@@ -32,19 +31,19 @@ os.environ["ERP_DATABASE_URL"] = os.environ.get(
     "ERP_TEST_DATABASE_URL", f"sqlite:///{_TMP / 'test.db'}"
 )
 
-import pytest  # noqa: E402
-from alembic import command  # noqa: E402
-from alembic.config import Config  # noqa: E402
-from argon2 import PasswordHasher  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import Engine, text  # noqa: E402
-from sqlalchemy.orm import Session  # noqa: E402
+import pytest
+from alembic import command
+from alembic.config import Config
+from argon2 import PasswordHasher
+from fastapi.testclient import TestClient
+from sqlalchemy import Engine, text
+from sqlalchemy.orm import Session
 
-from app.core import security  # noqa: E402
-from app.core.config import BACKEND_DIR, get_settings  # noqa: E402
-from app.db.models import metadata  # noqa: E402
-from app.db.session import SessionLocal, build_engine, set_engine  # noqa: E402
-from app.main import create_app  # noqa: E402
+from app.core import security
+from app.core.config import BACKEND_DIR, get_settings
+from app.db.models import metadata
+from app.db.session import SessionLocal, build_engine, set_engine
+from app.main import create_app
 
 # Production Argon2 parameters are deliberately slow; tests use cheap ones.
 security._hasher = PasswordHasher(time_cost=1, memory_cost=1024, parallelism=1)
@@ -90,7 +89,6 @@ def _clean_db(engine: Engine) -> Iterator[None]:
     yield
     from app.core.ratelimit import limiter
     from app.modules.system.domains import host_cache
-
     from app.modules.system.maintenance import cache as maintenance_cache
 
     limiter.reset()
@@ -258,7 +256,7 @@ class Shop:
         assert verify_balances(db, uuid.UUID(self.bid)) == []
 
 
-TODAY = date.today().isoformat()
+TODAY = __import__("app.core.clock", fromlist=["x"]).local_today().isoformat()  # business timezone
 
 
 @pytest.fixture

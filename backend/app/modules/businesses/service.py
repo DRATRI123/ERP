@@ -113,10 +113,9 @@ def create_business(db: Session, *, actor: User, data: dict[str, Any], today: da
     db.add(head)
     access_service.seed_system_roles(db, business.id)
     db.flush()
+    from app.modules.accounting.chart import seed_chart
     from app.modules.catalog.service import seed_units
     from app.modules.inventory.service import create_default_warehouse
-
-    from app.modules.accounting.chart import seed_chart
 
     seed_units(db, business.id)
     create_default_warehouse(db, business.id, head.id)
@@ -139,11 +138,9 @@ def update_business(db: Session, access: BusinessAccess, data: dict[str, Any]) -
     business = access.business
     if business.status == BusinessStatus.ARCHIVED:
         raise ValidationFailed("Restore the business before editing it")
-    if "fy_start_month" in data and data["fy_start_month"] != business.fy_start_month:
-        if list_financial_years(db, business.id):
-            raise ValidationFailed(
-                "The financial-year start month cannot change once financial years exist"
-            )
+    if ("fy_start_month" in data and data["fy_start_month"] != business.fy_start_month
+            and list_financial_years(db, business.id)):
+        raise ValidationFailed("The financial-year start month cannot change once financial years exist")
     if data.get("inventory_valuation", business.inventory_valuation) != business.inventory_valuation:
         from app.modules.inventory.service import has_stock_activity
 

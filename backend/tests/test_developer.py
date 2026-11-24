@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 from app.modules.integrations import base as ibase
-from tests.conftest import TODAY, VALID_GSTIN, Shop
+from tests.conftest import VALID_GSTIN, Shop
 from tests.test_billing import customer, invoice, stocked
 from tests.test_integrations import FakeProviders
 
@@ -44,7 +44,7 @@ def public_dns(monkeypatch):
     table = {"hooks.example.com": "93.184.216.34", "internal.example.com": "10.0.0.5",
              "metadata.example.com": "169.254.169.254"}
 
-    def fake(host, port, proto=0):  # noqa: ANN001
+    def fake(host, port, proto=0):
         ip = table.get(host, host)
         return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, port))]
 
@@ -144,7 +144,7 @@ def test_key_capped_by_creators_current_permissions(api, owner_headers, dshop):
     r = api.c.post("/api/v1/developer/apps", headers=admin_h, json={
         "name": "Wrong biz", "business_ids": [other.bid], "scopes": ["customers:read"]})
     assert r.status_code == 403
-    app, key = app_with_key(dshop, ["customers:read"], headers=admin_h)
+    _app, key = app_with_key(dshop, ["customers:read"], headers=admin_h)
     assert api.c.get(f"{dshop.base}/customers", headers=bearer(key)).status_code == 200
     # Suspending the creator's membership shuts the key out too.
     api.c.post(f"{dshop.base}/members/{member['id']}/suspend", headers=owner_headers)
@@ -192,7 +192,7 @@ def test_rate_limit_headers_and_429(dshop, api):
 
 
 def test_idempotency_keys(dshop, api):
-    app, key = app_with_key(dshop, ["customers:write", "customers:read"])
+    _app, key = app_with_key(dshop, ["customers:write", "customers:read"])
     h = bearer(key) | {"Idempotency-Key": "create-cust-001"}
     body = {"name": "Idempotent Clinic"}
     a = api.c.post(f"{dshop.base}/customers", headers=h, json=body)

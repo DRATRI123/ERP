@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import secrets
+import threading
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -23,13 +25,28 @@ JWT_ALGORITHM = "HS256"
 JWT_ISSUER = "erp"
 
 
+_hash_slots: threading.BoundedSemaphore | None = None
+
+
+def _slots() -> threading.BoundedSemaphore:
+    """Each Argon2 operation takes 64 MiB and a full core: bound how many run at once so a burst
+    of sign-ins (or a password-guessing attack) cannot exhaust memory. Extra callers wait."""
+    global _hash_slots
+    if _hash_slots is None:
+        n = get_settings().password_hash_concurrency or (os.cpu_count() or 2)
+        _hash_slots = threading.BoundedSemaphore(max(1, n))
+    return _hash_slots
+
+
 def hash_password(password: str) -> str:
-    return _hasher.hash(password)
+    with _slots():
+        return _hasher.hash(password)
 
 
 def verify_password(password_hash: str | None, password: str) -> bool:
     try:
-        return _hasher.verify(password_hash or _DUMMY_HASH, password) and password_hash is not None
+        with _slots():
+            return _hasher.verify(password_hash or _DUMMY_HASH, password) and password_hash is not None
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
 

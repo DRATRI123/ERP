@@ -31,7 +31,12 @@ from sqlalchemy.orm import Session
 
 from app.modules.accounting.chart import Accounts
 from app.modules.accounting.ledger import Line, post, reverse_source
-from app.modules.accounting.models import Account, AccountSubtype, JournalEntry, JournalSource
+from app.modules.accounting.models import (
+    Account,
+    AccountSubtype,
+    JournalEntry,
+    JournalSource,
+)
 from app.modules.billing.doctypes import DocType
 from app.modules.billing.models import Document, Payment, PaymentDirection, PaymentMode
 from app.modules.businesses.models import Business

@@ -499,3 +499,116 @@ __all__ = [
     "save_backup_settings",
     "verify_file",
 ]
+
+
+# ---------------------------------------------------------------------------- restore drills
+
+DRILL_KEY = "restore_drill"
+DRILL_EVERY = timedelta(days=30)
+
+
+def last_drill(db: Session) -> dict[str, Any] | None:
+    row = db.get(SystemSetting, DRILL_KEY)
+    return row.value if row else None
+
+
+def restore_drill() -> dict[str, Any]:
+    """Prove the latest backup can be restored: restore it into a scratch database, then check
+    the schema revision, every business's double-entry books and stock ledger there. The result
+    is recorded (``system_settings.restore_drill``) and shown on the health page."""
+    from sqlalchemy import create_engine, func, inspect
+    from sqlalchemy.orm import Session as OrmSession
+
+    from app.db.session import SessionLocal
+
+    started = datetime.now(UTC)
+    result: dict[str, Any] = {"at": started.isoformat(), "ok": False}
+    db = SessionLocal()
+    try:
+        run = last_success(db)
+        if run is None or not run.filename:
+            raise BackupError("No successful backup to drill")
+        _, path = backup_path(db, run.id)
+        result["backup"] = run.filename
+    except AppError as exc:
+        result["problems"] = [exc.message]
+        _save_drill(db, result)
+        db.close()
+        return result
+    db.close()
+
+    with tempfile.TemporaryDirectory(dir=backup_dir(), prefix=".drill-") as tmp:
+        header = backupcrypt.file_header(path)
+        if header["dialect"] == "sqlite":
+            target = f"sqlite:///{Path(tmp) / 'drill.db'}"
+        elif get_settings().restore_drill_url:
+            target = get_settings().restore_drill_url
+        else:
+            result["problems"] = ["Set ERP_RESTORE_DRILL_URL (a scratch PostgreSQL database) for drills"]
+            return _record_drill(result)
+        try:
+            restored = restore(path, target, force=True)
+            result["revision"] = restored.revision
+            engine = create_engine(target)
+            try:
+                problems: list[str] = []
+                with OrmSession(engine) as rs:
+                    from app.modules.accounting.reports import verify_books
+                    from app.modules.businesses.models import Business
+                    from app.modules.inventory.engine import verify_balances
+
+                    businesses = rs.scalars(select(Business)).all()
+                    for b in businesses:
+                        problems += [f"{b.name}: {p}" for p in verify_books(rs, b.id)]
+                        problems += [f"{b.name}: stock {p}" for p in verify_balances(rs, b.id)]
+                    tables = inspect(engine).get_table_names()
+                    from app.db.models import metadata
+
+                    rows = sum(rs.execute(select(func.count()).select_from(metadata.tables[t])).scalar() or 0
+                               for t in tables if t in metadata.tables)
+                result.update({"businesses": len(businesses), "tables": len(tables), "rows": rows,
+                               "problems": problems, "ok": not problems})
+            finally:
+                engine.dispose()
+        except AppError as exc:
+            result["problems"] = [exc.message]
+        except Exception as exc:
+            log.exception("restore drill failed")
+            result["problems"] = [f"{exc.__class__.__name__}: {exc}"[:300]]
+    result["seconds"] = round((datetime.now(UTC) - started).total_seconds(), 1)
+    return _record_drill(result)
+
+
+def _record_drill(result: dict[str, Any]) -> dict[str, Any]:
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        _save_drill(db, result)
+    finally:
+        db.close()
+    return result
+
+
+def _save_drill(db: Session, result: dict[str, Any]) -> None:
+    row = db.get(SystemSetting, DRILL_KEY)
+    if row is None:
+        db.add(SystemSetting(key=DRILL_KEY, value=result))
+    else:
+        row.value = result
+    db.commit()
+
+
+def drill_due(db: Session, now: datetime | None = None) -> bool:
+    now = now or datetime.now(UTC)
+    last = last_drill(db)
+    latest = last_success(db)
+    if latest is None:
+        return False
+    if last is None:
+        return True
+    at = datetime.fromisoformat(last["at"])
+    if last.get("ok"):
+        return now - at > DRILL_EVERY
+    # A failed drill is retried as soon as there is a newer backup, otherwise daily.
+    return last.get("backup") != latest.filename or now - at > timedelta(days=1)

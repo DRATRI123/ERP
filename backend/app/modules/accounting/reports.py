@@ -27,7 +27,13 @@ from app.modules.accounting.models import (
     JournalSource,
 )
 from app.modules.billing.doctypes import DocType
-from app.modules.billing.models import DocStatus, Document, Payment, PaymentDirection, PaymentState
+from app.modules.billing.models import (
+    DocStatus,
+    Document,
+    Payment,
+    PaymentDirection,
+    PaymentState,
+)
 from app.modules.gst.reports import present
 from app.modules.gst.tax import ZERO
 from app.modules.parties.models import Party

@@ -332,7 +332,7 @@ def _apply_scope(
     have = {mb.branch_id for mb in m.branches}
     m.branches.extend(MembershipBranch(branch_id=b) for b in sorted(wanted_branches - have))
 
-    wanted = {c: OverrideEffect.GRANT for c in grants} | {c: OverrideEffect.DENY for c in denies}
+    wanted = dict.fromkeys(grants, OverrideEffect.GRANT) | dict.fromkeys(denies, OverrideEffect.DENY)
     for o in list(m.overrides):
         if o.permission_code not in wanted:
             m.overrides.remove(o)

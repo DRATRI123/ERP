@@ -14,7 +14,32 @@ PostgreSQL.
 | 7 | Node.js realtime + webhook delivery, Redis, Rust workers (where benchmarks justify) | **Done** — real-time service, Redis stream + shared rate limits, batch PDF; Rust measured and not needed ([ADR 0001](adr/0001-rust-services.md)) |
 | 8 | Custom domains, SSL, encryption at rest, monitoring, backups, deployment | **Done** (220 tests in total) — first real VPS deployment still to be done with [deployment.md](deployment.md) |
 | 9 | SQLite → PostgreSQL migration utility and cutover | **Done** (227 tests in total) — see [postgres-migration.md](postgres-migration.md) |
-| 10 | Load/security testing, restore drills, production docs | Next |
+| 10 | Load/security testing, restore drills, production docs | **Done** — see [performance.md](performance.md), [security.md](security.md), [operations.md](operations.md) |
+
+## Phase 10 — what exists
+
+* **Load test** (`scripts/loadtest.py`) against the real server, with integrity checks
+  afterwards: books, stock ledger, gapless numbering, and stock sold equal to the stock drop.
+  90 users ran on SQLite and PostgreSQL in realistic and stress profiles with zero errors (see
+  [performance.md](performance.md)). Six concurrency and capacity problems were found and fixed:
+  the SQLite writer queue, login hashing outside the write lock, pool sizing, the PostgreSQL
+  connection budget, 503 load shedding, and bounded Argon2 hashing. API processes now scale per
+  CPU core.
+* **Security audit suite** over all 237 routes: the public-route allow-list, token forgery,
+  cross-business 404s, least privilege, owner-only routes, hostile input and secret leakage.
+  Six findings were fixed, and the review is recorded in [security.md](security.md).
+* **Dependency audits** (`pip-audit`, `npm audit`; `ws` upgraded) and the **ruff** rule set,
+  including Bandit-style security rules, run in CI. The whole codebase is lint-clean.
+* **Automated monthly restore drills** in the worker, with the result on the health page;
+  `restore-drill` CLI.
+* **Business-timezone calendar** (`ERP_TIMEZONE`) for every "today".
+* Production documentation: [operations.md](operations.md) runbook, security, performance.
+
+## Phase 10 — still to do outside this repository
+
+* First deployment on the real VPS (checklist in [deployment.md](deployment.md) §8), then a
+  restore practice on a spare server.
+* An external penetration test, if you want independent assurance beyond the automated audit.
 
 ## Phase 9 — what exists
 

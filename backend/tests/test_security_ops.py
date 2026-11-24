@@ -14,7 +14,13 @@ from sqlalchemy import create_engine, func, inspect, select, text
 
 from app.core.config import get_settings
 from app.modules.system import backupcrypt, backups, domains, totp
-from app.modules.system.models import BackupRun, BackupStatus, CustomDomain, DomainStatus, SecurityEvent
+from app.modules.system.models import (
+    BackupRun,
+    BackupStatus,
+    CustomDomain,
+    DomainStatus,
+    SecurityEvent,
+)
 from tests.conftest import OWNER_EMAIL, OWNER_PASSWORD, USER_PASSWORD, Shop
 from tests.test_billing import customer, invoice, stocked
 
@@ -101,7 +107,7 @@ def test_mfa_login_flow_recovery_codes_and_lockout(api, owner, owner_headers, db
     db.rollback()  # release the SQLite read transaction before more requests
 
     # Wrong second factors count towards the account lockout; a correct password does not reset it.
-    for attempt in range(1, 10):
+    for attempt in range(1, 10):  # noqa: B007 - checked after the loop
         r = api.c.post("/api/v1/auth/login", json={"email": OWNER_EMAIL, "password": OWNER_PASSWORD})
         if r.status_code == 429:
             break
@@ -302,7 +308,7 @@ def test_custom_domain_lifecycle(api, owner_headers, client, dns, db, settings):
     # The record disappears: disabled after three failed daily checks.
     dns.clear()
     dom = db.get(CustomDomain, uuid.UUID(d["id"]))
-    for i in range(domains.MAX_FAILURES):
+    for _ in range(domains.MAX_FAILURES):
         dom.last_checked_at = datetime.now(UTC) - timedelta(days=1)
         db.commit()
         assert domains.reverify_due(db) == {"checked": 1, "failed": 1}
@@ -514,7 +520,7 @@ def test_postgresql_backup_restore_drill(api, owner_headers, engine):
         with admin.connect() as c:
             c.execute(text(f"DROP DATABASE IF EXISTS {name}"))
             c.execute(text(f"CREATE DATABASE {name}"))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         pytest.skip(f"cannot create a scratch database: {exc}")
     target = url.set(database=name)
     try:
@@ -578,6 +584,13 @@ def test_ready_metrics_and_system_health(api, owner_headers, client, db, setting
     monitor.heartbeat(db, "worker", {"sent": 1})
     backups.run_backup(trigger="cli")
     h = client.get("/api/v1/system/health", headers=owner_headers).json()
+    assert any("restore drill" in w for w in h["warnings"])
+    db.rollback()
+    if get_settings().is_sqlite:
+        assert backups.restore_drill()["ok"]
+    else:
+        backups._save_drill(db, {"at": datetime.now(UTC).isoformat(), "ok": True})
+    h = client.get("/api/v1/system/health", headers=owner_headers).json()
     assert h["worker"]["alive"] and h["backups"]["last_status"] == "succeeded"
     assert h["status"] == "ok", h["warnings"]
     assert h["queues"]["messages_queued"] == {"pending": 0, "oldest_seconds": 0}
@@ -592,3 +605,68 @@ def test_worker_once_runs_every_job(owner, db, dns, monkeypatch):
     db.expire_all()
     assert monitor.last_heartbeat(db) is not None
     assert db.scalar(select(func.count()).select_from(BackupRun)) >= 0
+
+
+def test_restore_drill_proves_the_latest_backup(api, owner_headers, db, engine, tmp_path, settings):
+    assert backups.drill_due(db) is False  # nothing to drill yet
+    db.rollback()
+    r = backups.restore_drill()
+    assert not r["ok"] and r["problems"] == ["No successful backup to drill"]
+    db.rollback()
+    s = _sample_books(api, owner_headers)
+    run = backups.run_backup(trigger="cli")
+    if engine.dialect.name == "postgresql":
+        import uuid as _uuid
+
+        from sqlalchemy.engine import make_url
+
+        url = make_url(engine.url.render_as_string(hide_password=False))
+        name = f"erp_drill_{_uuid.uuid4().hex[:8]}"
+        admin = create_engine(url, isolation_level="AUTOCOMMIT")
+        with admin.connect() as c:
+            c.execute(text(f"CREATE DATABASE {name}"))
+        settings(restore_drill_url=url.set(database=name).render_as_string(hide_password=False))
+    try:
+        db.expire_all()
+        assert backups.drill_due(db) is True
+        db.rollback()
+        r = backups.restore_drill()
+        assert r["ok"], r
+        assert r["backup"] == run.filename and r["businesses"] == 1 and r["rows"] > 50
+        db.expire_all()
+        assert backups.drill_due(db) is False  # next one in a month
+        assert backups.last_drill(db)["ok"] is True
+        db.rollback()
+
+        # A damaged file fails the drill (and the health page says so).
+        path = Path(get_settings().backup_dir) / run.filename
+        data = bytearray(path.read_bytes())
+        data[-50] ^= 0xFF
+        path.write_bytes(bytes(data))
+        r = backups.restore_drill()
+        assert not r["ok"] and "corrupt" in r["problems"][0]
+        db.expire_all()
+        assert backups.drill_due(db) is False  # retried tomorrow, not every loop
+        db.rollback()
+    finally:
+        if engine.dialect.name == "postgresql":
+            with admin.connect() as c:
+                c.execute(text(f"DROP DATABASE IF EXISTS {name} WITH (FORCE)"))
+            admin.dispose()
+    assert s.bid
+
+
+def test_business_date_follows_the_configured_timezone(settings):
+    from zoneinfo import ZoneInfo
+
+    from app.core.clock import local_today
+
+    for zone in ("Asia/Kolkata", "Pacific/Kiritimati", "Etc/GMT+12"):  # +05:30, +14, -12
+        settings(timezone=zone)
+        assert local_today() == datetime.now(ZoneInfo(zone)).date()
+    from pydantic import ValidationError
+
+    from app.core.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(secret_key="x" * 40, timezone="Mars/Olympus")

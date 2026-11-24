@@ -12,7 +12,17 @@ import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
-from sqlalchemy import Column, MetaData, Table, Uuid, create_engine, func, insert, select, text
+from sqlalchemy import (
+    Column,
+    MetaData,
+    Table,
+    Uuid,
+    create_engine,
+    func,
+    insert,
+    select,
+    text,
+)
 from sqlalchemy.exc import IntegrityError, StatementError
 
 from app.core.config import get_settings
@@ -104,8 +114,8 @@ def test_only_one_owner_possible_at_database_level(engine):
 
     def row(email):
         now = datetime.now(UTC)
-        return dict(id=uuid.uuid4(), email=email, full_name="x", is_owner=True, status="active",
-                    failed_login_count=0, created_at=now, updated_at=now)
+        return {"id": uuid.uuid4(), "email": email, "full_name": "x", "is_owner": True, "status": "active",
+                    "failed_login_count": 0, "created_at": now, "updated_at": now}
 
     with engine.begin() as conn:
         conn.execute(insert(User.__table__).values(row("a@x.com")))

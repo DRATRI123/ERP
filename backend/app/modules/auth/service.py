@@ -18,13 +18,14 @@ from app.core.security import (
     create_access_token,
     create_mfa_token,
     decode_mfa_token,
-    password_fingerprint,
     hash_password,
     hash_token,
     new_secret_token,
+    password_fingerprint,
     password_needs_rehash,
     verify_password,
 )
+from app.db.session import read_only
 from app.modules.audit import service as audit
 from app.modules.auth.models import LoginEvent, OneTimeToken, TokenPurpose, UserSession
 from app.modules.users import service as users
@@ -98,7 +99,14 @@ def login(db: Session, *, email: str, password: str) -> IssuedTokens | MfaChalle
     survive the request's rollback. With two-factor authentication on, a correct password only
     yields a short-lived challenge token for ``login_mfa``."""
     email_n = users.normalize_email(email)
-    user = users.get_by_email(db, email_n)
+    # Argon2 verification is deliberately slow; do it in a read transaction so it never holds
+    # the (SQLite) write lock, then take the write lock only for the bookkeeping below.
+    with read_only():
+        user = users.get_by_email(db, email_n)
+        ok = verify_password(user.password_hash if user else None, password)
+    db.commit()  # nothing written yet: just ends the read snapshot
+    if user is not None:
+        db.refresh(user)  # current counters, now under the write lock
     now = _now()
 
     def fail(reason: str, exc: Exception) -> None:
@@ -107,11 +115,9 @@ def login(db: Session, *, email: str, password: str) -> IssuedTokens | MfaChalle
         raise exc
 
     if user is not None and user.locked_until is not None and user.locked_until > now:
-        verify_password(None, password)  # constant-ish timing
         fail("locked", TooManyRequests(
             "Too many failed attempts. Try again later.", code="account_locked"))
 
-    ok = verify_password(user.password_hash if user else None, password)
     if user is None or not ok:
         if user is not None:
             _register_failure(db, user, now)

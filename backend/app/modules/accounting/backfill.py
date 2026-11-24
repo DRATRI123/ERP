@@ -43,9 +43,8 @@ def backfill(db: Session, business: Business) -> BackfillReport:
     def run(source: JournalSource, item, label: str, do_post, cancelled_on) -> None:  # type: ignore[no-untyped-def]
         try:
             with db.begin_nested():
-                if not _has(db, business.id, source, item.id, "post"):
-                    if do_post() is not None:
-                        report.posted += 1
+                if not _has(db, business.id, source, item.id, "post") and do_post() is not None:
+                    report.posted += 1
                 if cancelled_on and _has(db, business.id, source, item.id, "post") \
                         and not _has(db, business.id, source, item.id, "cancel"):
                     reverse_source(db, business.id, source, item.id, on=cancelled_on, created_by=None)

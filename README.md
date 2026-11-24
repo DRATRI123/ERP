@@ -10,6 +10,8 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
 * [Database schema](docs/database-schema.md) – tables, conventions, planned tables per phase
 * [Roadmap](docs/roadmap.md) – phases and current status
 * [Deployment](docs/deployment.md) – VPS setup, Docker Compose, Caddy, backups, monitoring
+* [Operations](docs/operations.md) – routine tasks, health warnings, incidents, commands
+* [Security](docs/security.md) and [Performance](docs/performance.md) – controls, audit findings, load-test results
 
 ## Status
 
@@ -47,8 +49,13 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
 * **Phase 9 — complete:** verified SQLite → PostgreSQL migration (checksums over every row,
   books and stock re-checked before commit, dry-run rehearsal), database comparison and
   maintenance mode for the cutover. See [docs/postgres-migration.md](docs/postgres-migration.md).
-* Next: Phase 10 (load and security testing, production docs). The Next.js frontend is still to
-  be built.
+* **Phase 10 — complete:** load-tested with 90 concurrent users on SQLite and PostgreSQL with
+  zero errors and every integrity check passing; whole-API security audit suite; dependency and
+  static security scans in CI; automated monthly restore drills; operations runbook. See
+  [performance](docs/performance.md), [security](docs/security.md),
+  [operations](docs/operations.md).
+* **Not built yet:** the Next.js web frontend (all features are available through the API),
+  file management and the automation engine.
 
 After upgrading a database that already has invoices or stock from earlier phases, run
 `python -m app.cli accounting-backfill` once to post their journals.

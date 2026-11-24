@@ -27,7 +27,7 @@ from app.modules.integrations import base as ibase
 from app.modules.integrations.providers import messaging as msg_provider
 from tests.conftest import TODAY, VALID_GSTIN, Shop
 from tests.test_accounting import acct, bal, books_ok
-from tests.test_billing import customer, doc, finalize, invoice, stocked
+from tests.test_billing import customer, invoice, stocked
 
 D = Decimal
 
@@ -237,13 +237,13 @@ class FakeSMTP:
     sent: list[Any] = []
     fail_next = 0
 
-    def __init__(self, host, port, timeout=None, context=None):  # noqa: ANN001
+    def __init__(self, host, port, timeout=None, context=None):
         self.host = host
 
-    def starttls(self, context=None):  # noqa: ANN001
+    def starttls(self, context=None):
         pass
 
-    def login(self, user, password):  # noqa: ANN001
+    def login(self, user, password):
         if password != "app-pass":
             import smtplib
             raise smtplib.SMTPAuthenticationError(535, b"bad credentials")
@@ -251,7 +251,7 @@ class FakeSMTP:
     def noop(self):
         pass
 
-    def send_message(self, msg):  # noqa: ANN001
+    def send_message(self, msg):
         if FakeSMTP.fail_next:
             FakeSMTP.fail_next -= 1
             import smtplib
@@ -294,7 +294,7 @@ def test_email_invoice_via_worker_with_retries(ishop, smtp, db):
     assert process_due(db, now=now + timedelta(minutes=2))["sent"] == 1
     email = smtp.sent[0]
     assert email["To"] == "buyer@example.com" and inv["number"] in email["Subject"]
-    att = [part for part in email.iter_attachments()]
+    att = list(email.iter_attachments())
     assert att[0].get_filename() == inv["number"].replace("/", "-") + ".pdf"
     assert att[0].get_payload(decode=True)[:5] == b"%PDF-"
     html = email.get_body(("html",)).get_content()
@@ -537,8 +537,8 @@ def test_product_import_all_or_nothing_and_excel_roundtrip(ishop):
 
 
 def test_customer_import_and_tally_export(ishop):
-    rows = (f"name,gstin,phone,email,address,city,pincode\nKA Clinic,29AAGCB7383J1Z4,9876500000,ka@example.com,"
-            f"1 MG Road,Bengaluru,560001\nLocal Buyer,,9000000001,,,,\n").encode()
+    rows = (b"name,gstin,phone,email,address,city,pincode\nKA Clinic,29AAGCB7383J1Z4,9876500000,ka@example.com,"
+            b"1 MG Road,Bengaluru,560001\nLocal Buyer,,9000000001,,,,\n")
     assert _upload(ishop, "customers", "c.csv", rows)["imported"] == 2
     ka = ishop.get("/customers", q="KA Clinic")["items"][0]
     assert ka["state_code"] == "29" and ka["addresses"][0]["city"] == "Bengaluru"
@@ -552,7 +552,7 @@ def test_customer_import_and_tally_export(ishop):
     assert ledgers["KA Clinic"] == "Sundry Debtors" and ledgers["Output IGST"] == "Duties & Taxes"
     for v in root.iter("VOUCHER"):
         assert sum(D(x.findtext("AMOUNT")) for x in v.iter("ALLLEDGERENTRIES.LIST")) == 0
-    sale = [v for v in root.iter("VOUCHER") if "Sales Invoice" in (v.findtext("NARRATION") or "")][0]
+    sale = next(v for v in root.iter("VOUCHER") if "Sales Invoice" in (v.findtext("NARRATION") or ""))
     entries = {x.findtext("LEDGERNAME"): (x.findtext("ISDEEMEDPOSITIVE"), x.findtext("AMOUNT"))
                for x in sale.iter("ALLLEDGERENTRIES.LIST")}
     assert entries["KA Clinic"] == ("Yes", "-1180.00") and entries["Sales"] == ("No", "1000.00")

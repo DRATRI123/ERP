@@ -168,3 +168,29 @@ def require(*codes: str) -> Callable[..., BusinessAccess]:
 
     _dep.__name__ = f"require_{'_'.join(c.replace('.', '_') for c in codes)}"
     return _dep
+
+
+def require_any(*codes: str) -> Callable[..., BusinessAccess]:
+    """Dependency factory: demand at least one of the listed permissions. For endpoints whose
+    exact permission depends on the request (e.g. sales vs purchase documents): the precise
+    check still happens in the service, but members holding none of the candidates are refused
+    before the request body is even parsed."""
+
+    def _dep(access: Access) -> BusinessAccess:
+        if not any(access.can(c) for c in codes):
+            access.require(codes[0])  # raises the standard PermissionDenied
+        return access
+
+    _dep.__name__ = f"require_any_{'_'.join(c.replace('.', '_') for c in codes)}"
+    return _dep
+
+
+def require_business_owner(access: Access) -> BusinessAccess:
+    if not access.is_owner:
+        from app.core.errors import PermissionDenied
+
+        raise PermissionDenied("Only the owner can perform this action")
+    return access
+
+
+OwnerAccess = Annotated[BusinessAccess, Depends(require_business_owner)]

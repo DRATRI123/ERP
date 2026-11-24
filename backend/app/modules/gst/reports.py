@@ -27,7 +27,7 @@ from app.modules.gst.tax import ZERO, TaxCategory
 SALES_TYPES = (DocType.SALES_INVOICE, DocType.CREDIT_NOTE, DocType.DEBIT_NOTE)
 PURCHASE_TYPES = (DocType.PURCHASE_INVOICE, DocType.PURCHASE_RETURN)
 NEGATIVE = (DocType.CREDIT_NOTE, DocType.PURCHASE_RETURN)
-B2CL_LIMIT = Decimal("100000")  # inter-state B2C invoices above ₹1 lakh are reported invoice-wise
+B2CL_LIMIT = Decimal(100000)  # inter-state B2C invoices above ₹1 lakh are reported invoice-wise
 REGISTERED = ("regular", "composition", "sez")
 
 

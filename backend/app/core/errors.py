@@ -92,6 +92,29 @@ def install_error_handlers(app: FastAPI) -> None:
             _body("validation_failed", "Request validation failed", details), status_code=422
         )
 
+    from sqlalchemy.exc import OperationalError
+    from sqlalchemy.exc import TimeoutError as PoolTimeout
+
+    def _busy(exc: Exception) -> bool:
+        return isinstance(exc, PoolTimeout) or "database is locked" in str(exc) or "deadlock detected" in str(exc)
+
+    @app.exception_handler(OperationalError)
+    async def _db_operational(request: Request, exc: OperationalError) -> JSONResponse:
+        if _busy(exc):
+            # Overload, not a bug: the transaction was rolled back completely, so retrying is safe.
+            log.warning("database busy: %s", str(exc).splitlines()[0][:200])
+            request.state.error_code = "database_busy"
+            return JSONResponse(_body("database_busy", "The server is busy. Please try again in a moment."),
+                                status_code=503, headers={"Retry-After": "2"})
+        log.exception("Database error", exc_info=exc)
+        return JSONResponse(_body("internal_error", "Internal server error"), status_code=500)
+
+    @app.exception_handler(PoolTimeout)
+    async def _pool_timeout(request: Request, exc: PoolTimeout) -> JSONResponse:
+        log.warning("database connection pool exhausted")
+        return JSONResponse(_body("database_busy", "The server is busy. Please try again in a moment."),
+                            status_code=503, headers={"Retry-After": "2"})
+
     @app.exception_handler(StarletteHTTPException)
     async def _http(_: Request, exc: StarletteHTTPException) -> JSONResponse:
         code = {404: "not_found", 405: "method_not_allowed"}.get(exc.status_code, "http_error")

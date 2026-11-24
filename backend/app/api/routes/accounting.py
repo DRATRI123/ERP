@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import select
 
-from app.api.deps import DB, Access, require
+from app.api.deps import DB, Access, OwnerAccess, require
 from app.api.pagination import Page, PageParams, page_params, paginate
 from app.api.schemas_accounting import (
     AccountIn,
@@ -36,6 +36,7 @@ from app.api.schemas_accounting import (
     StatementImportIn,
     StatementLineOut,
 )
+from app.core.clock import local_today
 from app.core.errors import ValidationFailed
 from app.modules.access.service import BusinessAccess
 from app.modules.accounting import accounts as acc_service
@@ -153,7 +154,7 @@ def post_journal(body: JournalIn, access: Post, db: DB) -> JournalOut:
 @router.post("/journals/{entry_id}/reverse", response_model=JournalOut, status_code=status.HTTP_201_CREATED)
 def reverse_journal(entry_id: uuid.UUID, body: ReverseIn, access: Post, db: DB) -> JournalOut:
     e = acc_service.reverse_manual(db, access, acc_service.get_entry(db, access, entry_id),
-                                   on=body.on or date.today(), reason=body.reason)
+                                   on=body.on or local_today(), reason=body.reason)
     db.commit()
     return JournalOut.model_validate(e)
 
@@ -200,7 +201,7 @@ def create_expense(body: ExpenseIn, access: Annotated[BusinessAccess, Depends(re
 def cancel_expense(expense_id: uuid.UUID, body: ReverseIn,
                    access: Annotated[BusinessAccess, Depends(require("expenses.manage"))], db: DB) -> ExpenseOut:
     e = expense_service.cancel_expense(db, access, expense_service.get_expense(db, access, expense_id),
-                                       reason=body.reason, on=body.on or date.today())
+                                       reason=body.reason, on=body.on or local_today())
     db.commit()
     return ExpenseOut.model_validate(e)
 
@@ -287,7 +288,7 @@ def unmatch_line(line_id: uuid.UUID, access: Post, db: DB) -> StatementLineOut:
 
 
 @router.get("/bank/{account_id}/reconciliation", tags=["bank reconciliation"])
-def reconciliation(account_id: uuid.UUID, access: View, db: DB, as_of: date = Query(default_factory=date.today),
+def reconciliation(account_id: uuid.UUID, access: View, db: DB, as_of: date = Query(default_factory=local_today),
                    statement_opening: Decimal = Decimal(0)) -> dict:
     r = bank.reconciliation(db, access, account_id, as_of=as_of, statement_opening=statement_opening)
     return reports.present(r.__dict__)
@@ -304,7 +305,7 @@ def close_year(body: CloseYearIn, access: Post, db: DB) -> JournalOut | None:
 
 
 @router.post("/reopen-year", tags=["year end"])
-def reopen_year(body: ReopenYearIn, access: Access, db: DB) -> dict:
+def reopen_year(body: ReopenYearIn, access: OwnerAccess, db: DB) -> dict:
     fy = closing.reopen_year(db, access, body.financial_year_id, reason=body.reason)
     db.commit()
     return {"financial_year_id": fy.id, "code": fy.code, "is_closed": fy.is_closed}
@@ -363,7 +364,7 @@ def party_ledger(access: Access, db: DB, party_id: uuid.UUID, date_from: date, d
 
 @router.get("/reports/aging", tags=["accounting reports"])
 def aging(access: Access, db: DB, side: str = Query("receivable", pattern="^(receivable|payable)$"),
-          as_of: date = Query(default_factory=date.today)) -> dict:
+          as_of: date = Query(default_factory=local_today)) -> dict:
     access.require("customer_balances.view" if side == "receivable" else "supplier_balances.view")
     return reports.aging(db, access.business.id, side=side, as_of=as_of)
 
@@ -377,7 +378,7 @@ def profit_and_loss(access: ProfitView, db: DB, date_from: date, date_to: date,
 
 
 @router.get("/reports/balance-sheet", tags=["accounting reports"])
-def balance_sheet(access: View, db: DB, as_of: date = Query(default_factory=date.today)) -> dict:
+def balance_sheet(access: View, db: DB, as_of: date = Query(default_factory=local_today)) -> dict:
     return reports.balance_sheet(db, access.business.id, as_of=as_of)
 
 

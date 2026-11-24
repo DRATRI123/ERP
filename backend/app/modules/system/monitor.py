@@ -124,6 +124,13 @@ def system_health(db: Session) -> dict[str, Any]:
         warnings.append("Backups are not configured (ERP_BACKUP_KEY)")
     elif last_ok is None or now - last_ok.started_at > BACKUP_STALE:
         warnings.append("No successful backup in the last 26 hours")
+    drill = backups.last_drill(db)
+    if last_ok is not None and drill is None:
+        warnings.append("No restore drill has been run yet (the worker runs one monthly)")
+    elif drill is not None and not drill.get("ok"):
+        warnings.append(f"Last restore drill failed: {'; '.join(drill.get('problems') or [])[:200]}")
+    elif drill is not None and now - datetime.fromisoformat(drill["at"]) > timedelta(days=35):
+        warnings.append("Last successful restore drill is older than 35 days")
     if last_any is not None and last_any.status == BackupStatus.FAILED:
         warnings.append(f"Last backup failed: {last_any.error}")
     for name, q in queues.items():
@@ -147,6 +154,7 @@ def system_health(db: Session) -> dict[str, Any]:
             "last_success_at": last_ok.started_at if last_ok else None,
             "last_success_age_hours": backups.age_hours(last_ok, now),
             "last_status": last_any.status.value if last_any else None,
+            "last_restore_drill": drill,
         },
         "queues": queues,
         "domains": {k.value if hasattr(k, "value") else k: v for k, v in domains.items()},

@@ -35,7 +35,12 @@ from app.modules.audit import service as audit
 from app.modules.billing.doctypes import DocType
 from app.modules.billing.models import DocStatus, Document
 from app.modules.developer.catalog import EVENT_TYPES, matches
-from app.modules.developer.models import DeliveryStatus, EndpointStatus, WebhookDelivery, WebhookEndpoint
+from app.modules.developer.models import (
+    DeliveryStatus,
+    EndpointStatus,
+    WebhookDelivery,
+    WebhookEndpoint,
+)
 from app.modules.events import service as events
 from app.modules.events.models import OutboxEvent
 from app.modules.integrations.base import hmac_hex, http_client

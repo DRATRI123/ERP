@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -17,6 +16,7 @@ from app.api.schemas import (
     FinancialYearIn,
     FinancialYearOut,
 )
+from app.core.clock import local_today
 from app.modules.access.service import BusinessAccess
 from app.modules.businesses import service
 from app.modules.businesses.models import BusinessStatus
@@ -41,7 +41,7 @@ def list_businesses(
 
 @router.post("", response_model=BusinessOut, status_code=status.HTTP_201_CREATED)
 def create_business(body: BusinessCreateIn, p: OwnerPrincipal, db: DB) -> BusinessOut:
-    b = service.create_business(db, actor=p.user, data=body.model_dump(), today=date.today())
+    b = service.create_business(db, actor=p.user, data=body.model_dump(), today=local_today())
     db.commit()
     return BusinessOut.model_validate(b)
 
@@ -88,7 +88,8 @@ def list_branches(
 @router.post(
     "/{business_id}/branches", response_model=BranchOut, status_code=status.HTTP_201_CREATED
 )
-def create_branch(body: BranchCreateIn, access: Access, db: DB) -> BranchOut:
+def create_branch(body: BranchCreateIn,
+                  access: Annotated[BusinessAccess, Depends(require("branches.manage"))], db: DB) -> BranchOut:
     b = service.create_branch(db, access, body.model_dump())
     db.commit()
     return BranchOut.model_validate(b)

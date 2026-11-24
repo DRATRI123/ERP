@@ -26,7 +26,7 @@ from app.db.base import Base, Timestamps, UUIDPrimaryKey
 from app.db.types import Money, Quantity, ScaledDecimal, UTCDateTime, str_enum
 
 
-def Rate() -> ScaledDecimal:  # noqa: N802
+def Rate() -> ScaledDecimal:
     """Percentage rate such as 18.0000 (GST) or 0.2500 (special rates)."""
     return ScaledDecimal(9, 4)
 
@@ -116,8 +116,8 @@ class Product(UUIDPrimaryKey, Timestamps, Base):
     wholesale_price: Mapped[Decimal | None] = mapped_column(Money())
     mrp: Mapped[Decimal | None] = mapped_column(Money())
     prices_include_tax: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    gst_rate: Mapped[Decimal] = mapped_column(Rate(), default=Decimal("0"), nullable=False)
-    cess_rate: Mapped[Decimal] = mapped_column(Rate(), default=Decimal("0"), nullable=False)
+    gst_rate: Mapped[Decimal] = mapped_column(Rate(), default=Decimal(0), nullable=False)
+    cess_rate: Mapped[Decimal] = mapped_column(Rate(), default=Decimal(0), nullable=False)
 
     track_inventory: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     batch_tracking: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

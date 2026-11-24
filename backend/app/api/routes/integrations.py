@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, statu
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.api.deps import DB, Access, require
+from app.api.deps import DB, Access, require, require_any
 from app.api.pagination import Page, PageParams, page_params, paginate
 from app.core.errors import PermissionDenied, ValidationFailed
 from app.modules.access.service import BusinessAccess
@@ -192,7 +192,8 @@ def drive_backup(integration_id: uuid.UUID, access: Manage, db: DB) -> dict:
 
 
 @router.post("/documents/{document_id}/send", status_code=status.HTTP_202_ACCEPTED, tags=["billing"])
-def send_document(document_id: uuid.UUID, body: SendIn, access: Access, db: DB) -> dict:
+def send_document(document_id: uuid.UUID, body: SendIn,
+                  access: Annotated[BusinessAccess, Depends(require_any("invoices.view", "purchases.view"))], db: DB) -> dict:
     """Queue the document (as PDF) for e-mail / WhatsApp / SMS. Delivery happens in the worker."""
     doc = billing.get_document(db, access, document_id)
     link = sync.create_payment_link(db, access, doc, None).url if body.include_payment_link else None
@@ -248,7 +249,8 @@ def retry_message(message_id: uuid.UUID, access: Access, db: DB) -> dict:
 
 
 @router.post("/data/import/{kind}", tags=["data"])
-async def import_data(kind: str, access: Access, db: DB, file: UploadFile = File(...),
+async def import_data(kind: str, access: Annotated[BusinessAccess, Depends(require_any(
+        "products.manage", "customers.manage", "suppliers.manage"))], db: DB, file: UploadFile = File(...),
                       dry_run: bool = False) -> dict:
     """CSV or Excel. Nothing is written unless every row is valid; ``dry_run`` only validates."""
     data = await file.read()

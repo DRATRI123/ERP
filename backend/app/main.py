@@ -37,6 +37,11 @@ _DOCS_CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.
 log = logging.getLogger("erp.request")
 
 
+def _nul_rejected() -> JSONResponse:
+    return JSONResponse(status_code=422, content={"error": {
+        "code": "invalid_characters", "message": "The request contains a NUL character", "details": None}})
+
+
 def _host_only(host: str) -> str:
     host = host.strip().lower()
     if host.startswith("["):  # [IPv6]:port
@@ -75,6 +80,15 @@ def create_app() -> FastAPI:
                     "code": "unknown_host", "message": "This server does not serve that host name"}})
             if settings.force_https and request.url.scheme != "https" and host not in settings.internal_hosts:
                 return RedirectResponse(str(request.url.replace(scheme="https")), status_code=308)
+            # NUL characters are never valid business text, and PostgreSQL refuses to store or
+            # compare them: reject them at the edge, identically on every database.
+            if b"%00" in request.scope.get("query_string", b"") or "\x00" in path:
+                return _nul_rejected()
+            if request.method in ("POST", "PUT", "PATCH") and \
+                    request.headers.get("content-type", "").startswith("application/json"):
+                body = await request.body()
+                if b"\\u0000" in body or b"\x00" in body:
+                    return _nul_rejected()
             paused = await run_in_threadpool(maintenance.blocks, request.method, path)
             if paused:
                 return JSONResponse(status_code=503, headers={"Retry-After": "120"}, content={"error": {
@@ -87,7 +101,13 @@ def create_app() -> FastAPI:
         )
         start = time.perf_counter()
         try:
-            response = await call_next(request)
+            try:
+                response = await call_next(request)
+            except Exception:  # unhandled: answer here so the error still carries the request id
+                logging.getLogger("erp.errors").exception("Unhandled error")
+                response = JSONResponse(status_code=500, content={"error": {
+                    "code": "internal_error", "message": "Internal server error",
+                    "details": None, "request_id": rid}})
             elapsed = time.perf_counter() - start
             h = response.headers
             h["X-Request-ID"] = rid

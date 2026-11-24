@@ -17,7 +17,12 @@ from app.modules.access.service import BusinessAccess
 from app.modules.accounting.models import Account, AccountSubtype
 from app.modules.audit import service as audit
 from app.modules.businesses.models import Branch
-from app.modules.integrations.base import REGISTRY, CallLog, IntegrationError, ProviderSpec
+from app.modules.integrations.base import (
+    REGISTRY,
+    CallLog,
+    IntegrationError,
+    ProviderSpec,
+)
 from app.modules.integrations.models import Integration, IntegrationStatus
 from app.modules.integrations.providers import commerce, gateways, messaging
 from app.modules.inventory.models import Warehouse

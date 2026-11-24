@@ -16,7 +16,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, ValidationFailed
-from app.modules.accounting.models import Account, JournalEntry, JournalLine, JournalSource
+from app.modules.accounting.models import (
+    Account,
+    JournalEntry,
+    JournalLine,
+    JournalSource,
+)
 from app.modules.businesses.models import FinancialYear
 from app.modules.events import service as events
 from app.modules.gst.tax import ZERO
@@ -56,8 +61,8 @@ def net(lines: list[Line]) -> list[Line]:
         merged[key] = merged.get(key, ZERO) + ln.debit - ln.credit
         meta.setdefault(key, ln)
     out = []
-    for key, amount in merged.items():
-        amount = amount.quantize(Q4)
+    for key, raw in merged.items():
+        amount = raw.quantize(Q4)
         if amount == 0:
             continue
         m = meta[key]

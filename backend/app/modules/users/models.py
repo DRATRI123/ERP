@@ -5,7 +5,15 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, CheckConstraint, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey

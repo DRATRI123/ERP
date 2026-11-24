@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     )
 
     env: Literal["development", "test", "production"] = "development"
+    # Business calendar: decides which day "today" is for invoices, payments and reports.
+    timezone: str = "Asia/Kolkata"
     # Required: there is deliberately no default so a weak key can never ship.
     secret_key: str = Field(min_length=32)
     database_url: str = "sqlite:///./data/erp.db"
@@ -32,7 +34,18 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = 15
     password_min_length: int = 10
 
-    sqlite_busy_timeout_ms: int = 5000
+    sqlite_busy_timeout_ms: int = 15000
+    # Connection pool per API process. SQLite (cheap connections) gets one per request thread
+    # (40). PostgreSQL: every process may open pool + overflow connections, so
+    # api_workers × (pool + overflow) + worker + headroom must stay below max_connections
+    # (100 by default): 4 × 15 = 60. Requests beyond that wait briefly, then get 503.
+    db_pool_size: int = 8
+    db_max_overflow: int = 7
+    db_pool_timeout_s: int = 10
+    # API processes (uvicorn workers); used by check-config to size the PostgreSQL pool.
+    api_workers: int = 2
+    # Concurrent Argon2 password hashes (64 MiB each). Default: number of CPU cores.
+    password_hash_concurrency: int = 0
 
     # PDF printing via headless Chromium. Leave empty to auto-detect on PATH.
     pdf_chromium_path: str | None = None
@@ -76,6 +89,9 @@ class Settings(BaseSettings):
     # Encrypted backups: 32-byte key, base64 (``python -m app.cli backup-keygen``).
     backup_key: str | None = None
     backup_dir: str = "./data/backups"
+    # Scratch PostgreSQL database for automated restore drills (its contents are replaced).
+    # SQLite installs drill into a temporary file and need nothing.
+    restore_drill_url: str | None = None
     # Minimum free disk space before readiness fails and backups refuse to run.
     min_free_disk_mb: int = 500
 
@@ -86,6 +102,17 @@ class Settings(BaseSettings):
     smtp_username: str | None = None
     smtp_password: str | None = None
     smtp_from: str | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _valid_zone(cls, v: str) -> str:
+        from zoneinfo import ZoneInfo
+
+        try:
+            ZoneInfo(v)
+        except (KeyError, ValueError) as exc:  # ZoneInfoNotFoundError is a KeyError
+            raise ValueError(f"Unknown time zone {v!r} (use an IANA name such as Asia/Kolkata)") from exc
+        return v
 
     @field_validator("backup_dir")
     @classmethod

@@ -13,12 +13,18 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.clock import local_today
 from app.core.errors import AppError, ValidationFailed
 from app.modules.access.service import BusinessAccess, get_business_access
 from app.modules.billing import payments as pay_service
 from app.modules.billing import service as billing
 from app.modules.billing.doctypes import DocType
-from app.modules.billing.models import DocStatus, Document, PaymentDirection, PaymentMode
+from app.modules.billing.models import (
+    DocStatus,
+    Document,
+    PaymentDirection,
+    PaymentMode,
+)
 from app.modules.catalog.models import Product, ProductKind, Unit
 from app.modules.integrations.base import CallLog, IntegrationError
 from app.modules.integrations.models import (
@@ -120,7 +126,7 @@ def handle_gateway_webhook(db: Session, i: Integration, body: bytes, headers: di
     access = system_access(db, i.business_id)
     alloc = min(event.amount, doc.balance_due) if doc.status == DocStatus.FINAL else Decimal(0)
     pay = pay_service.create_payment(
-        db, access, direction=PaymentDirection.IN, party_id=doc.party_id, payment_date=date.today(),
+        db, access, direction=PaymentDirection.IN, party_id=doc.party_id, payment_date=local_today(),
         mode=PaymentMode.UPI if event.method == "upi" else PaymentMode.OTHER, amount=event.amount,
         reference=f"{i.provider}:{event.payment_id}", notes=f"Online payment via {i.name}",
         allocations=[{"document_id": doc.id, "amount": alloc}] if alloc > 0 else [],
@@ -223,7 +229,7 @@ def import_order(db: Session, i: Integration, order: dict[str, Any], access: Bus
     party = _customer(db, access, order)
     created = order.get("created_at", "")[:10]
     doc = billing.create_draft(db, access, DocType.SALES_INVOICE, {
-        "client_ref": ref, "doc_date": date.fromisoformat(created) if created else date.today(),
+        "client_ref": ref, "doc_date": date.fromisoformat(created) if created else local_today(),
         "branch_id": uuid.UUID(str(i.config["branch_id"])), "warehouse_id": uuid.UUID(str(i.config["warehouse_id"])),
         "party_id": party.id if party else None,
         "party_name": None if party else (order.get("billing_address") or {}).get("name") or "Shopify customer",

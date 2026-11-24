@@ -28,6 +28,7 @@ from app.api.schemas_inventory import (
     WarehouseValueOut,
 )
 from app.api.schemas_masters import WarehouseIn, WarehouseOut, WarehouseUpdateIn
+from app.core.clock import local_today
 from app.modules.access.service import BusinessAccess
 from app.modules.catalog.service import get_product
 from app.modules.inventory import reports, service
@@ -173,7 +174,7 @@ def get_document(document_id: uuid.UUID, access: ViewStock, db: DB) -> DocumentO
 @router.post("/inventory/documents/{document_id}/cancel", response_model=DocumentOut)
 def cancel_document(document_id: uuid.UUID, body: CancelIn, access: EditStock, db: DB) -> DocumentOut:
     doc = service.cancel_document(db, access, service.get_document(db, access, document_id),
-                                  reason=body.reason, on=body.cancel_date or date.today())
+                                  reason=body.reason, on=body.cancel_date or local_today())
     db.commit()
     return _doc_out(db, access, doc)
 
@@ -239,7 +240,7 @@ def expiring(access: ViewStock, db: DB,
     show_cost = access.can("stock_value.view")
     out = []
     for row in db.execute(reports.expiring_batches(db, access, within_days=within_days,
-                                                   today=date.today())).all():
+                                                   today=local_today())).all():
         r = reports.to_balance_row(*row)
         out.append(BalanceOut(**{**r.__dict__, **({} if show_cost else
                                                    {"value": None, "average_cost": None})}))

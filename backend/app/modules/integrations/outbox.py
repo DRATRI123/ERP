@@ -76,8 +76,8 @@ def _email_html(doc: Document, business: Business, msg: OutboundMessage) -> str:
 
     v = msg.variables
     lines = [f"<p>Dear {escape(v['name'])},</p>",
-             f"<p>Please find attached {escape(SPECS[doc.doc_type].label.lower())} <b>{escape(v['number'])}</b> "
-             f"for ₹{escape(v['amount'])} ({escape(rupees_in_words(doc.grand_total))}).</p>"]
+             (f"<p>Please find attached {escape(SPECS[doc.doc_type].label.lower())} <b>{escape(v['number'])}</b> "
+              f"for ₹{escape(v['amount'])} ({escape(rupees_in_words(doc.grand_total))}).</p>")]
     if msg.body:
         lines.append(f"<p>{escape(msg.body)}</p>")
     if v.get("link"):

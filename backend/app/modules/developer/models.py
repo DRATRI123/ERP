@@ -5,7 +5,18 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime
-from sqlalchemy import JSON, Boolean, ForeignKey, Index, Integer, String, Text, UniqueConstraint, Uuid
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey, utcnow

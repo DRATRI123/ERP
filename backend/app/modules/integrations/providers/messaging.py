@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import smtplib
 import ssl
@@ -81,10 +82,8 @@ def smtp_send(config: dict[str, Any], creds: dict[str, Any], *, to: str, subject
     except smtplib.SMTPException as exc:
         raise IntegrationError(f"SMTP send failed: {exc}") from exc
     finally:
-        try:
+        with contextlib.suppress(smtplib.SMTPException):
             conn.quit()
-        except smtplib.SMTPException:
-            pass
     if refused:
         raise IntegrationError(f"Recipient refused: {refused}")
     return msg.get("Message-ID") or ""

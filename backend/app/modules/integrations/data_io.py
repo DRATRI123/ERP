@@ -79,8 +79,8 @@ def import_products(db: Session, access: BusinessAccess, rows: list[dict[str, st
                         "barcode": r.get("barcode") or None, "hsn_sac": hsn,
                         "selling_price": _dec(r.get("selling_price", ""), 4),
                         "purchase_price": _dec(r.get("purchase_price", ""), 4), "mrp": _dec(r.get("mrp", ""), 4),
-                        "gst_rate": _dec(r.get("gst_rate", ""), 4) or Decimal("0"),
-                        "cess_rate": Decimal("0"), "reorder_level": _dec(r.get("reorder_level", ""), 3),
+                        "gst_rate": _dec(r.get("gst_rate", ""), 4) or Decimal(0),
+                        "cess_rate": Decimal(0), "reorder_level": _dec(r.get("reorder_level", ""), 3),
                         "prices_include_tax": (r.get("prices_include_tax") or "").lower() in ("yes", "y", "true", "1"),
                         "attributes": {}})
                 created += 1
@@ -196,7 +196,7 @@ def tally_xml(db: Session, business_id, *, date_from: date, date_to: date, compa
             f"<NAME.LIST><NAME>{escape(n)}</NAME></NAME.LIST><PARENT>{escape(g)}</PARENT></LEDGER></TALLYMESSAGE>"
             for n, g in sorted(masters.items())]
     for e in entries:
-        parts = [f'<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Journal" ACTION="Create">',
+        parts = ['<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Journal" ACTION="Create">',
                  f"<DATE>{e.entry_date:%Y%m%d}</DATE><VOUCHERTYPENAME>Journal</VOUCHERTYPENAME>",
                  f"<VOUCHERNUMBER>{escape(e.number)}</VOUCHERNUMBER>",
                  f"<NARRATION>{escape((e.narration or '') + (f' [{e.source_ref}]' if e.source_ref else ''))}</NARRATION>"]

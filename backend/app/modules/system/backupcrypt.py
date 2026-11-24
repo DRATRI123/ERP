@@ -109,16 +109,20 @@ def decrypt_chunks(src: BinaryIO, key: bytes) -> Iterator[bytes]:
             raise BackupCryptoError("Corrupt backup chunk")
         ct = src.read(n)
         nonce = prefix + _U32.pack(counter)
-        try:  # the final flag is unknown until we try: a non-final chunk fails with final=True
-            yield aes.decrypt(nonce, ct, _aad(raw, counter, False))
+        # The final flag is unknown until we try: a non-final chunk fails with final=True.
+        final = False
+        try:
+            pt = aes.decrypt(nonce, ct, _aad(raw, counter, False))
         except InvalidTag:
             try:
                 pt = aes.decrypt(nonce, ct, _aad(raw, counter, True))
             except InvalidTag as exc:
                 raise BackupCryptoError("Backup file is corrupt or was modified") from exc
-            if src.read(1):
-                raise BackupCryptoError("Unexpected data after the end of the backup")
-            yield pt
+            final = True
+        if final and src.read(1):
+            raise BackupCryptoError("Unexpected data after the end of the backup")
+        yield pt
+        if final:
             return
         counter += 1
 

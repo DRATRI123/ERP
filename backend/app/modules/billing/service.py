@@ -15,6 +15,7 @@ from typing import Any
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.clock import local_today
 from app.core.errors import Conflict, NotFound, ValidationFailed
 from app.modules.access.service import BusinessAccess
 from app.modules.audit import service as audit
@@ -40,7 +41,6 @@ from app.modules.gst.tax import (
     TaxError,
     compute_line,
     is_interstate,
-    q2,
     round_off,
 )
 from app.modules.inventory.engine import Movement, StockEngine, q4
@@ -183,9 +183,8 @@ def _price_line(db: Session, access: BusinessAccess, doc: Document, spec: DocTyp
     if not description:
         raise ValidationFailed(f"Line {i}: description is required for lines without a product")
     unit = db.get(Unit, product.unit_id) if product else None
-    if product and unit is not None:
-        if li.quantity != li.quantity.quantize(Decimal(1).scaleb(-unit.decimals)):
-            raise ValidationFailed(f"Line {i}: {unit.code} allows {unit.decimals} decimal places")
+    if product and unit is not None and li.quantity != li.quantity.quantize(Decimal(1).scaleb(-unit.decimals)):
+        raise ValidationFailed(f"Line {i}: {unit.code} allows {unit.decimals} decimal places")
 
     price, inclusive = li.unit_price, li.price_includes_tax
     if price is None and product is not None:
@@ -420,7 +419,7 @@ def convert(db: Session, access: BusinessAccess, source: Document, target: DocTy
     if not lines:
         raise Conflict(f"Nothing left on {source.number} to convert")
     base = {
-        "branch_id": source.branch_id, "doc_date": date.today(), "party_id": source.party_id,
+        "branch_id": source.branch_id, "doc_date": local_today(), "party_id": source.party_id,
         "party_name": source.party_name, "place_of_supply": source.place_of_supply,
         "billing_address_id": source.billing_address_id,
         "shipping_address_id": source.shipping_address_id, "tax_mode": source.tax_mode,
@@ -579,10 +578,8 @@ def _stock_movements(db: Session, access: BusinessAccess, doc: Document, spec: D
             issue = _source_issue_entry(db, ln)
             if issue is None:
                 raise ValidationFailed(f"Line {ln.line_no}: the original stock issue was not found")
-            if issue.quantity == -ln.quantity:
-                value = -issue.value
-            else:
-                value = q4(issue.unit_cost * ln.quantity)
+            # Returning everything that left: exactly its value; part of it: at the issue cost.
+            value = -issue.value if issue.quantity == -ln.quantity else q4(issue.unit_cost * ln.quantity)
             src = db.get(DocumentLine, ln.source_line_id)
             if serials and not set(serials) <= set(src.serials or []):  # type: ignore[union-attr]
                 raise ValidationFailed(f"Line {ln.line_no}: serials were not on the original invoice")

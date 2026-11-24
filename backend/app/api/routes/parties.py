@@ -29,8 +29,8 @@ from app.modules.parties.models import PartyRole
 def build_router(role: PartyRole) -> APIRouter:
     plural = "customers" if role == PartyRole.CUSTOMER else "suppliers"
     router = APIRouter(prefix=f"/businesses/{{business_id}}/{plural}", tags=[plural])
-    View = Annotated[BusinessAccess, Depends(require(f"{plural}.view"))]  # noqa: N806
-    Manage = Annotated[BusinessAccess, Depends(require(f"{plural}.manage"))]  # noqa: N806
+    View = Annotated[BusinessAccess, Depends(require(f"{plural}.view"))]
+    Manage = Annotated[BusinessAccess, Depends(require(f"{plural}.manage"))]
 
     @router.get("/groups", response_model=list[GroupOut], name=f"list_{role.value}_groups")
     def list_groups(access: View, db: DB) -> list[GroupOut]:

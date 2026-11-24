@@ -186,7 +186,8 @@ def _reset_sequences(conn: Connection) -> None:
         "FROM information_schema.columns WHERE table_schema = current_schema() "
         "AND pg_get_serial_sequence(table_name, column_name) IS NOT NULL")).all()
     for table, column, seq in rows:
-        conn.execute(text(f'SELECT setval(:seq, COALESCE((SELECT MAX("{column}") FROM "{table}"), 0) + 1, false)'),
+        # Identifiers come from the database catalogue (not user input) and are quoted.
+        conn.execute(text(f'SELECT setval(:seq, COALESCE((SELECT MAX("{column}") FROM "{table}"), 0) + 1, false)'),  # noqa: S608
                      {"seq": seq})
 
 
@@ -194,6 +195,7 @@ def _reset_sequences(conn: Connection) -> None:
 
 def upgrade_target(target_url: str) -> None:
     from alembic import command
+
     from app.cli import _alembic_config
 
     cfg = _alembic_config()

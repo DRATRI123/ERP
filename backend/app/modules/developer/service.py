@@ -13,7 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.errors import NotAuthenticated, NotFound, PermissionDenied, ValidationFailed
+from app.core.errors import (
+    NotAuthenticated,
+    NotFound,
+    PermissionDenied,
+    ValidationFailed,
+)
 from app.core.security import JWT_ALGORITHM, JWT_ISSUER, hash_token
 from app.modules.access.service import BusinessAccess, get_business_access
 from app.modules.audit import service as audit

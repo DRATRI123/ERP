@@ -10,7 +10,6 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.api.schemas_masters import scaled
-
 from app.modules.inventory.models import (
     AdjustmentReason,
     SerialStatus,

@@ -95,14 +95,15 @@ class _HostCache:
             return self._hosts
         with self._lock:
             if time.monotonic() - self._loaded >= self.ttl:
-                from app.db.session import SessionLocal
+                from app.db.session import SessionLocal, read_only
 
-                db = SessionLocal()
-                try:
-                    rows = db.scalars(select(CustomDomain.hostname)
-                                      .where(CustomDomain.status == DomainStatus.ACTIVE)).all()
-                finally:
-                    db.close()
+                with read_only():
+                    db = SessionLocal()
+                    try:
+                        rows = db.scalars(select(CustomDomain.hostname)
+                                          .where(CustomDomain.status == DomainStatus.ACTIVE)).all()
+                    finally:
+                        db.close()
                 self._hosts = frozenset(rows)
                 self._loaded = time.monotonic()
         return self._hosts
@@ -210,7 +211,7 @@ def check(db: Session, d: CustomDomain, *, actor_id: uuid.UUID | None = None) ->
 
 
 def update_domain(db: Session, d: CustomDomain, *, actor_id: uuid.UUID,
-                  default_business_id: uuid.UUID | None | object = ...,
+                  default_business_id: uuid.UUID | object | None = ...,
                   enabled: bool | None = None) -> CustomDomain:
     if default_business_id is not ...:
         _check_business(db, default_business_id)  # type: ignore[arg-type]

@@ -11,11 +11,19 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    StringConstraints,
+)
 
 from app.api.schemas import GSTIN, PAN, Name, Phone, StateCode
 from app.modules.catalog.models import ProductKind
 from app.modules.parties.models import AddressKind, PartyGstType
+
 
 def scaled(places: int) -> AfterValidator:
     """Normalise to the column's scale so responses always show it (e.g. "12.0000")."""
@@ -127,8 +135,8 @@ class ProductIn(ProductBase):
     sku: Sku
     unit_id: uuid.UUID
     prices_include_tax: bool = False
-    gst_rate: RateIn = Decimal("0")
-    cess_rate: RateIn = Decimal("0")
+    gst_rate: RateIn = Decimal(0)
+    cess_rate: RateIn = Decimal(0)
     track_inventory: bool = True
     batch_tracking: bool = False
     serial_tracking: bool = False

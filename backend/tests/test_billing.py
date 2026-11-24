@@ -568,7 +568,7 @@ def test_concurrent_finalization_unique_numbers_no_oversell(api, owner_headers, 
                     finalize_doc(session, access, session.get(Document, uuid.UUID(i)))
                     session.commit()
                     outcome = "ok"
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     session.rollback()
                     outcome = type(exc).__name__
                 with lock:

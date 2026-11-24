@@ -92,12 +92,12 @@ class ScaledDecimal(TypeDecorator[Decimal]):
         return Decimal(value).quantize(self._quantum)
 
 
-def Money() -> ScaledDecimal:  # noqa: N802 - reads like a type
+def Money() -> ScaledDecimal:
     """Monetary amount: 18 digits, 4 decimal places (supports rates and paise-level rounding)."""
     return ScaledDecimal(18, 4)
 
 
-def Quantity() -> ScaledDecimal:  # noqa: N802
+def Quantity() -> ScaledDecimal:
     """Stock quantity: 18 digits, 3 decimal places (grams, millilitres, etc.)."""
     return ScaledDecimal(18, 3)
 

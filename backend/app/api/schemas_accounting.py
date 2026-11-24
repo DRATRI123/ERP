@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 from app.api.schemas_billing import MoneyOut
 from app.api.schemas_masters import MoneyIn, RateIn
+from app.core.clock import local_today
 from app.modules.accounting.models import (
     AccountSubtype,
     AccountType,
@@ -137,7 +138,7 @@ class JournalOut(ORM):
 
 
 class ExpenseIn(BaseModel):
-    expense_date: date = Field(default_factory=date.today)
+    expense_date: date = Field(default_factory=local_today)
     account_id: uuid.UUID
     amount: MoneyIn = Field(description="Before GST")
     description: Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=300)]
