@@ -208,7 +208,7 @@ function Webhooks() {
           <DialogFooter><Button disabled={!url.startsWith("https://") || !picked.length || create.isPending} onClick={() => create.mutate()}>{create.isPending && <Loader2Icon className="animate-spin" />} Add endpoint</Button></DialogFooter>
         </DialogContent>
       </Dialog>
-      <SecretReveal title="Signing secret" secret={secret} onClose={() => setSecret(null)} note="Verify the X-ERP-Signature header with this secret (HMAC-SHA256). Shown only once." />
+      <SecretReveal title="Signing secret" secret={secret} onClose={() => setSecret(null)} note="Verify the ERP-Signature header (t=…,v1=HMAC-SHA256 of “t.body”) with this secret — see docs/api.md. Shown only once." />
     </div>
   );
 }
