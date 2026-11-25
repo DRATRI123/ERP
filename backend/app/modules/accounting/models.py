@@ -138,6 +138,7 @@ class JournalSource(enum.StrEnum):
     PAYROLL = "payroll"
     TDS = "tds"  # TDS deposited to the government
     CLAIM = "claim"  # damage claim settled by a supplier
+    CASH_CLOSING = "cash_closing"  # shortage / excess found when counting cash
 
 
 class JournalEntry(UUIDPrimaryKey, Base):
@@ -269,6 +270,9 @@ class FixedAsset(UUIDPrimaryKey, Timestamps, Base):
         Money(), default=Decimal(0), nullable=False)
     depreciated_to: Mapped[date | None] = mapped_column(Date)
     disposed_on: Mapped[date | None] = mapped_column(Date)
+    # Income-tax Act block (rate %), for the tax depreciation schedule; books use method/rate above.
+    it_block: Mapped[str | None] = mapped_column(String(30))
+    disposal_proceeds: Mapped[Decimal | None] = mapped_column(Money())
     cost_centre_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("cost_centres.id", ondelete="RESTRICT"))
     notes: Mapped[str | None] = mapped_column(Text)

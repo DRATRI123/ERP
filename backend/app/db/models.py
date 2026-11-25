@@ -16,6 +16,7 @@ from app.modules.digest import models as digest_models  # noqa: F401
 from app.modules.events import models as event_models  # noqa: F401
 from app.modules.field import models as field_models  # noqa: F401
 from app.modules.files import models as file_models  # noqa: F401
+from app.modules.finance import models as finance_models  # noqa: F401
 from app.modules.gst import models as gst_models  # noqa: F401
 from app.modules.integrations import models as integration_models  # noqa: F401
 from app.modules.inventory import models as inventory_models  # noqa: F401

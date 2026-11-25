@@ -120,6 +120,30 @@ PostgreSQL.
     overdue amounts, and stock value.
   * Shown per business and in total, for today, this month or this financial year.
   * A six-month sales chart. Clicking a business opens its dashboard.
+* **Accounts extras** (Accounting tabs; migration 0023):
+  * **Budgets:** monthly amounts per income or expense account, optionally per cost centre
+    (`PUT /budgets`).
+    * The month's report compares budget with actual from the books, with the difference,
+      % used and whether it is favourable.
+  * **Daily cash closing:** for a day, the cash account's opening, receipts, payments and
+    expected balance are shown.
+    * The drawer is counted by denomination (₹500 … ₹1 and coins).
+    * A difference posts to Cash Shortage (6910) or Cash Excess (4230), journal source
+      `cash_closing`. One closing per day per cash account.
+  * **Fixed assets screen** (the register existed only in the API): add assets, post
+    depreciation to the last month-end, see book values.
+    * **Income-tax depreciation by block** (section 32): opening WDV (entered once in
+      `settings.it_opening_wdv`), additions used 180 days or more at the full rate and the rest
+      at half rate, less sale proceeds (now stored on disposal), rolled forward year by year.
+    * Blocks: buildings 5/10%, furniture 10%, plant 15%, cars 15%, hire vehicles 30%,
+      computers 40%, intangibles 25%.
+  * **Balance confirmation:** a ledger statement (opening, entries, closing) sent as a secret
+    link, usually on WhatsApp.
+    * The party confirms, or disputes with their balance and a note, without logging in.
+    * Public `GET/POST /public/confirm/{token}`: valid 90 days, answered once.
+    * Replies show on the party page.
+  * **Payment links on invoices:** the existing Razorpay / Cashfree link API now has a button
+    on unpaid invoices. It copies the link and offers WhatsApp sharing.
 * **GST compliance** (GST page tabs; migration 0022):
   * **GSTR-2B reconciliation** (`POST /gst/2b-reconcile` with the portal's JSON): purchase
     bills of the period are matched by supplier GSTIN and bill number. Numbers like "INV/0012"

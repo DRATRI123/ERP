@@ -559,6 +559,34 @@ export const HELP: HelpTopic[] = [
     related: ["reports", "claims"],
   },
   {
+    id: "accounts-extra", title: "Budgets, cash closing, fixed assets, balance confirmation", group: "Money", routes: [],
+    summary: "Monthly budgets vs actual, counting the cash drawer every evening, the asset register with tax depreciation, and ledger confirmations by link.",
+    sections: [
+      { heading: "Budgets (Accounting → Budgets)", steps: [
+        "“Set budget for an account” → e.g. Rent → type the first month → “Same every month” → Save.",
+        "Each month shows budget, actual from the books and the difference (red when an expense is over budget or income is under).",
+      ] },
+      { heading: "Daily cash closing (Accounting → Cash closing)", steps: [
+        "At closing time, count the notes in the drawer and type how many of each, plus coins.",
+        "The screen compares with what the books say should be there. Close the day: any shortage or excess is booked, so tomorrow starts right.",
+      ] },
+      { heading: "Fixed assets (Accounting → Fixed assets)", steps: [
+        "Add asset: cost, date, book depreciation (WDV % or life), its Income-tax block, and where it was paid from.",
+        "“Post depreciation to last month-end” books depreciation for every asset.",
+        "The Income-tax table gives block-wise depreciation for your tax return (half rate for assets used less than 180 days).",
+      ] },
+      { heading: "Balance confirmation (customer / supplier page)", steps: [
+        "Send on WhatsApp: they get a link with the statement and tap Confirm, or “Doesn't match” with their figure and the reason.",
+        "Replies appear on the party page — useful at year end and for the auditor.",
+      ] },
+      { heading: "Payment links (invoice page)", steps: [
+        "Connect Razorpay or Cashfree once under Integrations.",
+        "On an unpaid invoice press Payment link: it is copied; share it on WhatsApp. When the customer pays, the payment is recorded automatically.",
+      ] },
+    ],
+    related: ["accounting", "payments"],
+  },
+  {
     id: "claims", title: "Expense claims and petty cash", group: "Money", routes: ["/claims"],
     summary: "Staff claim money they spent for the business with a photo of the bill; you approve and pay.",
     sections: [

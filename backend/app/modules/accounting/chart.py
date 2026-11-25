@@ -55,6 +55,7 @@ DEFAULT_CHART: list[tuple[str, str, S, str | None]] = [
     ("4100", "Sales Returns", S.SALES, "sales_returns"),
     ("4200", "Other Income", S.OTHER_INCOME, None),
     ("4210", "Round Off", S.OTHER_INCOME, "round_off"),
+    ("4230", "Cash Excess", S.OTHER_INCOME, "cash_excess"),
     ("5000", "Cost of Goods Sold", S.COST_OF_GOODS, "cogs"),
     ("5010", "Purchases (non-stock)", S.COST_OF_GOODS, "purchases"),
     ("5020", "Stock Adjustments", S.COST_OF_GOODS, "stock_adjustment"),
@@ -75,6 +76,7 @@ DEFAULT_CHART: list[tuple[str, str, S, str | None]] = [
     ("6200", "Bank Charges", S.FINANCE_COST, None),
     ("6210", "Interest Paid", S.FINANCE_COST, None),
     ("6900", "Loss on Sale of Assets", S.OTHER_EXPENSE, "asset_disposal"),
+    ("6910", "Cash Shortage", S.OTHER_EXPENSE, "cash_shortage"),
 ]
 
 

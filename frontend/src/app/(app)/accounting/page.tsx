@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { openFile } from "@/lib/api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AssetsPanel, BudgetsPanel, CashClosingPanel } from "@/features/accounting/finance-panels";
 import { ExpenseDialog } from "@/features/accounting/expense-dialog";
 import { JournalDialog, type Account } from "@/features/accounting/journal-dialog";
 import { useBizQuery, useBusiness } from "@/hooks/use-business";
@@ -56,7 +57,8 @@ export default function AccountingPage() {
           {post && <Button onClick={() => setJournal(true)}><BookPlusIcon /> Manual journal</Button>}
         </>} />
       <Tabs defaultValue="accounts">
-        <TabsList><TabsTrigger value="accounts">Chart of accounts</TabsTrigger><TabsTrigger value="journals">Journals</TabsTrigger><TabsTrigger value="expenses">Expenses</TabsTrigger></TabsList>
+        <TabsList><TabsTrigger value="accounts">Chart of accounts</TabsTrigger><TabsTrigger value="journals">Journals</TabsTrigger><TabsTrigger value="expenses">Expenses</TabsTrigger>
+          <TabsTrigger value="budgets">Budgets</TabsTrigger><TabsTrigger value="cash">Cash closing</TabsTrigger><TabsTrigger value="assets">Fixed assets</TabsTrigger></TabsList>
         <TabsContent value="accounts" className="grid gap-4 lg:grid-cols-2">
           {accounts.isLoading ? <Card><TableSkeleton /></Card> : accounts.error ? <Card><ErrorState error={accounts.error} /></Card> : TYPES.map((t) => {
             const rows = (accounts.data ?? []).filter((a) => a.type === t);
@@ -75,6 +77,9 @@ export default function AccountingPage() {
           })}
         </TabsContent>
         <TabsContent value="journals"><DataTable<Journal> queryKey={["journals"]} path="/accounting/journals" columns={jCols} searchPlaceholder="Journal number or reference…" /></TabsContent>
+        <TabsContent value="budgets"><BudgetsPanel /></TabsContent>
+        <TabsContent value="cash"><CashClosingPanel /></TabsContent>
+        <TabsContent value="assets"><AssetsPanel /></TabsContent>
         <TabsContent value="expenses"><DataTable<Expense> queryKey={["expenses"]} path="/accounting/expenses" columns={eCols} searchParam={null} /></TabsContent>
       </Tabs>
       <JournalDialog open={journal} onOpenChange={setJournal} accounts={accounts.data ?? []} />

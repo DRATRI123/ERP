@@ -66,6 +66,11 @@ def create_asset(db: Session, access: BusinessAccess, data: dict[str, Any],
     if db.scalar(select(FixedAsset.id).where(FixedAsset.business_id == access.business.id,
                                              FixedAsset.code == data["code"])):
         raise Conflict(f"Asset code {data['code']} is already used")
+    if data.get("it_block"):
+        from app.modules.finance.service import IT_BLOCKS
+
+        if data["it_block"] not in IT_BLOCKS:
+            raise ValidationFailed(f"Income-tax block must be one of {', '.join(IT_BLOCKS)}")
     asset = FixedAsset(business_id=access.business.id, accumulated_depreciation=ZERO, **data)
     db.add(asset)
     db.flush()
@@ -152,6 +157,7 @@ def dispose_asset(db: Session, access: BusinessAccess, asset: FixedAsset, *, on:
     if asset.accumulated_depreciation:
         lines.append(Line(acc["accumulated_depreciation"], debit=asset.accumulated_depreciation,
                           description=asset.code))
+    asset.disposal_proceeds = proceeds
     if proceeds:
         if proceeds_account_id is None:
             raise ValidationFailed("Say which cash/bank account received the proceeds")

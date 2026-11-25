@@ -235,6 +235,20 @@ Also:
 | `rcm_self_invoices` | Self-invoice number and date for one reverse-charge purchase bill (unique per bill) |
 | `job_work_challans` | Job-work challan: out (sent) or in (received back, linked to the sent one), inputs or capital goods, job worker, our and the job worker's godown, the stock transfer, lines with value |
 
+## Accounts extras (migration 0023)
+
+| Table | Purpose |
+|---|---|
+| `budgets` | Monthly budget per account (and optional cost centre) |
+| `cash_closings` | One per cash account per day: expected, counted, difference, denominations, notes |
+| `balance_confirmations` | Statement snapshot sent to a party, secret token, status sent/confirmed/disputed, their balance and note |
+
+Also:
+
+* On `fixed_assets`: `it_block` and `disposal_proceeds`.
+* `journal_entries.source_type` also accepts `cash_closing`.
+* New system accounts: 4230 Cash Excess and 6910 Cash Shortage.
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |

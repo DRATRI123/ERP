@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  LinkIcon,
   ArrowLeftIcon, CheckCircle2Icon, CopyPlusIcon, FileDownIcon, MoreHorizontalIcon, PencilIcon, PrinterIcon, SendIcon, WalletIcon, XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -96,6 +97,15 @@ function DocumentPage() {
             <Button variant="outline" onClick={() => openFile(`${base}/documents/${id}/print`, { format: "pdf", paper: paper || undefined }, `${(d.number ?? "document").replace(/\//g, "-")}.pdf`)}><FileDownIcon /> PDF</Button>
             {payable && Number(d.balance_due) > 0 && (isOwner || can("payments.create")) && (
               <Button asChild><Link href={`/payments?new=1&party=${d.party_id ?? ""}&doc=${d.id}&dir=${sales ? "in" : "out"}`}><WalletIcon /> Record payment</Link></Button>
+            )}
+            {sales && d.doc_type === "sales_invoice" && Number(d.balance_due) > 0 && (
+              <Button variant="outline" onClick={async () => {
+                try {
+                  const r = await api<{ url: string }>(`${base}/documents/${id}/payment-link`, { method: "POST" });
+                  await navigator.clipboard.writeText(r.url).catch(() => undefined);
+                  toast.success("Payment link copied", { description: r.url, action: { label: "WhatsApp", onClick: () => window.open(`https://wa.me/?text=${encodeURIComponent(`Please pay ${money(d.balance_due)} for invoice ${d.number}: ${r.url}`)}`, "_blank", "noopener") } });
+                } catch (e) { toast.error((e as ApiError).message, { description: "Connect Razorpay or Cashfree under Integrations to send payment links." }); }
+              }}><LinkIcon /> Payment link</Button>
             )}
           </>}
           <DropdownMenu>

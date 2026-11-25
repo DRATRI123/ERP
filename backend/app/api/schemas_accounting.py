@@ -189,6 +189,8 @@ class AssetIn(BaseModel):
     branch_id: uuid.UUID | None = None
     cost_centre_id: uuid.UUID | None = None
     notes: Annotated[str, StringConstraints(max_length=2000)] | None = None
+    it_block: Annotated[str, StringConstraints(pattern=r"^[a-z_]{2,30}$")] | None = Field(
+        None, description="Income-tax Act block, e.g. computer, plant, furniture (see /assets/it-depreciation)")
     capitalise_from_account_id: uuid.UUID | None = Field(
         None, description="Also post the purchase: Dr asset, Cr this account (bank, loan, capital…)")
 
@@ -208,6 +210,9 @@ class AssetOut(ORM):
     book_value: MoneyOut | None = None
     depreciated_to: date | None
     disposed_on: date | None
+    it_block: str | None = None
+    disposal_proceeds: Decimal | None = None
+
 
 
 class DepreciationRunIn(BaseModel):

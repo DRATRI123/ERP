@@ -36,6 +36,8 @@ PUBLIC_ROUTES = {
     ("GET", "/health"),
     # Link-only order catalogue: a 32-byte secret token, rate-limited orders that only create drafts.
     ("GET", "/public/catalogue/{token}"), ("POST", "/public/catalogue/{token}/orders"),
+    # Balance confirmation link: a 24-byte secret token, valid 90 days, answers only once.
+    ("GET", "/public/confirm/{token}"), ("POST", "/public/confirm/{token}"),
 }
 AUTH_DEPS = {"get_any_principal", "get_principal", "require_owner"}
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
