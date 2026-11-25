@@ -4,6 +4,8 @@ import {
   IdCardIcon, LifeBuoyIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, StethoscopeIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
 } from "lucide-react";
 
+import { isModuleOn, type ModuleKey } from "@/hooks/use-modules";
+
 export interface NavItem {
   href: string;
   label: string;
@@ -13,6 +15,8 @@ export interface NavItem {
   ownerOnly?: boolean;
   shortcut?: string; // "g" + key
   group: "main" | "money" | "manage";
+  /** Optional module (Settings → Modules); hidden while the business has it switched off. */
+  module?: ModuleKey;
 }
 
 export const NAV: NavItem[] = [
@@ -21,23 +25,23 @@ export const NAV: NavItem[] = [
   { href: "/sales", label: "Sales & Invoices", icon: ReceiptIndianRupeeIcon, any: ["invoices.view"], group: "main", shortcut: "s" },
   { href: "/purchases", label: "Purchases", icon: ShoppingCartIcon, any: ["purchases.view"], group: "main", shortcut: "p" },
   { href: "/inventory", label: "Products & Inventory", icon: BoxesIcon, any: ["products.view", "stock.view"], group: "main", shortcut: "i" },
-  { href: "/manufacturing", label: "Manufacturing", icon: FactoryIcon, any: ["stock.view"], group: "main" },
-  { href: "/pricing", label: "Pricing & Schemes", icon: TagsIcon, any: ["products.view"], group: "main" },
-  { href: "/catalogue", label: "WhatsApp catalogue", icon: MessageCircleIcon, any: ["business.settings", "invoices.view"], group: "main" },
+  { href: "/manufacturing", label: "Manufacturing", icon: FactoryIcon, any: ["stock.view"], group: "main", module: "manufacturing" },
+  { href: "/pricing", label: "Pricing & Schemes", icon: TagsIcon, any: ["products.view"], group: "main", module: "pricing" },
+  { href: "/catalogue", label: "WhatsApp catalogue", icon: MessageCircleIcon, any: ["business.settings", "invoices.view"], group: "main", module: "catalogue" },
   { href: "/customers", label: "Customers", icon: UsersIcon, any: ["customers.view"], group: "main", shortcut: "c" },
   { href: "/suppliers", label: "Suppliers", icon: TruckIcon, any: ["suppliers.view"], group: "main" },
-  { href: "/doctors", label: "Doctors", icon: StethoscopeIcon, any: ["invoices.view"], group: "main" },
+  { href: "/doctors", label: "Doctors", icon: StethoscopeIcon, any: ["invoices.view"], group: "main", module: "pharmacy" },
   { href: "/accounting", label: "Accounting", icon: BookOpenIcon, any: ["accounting.view", "expenses.view"], group: "money", shortcut: "a" },
   { href: "/payments", label: "Banking & Payments", icon: WalletIcon, any: ["payments.view"], group: "money" },
-  { href: "/claims", label: "Expense claims", icon: ReceiptIcon, any: ["expenses.claim", "expenses.manage"], group: "money" },
-  { href: "/staff", label: "Staff & Salary", icon: IdCardIcon, any: ["payroll.manage", "attendance.mark"], group: "money" },
+  { href: "/claims", label: "Expense claims", icon: ReceiptIcon, any: ["expenses.claim", "expenses.manage"], group: "money", module: "claims" },
+  { href: "/staff", label: "Staff & Salary", icon: IdCardIcon, any: ["payroll.manage", "attendance.mark"], group: "money", module: "payroll" },
   { href: "/gst", label: "GST & Tax", icon: LandmarkIcon, any: ["gst.view"], group: "money", shortcut: "t" },
   { href: "/reports", label: "Reports", icon: BarChart3Icon, any: ["reports.view", "accounting.view"], group: "money", shortcut: "r" },
   { href: "/documents", label: "Documents", icon: FileTextIcon, group: "manage" },
-  { href: "/licences", label: "Licences", icon: ShieldCheckIcon, group: "manage" },
-  { href: "/automation", label: "Automation", icon: BotIcon, group: "manage" },
+  { href: "/licences", label: "Licences", icon: ShieldCheckIcon, group: "manage", module: "licences" },
+  { href: "/automation", label: "Automation", icon: BotIcon, group: "manage", module: "automation" },
   { href: "/integrations", label: "Integrations", icon: PlugIcon, any: ["integrations.manage"], group: "manage" },
-  { href: "/developer", label: "Developer API", icon: CodeXmlIcon, any: ["developer.manage"], group: "manage" },
+  { href: "/developer", label: "Developer API", icon: CodeXmlIcon, any: ["developer.manage"], group: "manage", module: "developer" },
   { href: "/users", label: "Users & Permissions", icon: UserCogIcon, any: ["users.view"], group: "manage", shortcut: "u" },
   { href: "/businesses", label: "Businesses", icon: Building2Icon, ownerOnly: true, group: "manage" },
   { href: "/settings", label: "Settings", icon: SettingsIcon, group: "manage" },
@@ -46,6 +50,7 @@ export const NAV: NavItem[] = [
 
 export const GROUP_LABEL: Record<NavItem["group"], string> = { main: "Operations", money: "Finance", manage: "Workspace" };
 
-export function visibleNav(can: (code: string) => boolean, isOwner: boolean) {
-  return NAV.filter((n) => (n.ownerOnly ? isOwner : isOwner || !n.any || n.any.some(can)));
+export function visibleNav(can: (code: string) => boolean, isOwner: boolean, modules?: Record<string, boolean>) {
+  return NAV.filter((n) => (!n.module || isModuleOn(modules, n.module))
+    && (n.ownerOnly ? isOwner : isOwner || !n.any || n.any.some(can)));
 }

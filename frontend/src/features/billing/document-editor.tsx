@@ -20,6 +20,7 @@ import { Field } from "@/components/ui/form-field";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useBusiness } from "@/hooks/use-business";
+import { useModules } from "@/hooks/use-modules";
 import { useDebounced } from "@/hooks/use-debounce";
 import { api, ApiError } from "@/lib/api";
 import { dec, decStr, money, qty, todayISO } from "@/lib/format";
@@ -65,6 +66,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   const router = useRouter();
   const { base, id: bizId, can, isOwner } = useBusiness();
   const types = side === "sales" ? SALES_TYPES : PURCHASE_TYPES;
+  const pharmacy = useModules().on("pharmacy");
   const [docType, setDocType] = useState<DocType>(draft?.doc_type ?? (side === "sales" ? "sales_invoice" : "purchase_invoice"));
   const [party, setParty] = useState<Party | null>(draft?.party_id ? ({ id: draft.party_id, name: draft.party_name ?? "" } as Party) : null);
   const [partyName, setPartyName] = useState(draft && !draft.party_id ? (draft.party_name ?? "") : "");
@@ -135,7 +137,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
         composition: (p.composition as string | null) ?? null, packSize: p.pack_size ? Number(p.pack_size) : undefined,
         packLabel: (p.pack_label as string | null) ?? null }];
     });
-  }, [side]);
+  }, [side, setLines]);
   /** Swap a line to a substitute (same salt), keeping its quantity. */
   const swap = (key: string, p: Product) => setLines((ls) => ls.map((l) => (l.key !== key ? l : {
     ...l, product_id: p.id, name: p.name, sku: p.sku, hsn: p.hsn_sac, unit_price: p.selling_price ? String(Number(p.selling_price)) : "",
@@ -163,8 +165,8 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
     },
     onError: (e: ApiError) => toast.error(e.message, { description: Object.values(e.fieldErrors)[0] }),
   });
-  const needsRx = side === "sales" && lines.some((l) => l.schedule && RX_SCHEDULES.has(l.schedule));
-  const needsRxNo = side === "sales" && lines.some((l) => l.schedule && REGISTER_SCHEDULES.has(l.schedule));
+  const needsRx = pharmacy && side === "sales" && lines.some((l) => l.schedule && RX_SCHEDULES.has(l.schedule));
+  const needsRxNo = pharmacy && side === "sales" && lines.some((l) => l.schedule && REGISTER_SCHEDULES.has(l.schedule));
   const rxMissing = docType === "sales_invoice" && needsRx && (!rx.doctor_id || !rx.patient_name.trim() || (needsRxNo && !rx.rx_number.trim()));
   const missingBatch = side === "purchase" && docType === "purchase_invoice" && lines.some((l) => l.batched && !l.batch_no?.trim());
   const canSave = lines.length > 0 && lines.every((l) => Number(l.quantity) > 0) && !save.isPending && !missingBatch;
@@ -216,7 +218,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
             )}
             {side === "sales" && (
               <Field label="Rate" htmlFor="doc-tier" hint={tier === "ptr" || tier === "pts" ? "Pharma trade rate" : undefined}>
-                <NativeSelect id="doc-tier" value={tier} onChange={(e) => setTier(e.target.value)}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</NativeSelect>
+                <NativeSelect id="doc-tier" value={tier} onChange={(e) => setTier(e.target.value)}>{TIERS.filter(([v]) => pharmacy || (v !== "ptr" && v !== "pts")).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</NativeSelect>
               </Field>
             )}
             {side === "sales" && party && <CreditPanel partyId={party.id} />}
@@ -224,7 +226,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
           </CardContent>
         </Card>
 
-        {side === "sales" && (needsRx || showRx) && (
+        {pharmacy && side === "sales" && (needsRx || showRx) && (
           <Card className={cn(rxMissing && "border-warning/60")}>
             <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
@@ -263,14 +265,14 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                       <tr key={l.key} className="align-middle max-md:grid max-md:grid-cols-3 max-md:gap-x-2 max-md:gap-y-2 max-md:px-3 max-md:py-3">
                         <td className="px-3 py-2 text-muted-foreground max-md:hidden">{i + 1}</td>
                         <td className="px-3 py-2 max-md:col-span-3 max-md:p-0">
-                          {l.product_id ? <p className="flex flex-wrap items-center gap-1.5 font-medium">{l.name} <ScheduleBadge schedule={l.schedule} />
+                          {l.product_id ? <p className="flex flex-wrap items-center gap-1.5 font-medium">{l.name} {pharmacy && <ScheduleBadge schedule={l.schedule} />}
                             {side === "sales" && (t?.custom_fields as Record<string, unknown> | undefined)?.near_expiry === true && (
                               <Badge variant="warning" className="h-5 gap-1 px-1.5 text-[10px]"><ClockAlertIcon className="size-3" /> Near expiry −{Number(t?.discount_percent)}%</Badge>)}</p> : (
                             <Input value={l.name} onChange={(e) => update(l.key, { name: e.target.value })} placeholder="Description" className="h-8" />
                           )}
                           <p className="text-xs text-muted-foreground">{[l.sku, l.rack && `Rack ${l.rack}`, l.hsn && `HSN ${l.hsn}`].filter(Boolean).join(" · ")}
                             {low && <span className="ml-1 text-destructive">· only {qty(l.stock)} in stock</span>}
-                            {side === "sales" && l.product_id && l.composition && (
+                            {pharmacy && side === "sales" && l.product_id && l.composition && (
                               <button type="button" onClick={() => setSubsFor(l)} className="ml-1.5 inline-flex items-center gap-0.5 text-primary hover:underline">
                                 <ArrowLeftRightIcon className="size-3" /> Substitutes</button>)}</p>
                           {l.batched && l.product_id && (side === "purchase" ? (
@@ -387,7 +389,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
           )}
           <CardContent className="grid gap-2 border-t">
             {rxMissing && <p className="text-xs text-amber-700 dark:text-warning">Enter the prescription details above to finalize.</p>}
-            {side === "sales" && !needsRx && !showRx && <Button variant="link" size="sm" className="h-auto justify-start p-0" onClick={() => setShowRx(true)}><StethoscopeIcon /> Add doctor / prescription</Button>}
+            {pharmacy && side === "sales" && !needsRx && !showRx && <Button variant="link" size="sm" className="h-auto justify-start p-0" onClick={() => setShowRx(true)}><StethoscopeIcon /> Add doctor / prescription</Button>}
             <Button size="lg" disabled={!canFinalize} onClick={() => save.mutate(true)}>
               {save.isPending ? <Loader2Icon className="animate-spin" /> : <CheckCircle2Icon />} {finalizeLabel} <kbd className="ml-auto rounded bg-white/15 px-1.5 text-[11px]">F9</kbd>
             </Button>

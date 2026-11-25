@@ -148,6 +148,11 @@ def update_business(db: Session, access: BusinessAccess, data: dict[str, Any]) -
             raise ValidationFailed(
                 "The inventory valuation method cannot change once stock has been recorded"
             )
+    if "settings" in data:
+        # Merge, so a client that knows only some keys never wipes the others (modules, pharmacy…).
+        # A key set to null is removed.
+        merged = {**(business.settings or {}), **(data["settings"] or {})}
+        data["settings"] = {k: v for k, v in merged.items() if v is not None}
     before = audit.snapshot(business, BUSINESS_FIELDS)
     for k, v in data.items():
         setattr(business, k, v)

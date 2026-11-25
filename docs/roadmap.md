@@ -120,7 +120,23 @@ PostgreSQL.
     overdue amounts, and stock value.
   * Shown per business and in total, for today, this month or this financial year.
   * A six-month sales chart. Clicking a business opens its dashboard.
-* **Pharmacy** (migration 0017):
+* **Modules per business** (Settings → Modules; `GET/PUT /businesses/{id}/modules`):
+  * The ERP serves different kinds of business. The core is always on: sales, purchases, stock,
+    parties, payments, accounting, GST, reports, users and settings.
+  * Each business switches the optional modules on or off: pharmacy, manufacturing, price lists &
+    schemes, WhatsApp catalogue, staff & salary, expense claims, licences, automation and
+    developer API.
+  * Stored in `businesses.settings["modules"]`. Pharmacy is off by default and everything else
+    is on. Quick set-up buttons apply a preset per business type: pharmacy, manufacturer,
+    distributor, retail or services.
+  * Switching a module off hides its menu, screens and fields. Its pages say the module is off,
+    with a link to switch it back on. Data is kept.
+  * The pharmacy billing rules (prescriptions, near-expiry discount) apply only while Pharmacy is
+    on. Migration 0018 switches Pharmacy on for businesses that already have doctors or medicines
+    with a salt or schedule.
+  * `PATCH /businesses/{id}` now merges `settings` instead of replacing them, so editing the
+    profile never wipes modules or other keys. A key sent as `null` is removed.
+* **Pharmacy** (migration 0017; only for businesses with the Pharmacy module on):
   * Products carry a salt / composition, rack, drug schedule (None, G, H, H1, X, narcotic),
     PTR and PTS, and a pack size and name for loose selling.
   * Searching a salt finds every brand. `GET /products/{id}/substitutes` lists other active
@@ -139,7 +155,7 @@ PostgreSQL.
     batch and quantity. Defaults to H1, X and narcotics; `schedule=` chooses others.
   * **Doctor-wise sales** (`GET /reports/doctor-sales`): bills, taxable value and bill value per
     doctor.
-  * **Near-expiry discount** (Settings → Pharmacy, `business.settings`): a batch expiring
+  * **Near-expiry discount** (Settings → Modules, `business.settings`): a batch expiring
     within N days gets X % off automatically on sales invoices.
     * The batch is the chosen one, or the first-expiry batch when it covers the whole line.
     * The line is flagged `near_expiry`.

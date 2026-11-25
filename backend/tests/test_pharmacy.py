@@ -16,7 +16,10 @@ T = date.fromisoformat(TODAY)
 
 @pytest.fixture
 def ph(api, owner_headers) -> Shop:
-    return Shop(api, owner_headers)
+    s = Shop(api, owner_headers)
+    r = api.c.put(f"{s.base}/modules", headers=owner_headers, json={"modules": {"pharmacy": True}})
+    assert r.status_code == 200 and r.json()["enabled"]["pharmacy"] is True
+    return s
 
 
 def stocked(s: Shop, sku: str, qty: str = "100", **kw) -> str:
@@ -37,7 +40,7 @@ def test_product_fields_search_by_salt_and_substitutes(ph):
                    ptr="1.80", pts="1.60", pack_size="15", pack_label="strip")
     assert (a["composition"], a["rack"], a["pack_size"], a["pack_label"]) == ("Paracetamol 500 mg", "A-3", "15.000", "strip")
     assert a["drug_schedule"] == "none" and a["ptr"] == "1.8000"
-    b = ph.product("dolo", composition="paracetamol 500 MG", selling_price="2.00")
+    ph.product("dolo", composition="paracetamol 500 MG", selling_price="2.00")
     ph.product("calpol", composition="Paracetamol 650 mg", selling_price="2.20")
     ph.product("other", composition="Cetirizine 10 mg")
 
@@ -153,3 +156,30 @@ def test_near_expiry_discount(ph):
 
     bad = ph.api.c.put(f"{ph.base}/pharmacy/settings/near-expiry", headers=ph.h, json={"days": 30, "percent": "150"})
     assert bad.status_code == 422
+
+
+def test_modules_switch_and_settings_merge(api, owner_headers):
+    s = Shop(api, owner_headers)
+    mods = s.get("/modules")
+    assert mods["enabled"]["pharmacy"] is False and mods["enabled"]["manufacturing"] is True
+    assert {m["key"] for m in mods["modules"]} >= {"pharmacy", "manufacturing", "payroll", "catalogue"}
+
+    # Pharmacy off: a scheduled drug sells without a prescription, and no near-expiry discount.
+    h = stocked(s, "azithro", selling_price="100", drug_schedule="h")
+    finalize(s, doc(s, "sales_invoice", [{"product_id": h}])["id"], [{"mode": "cash", "amount": "100"}])
+    put = lambda body: api.c.put(f"{s.base}/modules", headers=owner_headers, json=body)  # noqa: E731
+    assert put({"modules": {"nonsense": True}}).status_code == 422
+    out = put({"modules": {"pharmacy": True, "manufacturing": False}}).json()["enabled"]
+    assert out["pharmacy"] and not out["manufacturing"] and out["payroll"]
+    assert fails(s, doc(s, "sales_invoice", [{"product_id": h}])["id"])["code"] == "prescription_required"
+
+    # Editing the business profile with other settings keeps the modules (settings merge).
+    r = api.c.patch(s.base, headers=owner_headers, json={"settings": {"round_off": False}})
+    assert r.status_code == 200, r.text
+    assert r.json()["settings"]["modules"] == {"pharmacy": True, "manufacturing": False}
+    assert r.json()["settings"]["round_off"] is False
+    assert s.get("/modules")["enabled"]["manufacturing"] is False
+
+    # Members without business.settings can read but not change modules.
+    r = api.c.put(f"{s.base}/modules", headers={}, json={"modules": {"pharmacy": False}})
+    assert r.status_code in (401, 403)

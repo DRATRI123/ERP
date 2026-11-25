@@ -20,7 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { NearExpirySettings } from "@/features/pharmacy/pharmacy";
+import { ModulesSettings } from "@/features/settings/modules";
 import { useApiQuery, useBizQuery, useBusiness } from "@/hooks/use-business";
 import { api, ApiError, openFile, type Page } from "@/lib/api";
 import { dateTime, titleCase } from "@/lib/format";
@@ -38,15 +38,16 @@ export default function SettingsPage() {
 
 function SettingsTabs() {
   const { isOwner, can } = useBusiness();
-  const tab = useSearchParams().get("tab") ?? "business";
+  const raw = useSearchParams().get("tab") ?? "business";
+  const tab = raw === "pharmacy" ? "modules" : raw;
   return (
     <>
-      <PageHeader title="Settings" description="Business profile, branches, numbering, print templates and system." />
+      <PageHeader title="Settings" description="Business profile, branches, numbering, print templates, modules and system." />
       <Tabs defaultValue={tab}>
         <TabsList>
           <TabsTrigger value="business">Business</TabsTrigger><TabsTrigger value="branches">Branches</TabsTrigger>
           <TabsTrigger value="numbering">Numbering</TabsTrigger><TabsTrigger value="templates">Print templates</TabsTrigger>
-          <TabsTrigger value="pharmacy">Pharmacy</TabsTrigger>
+          <TabsTrigger value="modules">Modules</TabsTrigger>
           {isOwner && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
         <TabsContent value="business"><BusinessProfile editable={isOwner || can("business.settings")} /></TabsContent>
@@ -59,7 +60,7 @@ function SettingsTabs() {
             <Button asChild><Link href="/settings/templates">Open designer</Link></Button>
           </CardContent></Card>
         </TabsContent>
-        <TabsContent value="pharmacy"><NearExpirySettings editable={isOwner || can("business.settings")} /></TabsContent>
+        <TabsContent value="modules"><ModulesSettings editable={isOwner || can("business.settings")} /></TabsContent>
         {isOwner && <TabsContent value="system"><System /></TabsContent>}
       </Tabs>
       <Card className="mt-6"><CardContent className="flex items-center gap-3 text-sm">

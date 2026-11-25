@@ -9,6 +9,7 @@ import { Logo } from "@/components/layout/logo";
 import { GROUP_LABEL, visibleNav, type NavItem } from "@/components/layout/nav";
 import { Tooltip } from "@/components/ui/switch";
 import { useBusiness } from "@/hooks/use-business";
+import { useModules } from "@/hooks/use-modules";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/stores/business";
 
@@ -28,7 +29,8 @@ function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed: bo
 
 export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
   const { can, isOwner } = useBusiness();
-  const items = visibleNav(can, isOwner);
+  const { enabled } = useModules();
+  const items = visibleNav(can, isOwner, enabled);
   const groups = (["main", "money", "manage"] as const).map((g) => ({ g, items: items.filter((i) => i.group === g) }));
   const folded = useWorkspace((s) => s.foldedGroups);
   const toggleGroup = useWorkspace((s) => s.toggleGroup);

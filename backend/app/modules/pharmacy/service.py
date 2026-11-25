@@ -17,6 +17,7 @@ from app.modules.access.service import BusinessAccess
 from app.modules.audit import service as audit
 from app.modules.billing.doctypes import DocType
 from app.modules.billing.models import DocStatus, Document, DocumentLine
+from app.modules.businesses.modules import is_enabled
 from app.modules.catalog.models import Product
 from app.modules.pharmacy.models import (
     PRESCRIPTION_REQUIRED,
@@ -113,9 +114,11 @@ def substitutes(db: Session, access: BusinessAccess, product: Product) -> list[P
 # ---------------------------------------------------------------------------- prescriptions
 
 
-def check_prescription(db: Session, doc: Document) -> None:
+def check_prescription(db: Session, doc: Document, settings: dict[str, Any] | None) -> None:
     """A sale of a Schedule H/H1/X/narcotic drug must name the doctor and the patient; H1, X and
     narcotics (which go in the schedule register) also need the prescription number."""
+    if not is_enabled(settings, "pharmacy"):
+        return
     scheduled: dict[DrugSchedule, list[str]] = {}
     for ln in doc.lines:
         if ln.product_id is None:
@@ -206,7 +209,7 @@ def apply_near_expiry_discount(db: Session, access: BusinessAccess, doc: Documen
     """Give the configured discount on lines whose batch (chosen, or the one first-expiry-first-out
     will pick) expires within the configured days. Lines with their own discount are left alone."""
     rule = near_expiry_rule(access.business.settings or {})
-    if rule is None:
+    if rule is None or not is_enabled(access.business.settings, "pharmacy"):
         return
     days, pct = rule
     from app.modules.billing.service import _default_warehouse

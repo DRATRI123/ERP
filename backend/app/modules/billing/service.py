@@ -655,7 +655,7 @@ def finalize(db: Session, access: BusinessAccess, doc: Document, *,
     if doc.doc_type == DocType.SALES_INVOICE:
         from app.modules.pharmacy.service import check_prescription
 
-        check_prescription(db, doc)
+        check_prescription(db, doc, access.business.settings)
     if doc.doc_type == DocType.PURCHASE_INVOICE:
         if not doc.supplier_invoice_no:
             raise ValidationFailed("Enter the supplier's invoice number")

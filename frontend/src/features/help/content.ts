@@ -19,6 +19,7 @@ export const HELP: HelpTopic[] = [
       { heading: "Set up once (about 30 minutes)", steps: [
         "Settings → Business: legal name, GSTIN, address, phone, logo. These print on every invoice.",
         "Settings → Branches: one per shop or godown, with its own address and PIN code.",
+        "Settings → Modules: pick your business type (pharmacy, manufacturer, distributor, retail, services) so only what you use shows in the menu.",
         "Settings → Numbering: invoice number series (e.g. INV/2026-27/0001). The defaults are fine to start.",
         "Licences → Add licence: drug licence, FSSAI, AYUSH… tick “Print number on invoices”.",
         "Products & Inventory → New product (or import a CSV/Excel file from Settings). For medicines switch on “Batches & expiry”.",
@@ -189,9 +190,14 @@ export const HELP: HelpTopic[] = [
   // ------------------------------------------------------------------ buying
   {
     id: "pharmacy", title: "Pharmacy: doctors, prescriptions, salts, loose tablets", group: "Selling",
-    routes: ["/doctors", "/sales/new", "/settings?tab=pharmacy"],
-    summary: "Sell medicines the way a chemist does: by strip or loose, with substitutes by salt, the prescription on Schedule H bills and the H1 register kept for you.",
+    routes: ["/doctors", "/sales/new", "/settings?tab=modules"],
+    summary: "For a medical store: sell by strip or loose, with substitutes by salt, the prescription on Schedule H bills and the H1 register kept for you. Switch it on only for the business that needs it.",
     sections: [
+      { heading: "Switch it on (only for your pharmacy business)", steps: [
+        "Choose the pharmacy business in the business switcher (top left).",
+        "Settings → Modules → turn on “Pharmacy / medical store”, or press the “Medical store / pharmacy” quick set-up.",
+        "Your other businesses (manufacturing, distribution, retail…) never see these fields.",
+      ] },
       { heading: "Set up each medicine (Products & Inventory → New product / Edit)", steps: [
         "Salt / composition: e.g. “Paracetamol 500 mg”. Searching the salt finds every brand, and the bill offers substitutes.",
         "Rack / shelf: e.g. “A-3”. Shown in search results and on the bill line, so staff find it fast.",
@@ -215,7 +221,7 @@ export const HELP: HelpTopic[] = [
         "Press Use to swap the line to that brand; the quantity stays.",
       ] },
       { heading: "Near-expiry discount", steps: [
-        "Settings → Pharmacy: set e.g. 60 days and 10%.",
+        "Settings → Modules (below the switches): set e.g. 60 days and 10%.",
         "When the batch being sold expires within 60 days, the line gets 10% off automatically, marked “Near expiry”.",
         "A line where you typed your own discount is left alone.",
       ] },
@@ -497,12 +503,13 @@ export const HELP: HelpTopic[] = [
   },
   {
     id: "settings", title: "Settings", group: "Workspace", routes: ["/settings"],
-    summary: "Business profile, branches, number series, print templates and system (backups).",
+    summary: "Business profile, branches, number series, print templates, modules and system (backups).",
     sections: [{ heading: "Sections", steps: [
       "Business: name, GSTIN, address, logo, bank/UPI for invoices.",
       "Branches: Add branch for each shop/godown.",
       "Numbering: New series for different counters or document kinds.",
       "Print templates: design A4 and thermal invoices (drag fields, logo, custom fields, preview).",
+      "Modules: switch on only what this business uses — pharmacy, manufacturing, price lists, WhatsApp catalogue, staff & salary, expense claims, licences, automation, developer API. A quick set-up button per business type sets them in one go. Switching off only hides a module; its data is kept.",
       "System: backups (Back up now), health, security (2FA).",
     ] }],
   },

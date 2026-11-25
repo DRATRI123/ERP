@@ -14,6 +14,7 @@ import { Field } from "@/components/ui/form-field";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useBizQuery, useBusiness } from "@/hooks/use-business";
+import { useModules } from "@/hooks/use-modules";
 import { api, ApiError } from "@/lib/api";
 import type { Product } from "@/lib/types";
 
@@ -48,6 +49,7 @@ export const SCHEDULES = [
 export function ProductDialog({ open, onOpenChange, product }: { open: boolean; onOpenChange: (v: boolean) => void; product?: Product }) {
   const { base, id } = useBusiness();
   const qc = useQueryClient();
+  const pharmacy = useModules().on("pharmacy");
   const units = useBizQuery<{ id: string; code: string; name: string }[]>(["units"], "/units", undefined, { enabled: open });
   const cats = useBizQuery<{ id: string; name: string }[]>(["categories"], "/categories", undefined, { enabled: open });
   const n = (v: unknown) => (v === null || v === undefined ? "" : String(Number(v)));
@@ -105,7 +107,7 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
           <Field label="Purchase price" error={err.purchase_price?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("purchase_price")} /></Field>
           <Field label="MRP" error={err.mrp?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("mrp")} /></Field>
           <Field label="Reorder level" hint="Alert when stock falls to this" className="sm:col-span-2"><Input inputMode="decimal" {...form.register("reorder_level")} /></Field>
-          <fieldset className="grid gap-4 rounded-lg border p-3 sm:col-span-6 sm:grid-cols-6">
+          {pharmacy && <fieldset className="grid gap-4 rounded-lg border p-3 sm:col-span-6 sm:grid-cols-6">
             <legend className="px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Pharmacy (optional)</legend>
             <Field label="Salt / composition" hint="Finds substitutes with the same salt" className="sm:col-span-4"><Input placeholder="Paracetamol 500 mg" {...form.register("composition")} /></Field>
             <Field label="Rack / shelf" className="sm:col-span-2"><Input placeholder="A-3" {...form.register("rack")} /></Field>
@@ -117,7 +119,7 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
             <p className="self-end pb-2 text-xs text-muted-foreground sm:col-span-2">
               {perPack ? `One ${packLabel || "pack"} = ${Number(packSize)} units = ₹${perPack}. Stock and prices stay per unit.` : "Stock and prices are per unit (e.g. per tablet)."}
             </p>
-          </fieldset>
+          </fieldset>}
           <div className="grid gap-3 rounded-lg border p-3 sm:col-span-4 sm:grid-cols-2">
             {([["prices_include_tax", "Prices include GST"], ["track_inventory", "Track stock"], ["batch_tracking", "Batches & expiry"], ["serial_tracking", "Serial numbers"]] as const).map(([k, label]) => (
               <label key={k} className="flex items-center justify-between gap-2 text-sm">{label}

@@ -14,6 +14,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useBizQuery } from "@/hooks/use-business";
+import { useModules } from "@/hooks/use-modules";
 import { downloadCsv } from "@/lib/csv";
 import { date, money, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ function Statement({ sections }: { sections: { title: string; rows: Row[]; total
 
 export default function ReportsPage() {
   const [report, setReport] = useState<Id>("pl");
+  const pharmacy = useModules().on("pharmacy");
   const [period, setPeriod] = useState(PRESETS.this_fy!());
   const [asOf, setAsOf] = useState(todayISO());
   const ranged = { date_from: period.from, date_to: period.to };
@@ -142,7 +144,8 @@ export default function ReportsPage() {
     body = ds.data.rows.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">No bills with a doctor in this period. Choose the doctor on a bill to see it here.</p> : <MoneyTable rows={ds.data.rows} cols={dsCols} />;
   }
 
-  const groups = [...new Set(REPORTS.map((r) => r.group))];
+  const shown = REPORTS.filter((r) => pharmacy || r.group !== "Pharmacy");
+  const groups = [...new Set(shown.map((r) => r.group))];
   return (
     <>
       <PageHeader title="Reports" description="Statements and registers, straight from the books."
@@ -151,7 +154,7 @@ export default function ReportsPage() {
         <nav className="space-y-4" aria-label="Reports">
           {groups.map((g) => (
             <div key={g}><p className="px-2 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{g}</p>
-              {REPORTS.filter((r) => r.group === g).map((r) => (
+              {shown.filter((r) => r.group === g).map((r) => (
                 <button key={r.id} type="button" onClick={() => setReport(r.id)}
                   className={cn("block w-full rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent", report === r.id && "bg-sidebar-active font-medium text-primary")}>{r.label}</button>
               ))}</div>

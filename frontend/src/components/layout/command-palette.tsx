@@ -10,6 +10,7 @@ import { visibleNav } from "@/components/layout/nav";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useBusiness } from "@/hooks/use-business";
+import { useModules } from "@/hooks/use-modules";
 import { useDebounced } from "@/hooks/use-debounce";
 import { api, type Page } from "@/lib/api";
 import { money } from "@/lib/format";
@@ -19,6 +20,7 @@ import { DOC_LABEL, type DocumentSummary, type Party, type Product } from "@/lib
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const router = useRouter();
   const { base, id, can, canAny, isOwner } = useBusiness();
+  const { enabled: modules } = useModules();
   const { resolvedTheme, setTheme } = useTheme();
   const [q, setQ] = useState("");
   const term = useDebounced(q.trim(), 200);
@@ -87,7 +89,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                   </CommandItem>
                 </CommandGroup>
                 <CommandGroup heading="Go to">
-                  {visibleNav(can, isOwner).map((n) => (
+                  {visibleNav(can, isOwner, modules).map((n) => (
                     <CommandItem key={n.href} onSelect={() => go(n.href)}>
                       <n.icon /> {n.label}{n.shortcut && <CommandShortcut>G {n.shortcut.toUpperCase()}</CommandShortcut>}
                     </CommandItem>

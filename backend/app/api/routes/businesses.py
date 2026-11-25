@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, status
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.api.deps import DB, Access, AnyPrincipal, OwnerPrincipal, require
 from app.api.schemas import (
@@ -17,9 +18,12 @@ from app.api.schemas import (
     FinancialYearOut,
 )
 from app.core.clock import local_today
+from app.core.errors import ValidationFailed
 from app.modules.access.service import BusinessAccess
+from app.modules.audit import service as audit
 from app.modules.businesses import service
 from app.modules.businesses.models import BusinessStatus
+from app.modules.businesses.modules import BY_KEY, MODULES, enabled_modules
 
 router = APIRouter(prefix="/businesses", tags=["businesses"])
 
@@ -49,6 +53,42 @@ def create_business(body: BusinessCreateIn, p: OwnerPrincipal, db: DB) -> Busine
 @router.get("/{business_id}", response_model=BusinessOut)
 def get_business(access: Annotated[BusinessAccess, Depends(require("business.view"))]) -> BusinessOut:
     return BusinessOut.model_validate(access.business)
+
+
+class ModulesIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    modules: dict[str, bool] = Field(description="Module key -> on/off; keys not sent keep their setting")
+
+
+def _modules_out(settings: dict | None) -> dict[str, Any]:
+    on = enabled_modules(settings)
+    return {"modules": [{"key": m.key, "label": m.label, "description": m.description, "enabled": on[m.key],
+                         "default": m.default} for m in MODULES], "enabled": on}
+
+
+@router.get("/{business_id}/modules")
+def get_modules(access: Annotated[BusinessAccess, Depends(require("business.view"))]) -> dict[str, Any]:
+    """Which optional modules this business uses. The core (sales, stock, books, GST) is always on."""
+    return _modules_out(access.business.settings)
+
+
+@router.put("/{business_id}/modules")
+def set_modules(body: ModulesIn, access: Annotated[BusinessAccess, Depends(require("business.settings"))],
+                db: DB) -> dict[str, Any]:
+    unknown = sorted(set(body.modules) - set(BY_KEY))
+    if unknown:
+        raise ValidationFailed(f"Unknown module: {', '.join(unknown)}")
+    business = access.business
+    before = enabled_modules(business.settings)
+    stored = {**((business.settings or {}).get("modules") or {}), **body.modules}
+    business.settings = {**(business.settings or {}), "modules": stored}
+    after = enabled_modules(business.settings)
+    changed = {k: {"before": before[k], "after": after[k]} for k in after if before[k] != after[k]}
+    if changed:
+        audit.record(db, action="business.modules_updated", entity_type="business", entity_id=business.id,
+                     business_id=business.id, actor_id=access.user.id, changes=changed)
+    db.commit()
+    return _modules_out(business.settings)
 
 
 @router.patch("/{business_id}", response_model=BusinessOut)
