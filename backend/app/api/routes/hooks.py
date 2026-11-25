@@ -7,13 +7,15 @@ Responses reveal nothing about the business.
 
 from __future__ import annotations
 
+import html
+import json
 import uuid
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from app.api.deps import DB
-from app.core.errors import NotAuthenticated, NotFound
+from app.core.errors import AppError, NotAuthenticated, NotFound
 from app.modules.integrations import outbox, sync
 from app.modules.integrations import service as svc
 from app.modules.integrations.base import IntegrationError, same
@@ -38,11 +40,42 @@ async def _body(request: Request) -> bytes:
     return body
 
 
+def _oauth_page(ok: bool, message: str, back: str | None) -> HTMLResponse:
+    title = "Google is connected" if ok else "Google was not connected"
+    link = f'<p><a href="{html.escape(back)}">Back to Integrations</a></p>' if back else ""
+    colour = "#15803d" if ok else "#b91c1c"
+    script = f'<script>setTimeout(function(){{location.href={json.dumps(back)}}},2500)</script>' if ok and back else ""
+    body = (f'<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>{title}</title><body style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1rem">'
+            f'<h2 style="color:{colour}">{title}</h2><p>{html.escape(message)}</p>{link}{script}</body>')
+    return HTMLResponse(body, status_code=200 if ok else 400)
+
+
 @router.get("/google/oauth/callback", response_class=HTMLResponse)
-def google_callback(db: DB, code: str = Query(max_length=2000), state: str = Query(max_length=2000)) -> HTMLResponse:
-    svc.google_callback(db, code=code, state=state)
-    db.commit()
-    return HTMLResponse("<h3>Google is connected.</h3><p>You can close this window.</p>")
+def google_callback(db: DB, code: str | None = Query(None, max_length=2000), state: str | None = Query(None, max_length=2000),
+                    error: str | None = Query(None, max_length=200)) -> HTMLResponse:
+    """Where Google sends the browser back. Always answers with a readable page, never raw JSON."""
+    back = None
+    if state:
+        try:
+            ru = svc.decode_state(state).get("ru") or svc.oauth_redirect_uri()
+            back = ru.removesuffix(svc.CALLBACK_PATH) + "/integrations"
+        except AppError:
+            pass
+    if error or not code or not state:
+        reason = {"access_denied": "You cancelled on Google's screen, or this Google account is not a test user "
+                                   "of the app (OAuth consent screen → Test users)."}.get(error or "", error or "Google sent no code.")
+        return _oauth_page(False, reason, back)
+    try:
+        svc.google_callback(db, code=code, state=state)
+        db.commit()
+    except (AppError, IntegrationError) as exc:
+        db.rollback()
+        msg = getattr(exc, "message", str(exc))
+        if "redirect_uri_mismatch" in msg or "invalid_grant" in msg:
+            msg += " — check that the Authorized redirect URI in Google Cloud matches the one shown in the ERP exactly."
+        return _oauth_page(False, msg, back)
+    return _oauth_page(True, "Gmail sending and Drive backups can now be used. Taking you back…", back)
 
 
 @router.get("/whatsapp_cloud/{integration_id}", response_class=PlainTextResponse)

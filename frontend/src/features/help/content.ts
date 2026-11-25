@@ -877,7 +877,19 @@ export const HELP: HelpTopic[] = [
   {
     id: "integrations", title: "Integrations", group: "Workspace", routes: ["/integrations"],
     summary: "Connect e-mail, WhatsApp, SMS, payment gateways, Google Drive backup and online stores.",
-    sections: [{ heading: "Connect", steps: ["Integrations → pick the provider → Connect → enter its keys or Authorise with Google → Test.", "Logs show every call if something fails."] }],
+    sections: [
+      { heading: "Connect", steps: ["Integrations → pick the provider → Connect → enter its keys → Test.", "Activity shows every call if something fails."] },
+      { heading: "Google (Gmail and Drive)", steps: [
+        "Integrations → Google Workspace → Connect. The dialog shows the Authorized JavaScript origin and Authorized redirect URI for the address you opened the ERP at — tap to copy.",
+        "In console.cloud.google.com: enable Gmail API and Google Drive API, set up the OAuth consent screen (add your Gmail as a Test user while it is in Testing), then Credentials → OAuth client ID → Web application, and paste both values.",
+        "Copy the Client ID and secret back into the ERP and press Connect: Google opens in the same tab; allow access and you come back to Integrations, connected.",
+        "Open the ERP the same way every time (e.g. always http://localhost:3000, or always your https domain): Google only accepts the exact addresses you entered.",
+      ] },
+      { heading: "Disconnect, reconnect, remove", steps: [
+        "Disconnect deletes the stored keys (and withdraws access at Google). The card stays, with Reconnect to enter keys again.",
+        "Remove takes it off the list (disconnecting first). If messages were sent through it, the history is kept and only the card disappears.",
+      ] },
+    ],
   },
   {
     id: "developer", title: "Developer API and webhooks", group: "Workspace", routes: ["/developer"],

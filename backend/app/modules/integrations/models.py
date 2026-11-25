@@ -46,6 +46,8 @@ class Integration(UUIDPrimaryKey, Timestamps, Base):
     last_tested_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     last_synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     last_error: Mapped[str | None] = mapped_column(String(500))
+    # Removed by the user but kept because messages / payments point at it; hidden from lists.
+    removed_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
     created_by_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 

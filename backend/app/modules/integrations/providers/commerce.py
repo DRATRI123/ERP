@@ -28,8 +28,9 @@ GOOGLE = register(ProviderSpec(
             Field("client_secret", "OAuth client secret", secret=True),
             Field("drive_folder_id", "Drive folder for backups", required=False)),
     capabilities=("send_email", "drive_backup"), oauth=True,
-    docs="Google Cloud Console → APIs & Services: enable Gmail API and Drive API, create an OAuth "
-         "client (Web application) and add the redirect URI shown after connecting.",
+    docs="Google Cloud Console → APIs & Services: enable Gmail API and Google Drive API, set up the OAuth "
+         "consent screen, then Credentials → Create OAuth client ID → Web application, and paste the "
+         "Authorized JavaScript origin and Authorized redirect URI shown here.",
 ))
 SCOPES = ["https://www.googleapis.com/auth/gmail.send", "https://www.googleapis.com/auth/drive.file"]
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -62,6 +63,12 @@ def google_access_token(creds: dict[str, Any]) -> str:
                                             "refresh_token": creds["refresh_token"], "grant_type": "refresh_token"}),
                     what="Google token refresh")
     return tok["access_token"]
+
+
+def google_revoke(token: str) -> None:
+    """Withdraw the ERP's access in the Google account (also removes it from 'Third-party apps')."""
+    with http_client() as c:
+        c.post("https://oauth2.googleapis.com/revoke", data={"token": token})
 
 
 def google_test(config: dict[str, Any], creds: dict[str, Any]) -> str:

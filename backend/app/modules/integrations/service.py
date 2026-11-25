@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import urlsplit
 
 import jwt
 from sqlalchemy import select
@@ -52,13 +54,60 @@ def webhook_url(integration: Integration) -> str | None:
     return f"{get_settings().public_base_url.rstrip('/')}/api/v1/hooks/{integration.provider}/{integration.id}"
 
 
-def oauth_redirect_uri() -> str:
-    return f"{get_settings().public_base_url.rstrip('/')}/api/v1/hooks/google/oauth/callback"
+log = logging.getLogger(__name__)
+CALLBACK_PATH = "/api/v1/hooks/google/oauth/callback"
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+
+
+def _trusted_origin(origin: str | None) -> str | None:
+    """The address the ERP is opened at, if this server answers to it. Next.js (local runs) and
+    Caddy (production) both pass /api/v1 to the API, so the callback works on that same origin."""
+    if not origin:
+        return None
+    p = urlsplit(origin.strip())
+    if p.scheme not in ("http", "https") or not p.hostname or p.path not in ("", "/") or p.query or p.username:
+        return None
+    s = get_settings()
+    trusted = {urlsplit(s.public_base_url).hostname, *(h.lower() for h in s.allowed_hosts),
+               *(urlsplit(o).hostname for o in s.cors_origins)}
+    host = p.hostname.lower()
+    if host in LOCAL_HOSTS or host in trusted:
+        return f"{p.scheme}://{p.netloc}".lower()
+    return None
+
+
+def oauth_origin(origin: str | None = None) -> str:
+    return _trusted_origin(origin) or get_settings().public_base_url.rstrip("/")
+
+
+def oauth_redirect_uri(origin: str | None = None) -> str:
+    return f"{oauth_origin(origin)}{CALLBACK_PATH}"
+
+
+def oauth_setup(origin: str | None) -> dict[str, Any]:
+    """What to enter in Google Cloud Console → Credentials → OAuth client (Web application)."""
+    base = oauth_origin(origin)
+    p = urlsplit(base)
+    host = (p.hostname or "").lower()
+    warnings = []
+    if p.scheme != "https" and host not in LOCAL_HOSTS:
+        warnings.append("Google accepts plain http only for localhost. Open the ERP on https (your domain) "
+                        "or on http://localhost on this computer to connect Google.")
+    if host.replace(".", "").isdigit() and host not in LOCAL_HOSTS:
+        warnings.append("Google does not accept an IP address here. Use a domain name, or localhost on this computer.")
+    if host.endswith((".local", ".lan", ".internal")):
+        warnings.append("Google needs a public domain name (or localhost); local network names are refused.")
+    if origin and _trusted_origin(origin) is None:
+        warnings.append(f"This server is not set up for {origin}; the address from ERP_PUBLIC_BASE_URL is shown. "
+                        "Add the domain to ERP_ALLOWED_HOSTS / ERP_PUBLIC_BASE_URL.")
+    return {"javascript_origins": [base], "redirect_uris": [f"{base}{CALLBACK_PATH}"], "warnings": warnings,
+            "scopes": list(commerce.SCOPES),
+            "apis": ["Gmail API", "Google Drive API"]}
 
 
 def get_integration(db: Session, access: BusinessAccess, iid: uuid.UUID) -> Integration:
     i = db.get(Integration, iid)
-    if i is None or i.business_id != access.business.id:
+    if i is None or i.business_id != access.business.id or i.removed_at is not None:
         raise NotFound("Integration not found")
     return i
 
@@ -116,8 +165,10 @@ def connect(db: Session, access: BusinessAccess, *, provider: str, name: str, co
     access.require("integrations.manage")
     sp = spec(provider)
     _validate(db, access, sp, config, creds, partial=False)
-    if db.scalar(select(Integration.id).where(Integration.business_id == access.business.id,
-                                              Integration.name == name)):
+    same = db.scalar(select(Integration).where(Integration.business_id == access.business.id, Integration.name == name))
+    if same is not None:
+        if same.status == IntegrationStatus.DISCONNECTED:
+            raise Conflict(f"{name!r} is already in the list (disconnected). Use Reconnect on it, or Remove it first.")
         raise Conflict(f"An integration named {name!r} already exists")
     i = Integration(business_id=access.business.id, provider=provider, name=name, config=config,
                     credentials_encrypted=encrypt_json(creds), credentials_rotated_at=datetime.now(UTC),
@@ -169,40 +220,82 @@ def test_connection(db: Session, access: BusinessAccess, i: Integration) -> tupl
 
 
 def disconnect(db: Session, access: BusinessAccess, i: Integration) -> Integration:
-    """Stop using the integration and destroy its stored secrets. History stays."""
+    """Stop using the integration and destroy its stored secrets. History stays. Works from any
+    state (pending, error, connected) and again on an already-disconnected one. For Google the
+    refresh token is also revoked at Google (best effort: a failure there never blocks this)."""
     access.require("integrations.manage")
+    if i.provider == "google" and i.credentials_encrypted:
+        try:
+            token = decrypt_json(i.credentials_encrypted).get("refresh_token")
+            if token:
+                commerce.google_revoke(token)
+        except Exception as exc:  # noqa: BLE001 - offline, already revoked, or unreadable: still disconnect
+            log.warning("Google token revoke failed for integration %s: %s", i.id, exc)
     i.status = IntegrationStatus.DISCONNECTED
     i.credentials_encrypted = None
+    i.last_error = None
     _record(db, access, "integration.disconnected", i)
     return i
+
+
+def remove(db: Session, access: BusinessAccess, i: Integration) -> str:
+    """Delete the integration (disconnecting it first). If messages, payment links or synced
+    orders still point at it, it is hidden instead and its name freed, so history stays intact."""
+    access.require("integrations.manage")
+    from sqlalchemy import exists
+
+    from app.modules.integrations.models import GatewayPayment, OutboundMessage, PaymentLink
+
+    if i.status != IntegrationStatus.DISCONNECTED or i.credentials_encrypted:
+        disconnect(db, access, i)
+    used = any(db.scalar(select(exists().where(m.integration_id == i.id)))
+               for m in (OutboundMessage, PaymentLink, GatewayPayment))
+    _record(db, access, "integration.removed", i, {"kept_for_history": used})
+    if used:
+        i.removed_at = datetime.now(UTC)
+        i.name = f"{i.name[:60]} · removed {i.id.hex[:6]}"
+        return "hidden"
+    db.delete(i)
+    db.flush()
+    return "deleted"
 
 
 # ---------------------------------------------------------------------------- Google OAuth
 
 
-def _state_token(i: Integration) -> str:
-    claims = {"iid": str(i.id), "aud": "google-oauth", "exp": datetime.now(UTC) + timedelta(minutes=15)}
+def _state_token(i: Integration, redirect_uri: str) -> str:
+    claims = {"iid": str(i.id), "aud": "google-oauth", "exp": datetime.now(UTC) + timedelta(minutes=15),
+              "ru": redirect_uri}
     return jwt.encode(claims, get_settings().secret_key, algorithm="HS256")
 
 
-def google_consent_url(db: Session, access: BusinessAccess, i: Integration) -> str:
+def google_consent_url(db: Session, access: BusinessAccess, i: Integration, origin: str | None = None) -> str:
     access.require("integrations.manage")
     if i.provider != "google":
         raise ValidationFailed("Only Google integrations use OAuth consent")
-    return commerce.google_auth_url(credentials(i), redirect_uri=oauth_redirect_uri(), state=_state_token(i))
+    if i.status == IntegrationStatus.DISCONNECTED or not i.credentials_encrypted:
+        raise Conflict("This integration is disconnected — use Reconnect to enter the client ID and secret again")
+    ru = oauth_redirect_uri(origin)
+    return commerce.google_auth_url(credentials(i), redirect_uri=ru, state=_state_token(i, ru))
+
+
+def decode_state(state: str) -> dict[str, Any]:
+    try:
+        return jwt.decode(state, get_settings().secret_key, algorithms=["HS256"], audience="google-oauth")
+    except jwt.PyJWTError as exc:
+        raise ValidationFailed("The authorisation link expired or was tampered with; start again") from exc
 
 
 def google_callback(db: Session, *, code: str, state: str) -> Integration:
-    try:
-        claims = jwt.decode(state, get_settings().secret_key, algorithms=["HS256"], audience="google-oauth")
-    except jwt.PyJWTError as exc:
-        raise ValidationFailed("The authorisation link expired or was tampered with; start again") from exc
+    claims = decode_state(state)
     i = db.get(Integration, uuid.UUID(claims["iid"]))
     if i is None or i.provider != "google":
         raise NotFound("Integration not found")
+    if i.status == IntegrationStatus.DISCONNECTED or not i.credentials_encrypted:
+        raise Conflict("This integration was disconnected meanwhile; reconnect it and try again")
     with CallLog(db, i, "oauth_exchange"):
         creds = credentials(i)
-        tok = commerce.google_exchange_code(creds, code=code, redirect_uri=oauth_redirect_uri())
+        tok = commerce.google_exchange_code(creds, code=code, redirect_uri=claims.get("ru") or oauth_redirect_uri())
         i.credentials_encrypted = encrypt_json({**creds, "refresh_token": tok["refresh_token"]})
     i.status = IntegrationStatus.CONNECTED
     i.credentials_rotated_at = datetime.now(UTC)

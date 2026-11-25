@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  CheckCircle2Icon, CircleAlertIcon, CopyIcon, CreditCardIcon, ExternalLinkIcon, Loader2Icon, MailIcon, MessageCircleIcon,
+  CheckCircle2Icon, CircleAlertIcon, CopyIcon, SettingsIcon, Trash2Icon, TriangleAlertIcon, CreditCardIcon, ExternalLinkIcon, Loader2Icon, MailIcon, MessageCircleIcon,
   MessageSquareIcon, PlugZapIcon, ShoppingBagIcon, type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
@@ -46,10 +46,13 @@ export default function IntegrationsPage() {
     onSuccess: () => { toast.success("Disconnected — stored credentials were deleted"); qc.invalidateQueries({ queryKey: ["biz", id] }); },
     onError: (e: ApiError) => toast.error(e.message),
   });
-  async function consent(i: Integration) {
-    try { const r = await api<{ consent_url: string }>(`${base}/integrations/${i.id}/consent-url`); window.open(r.consent_url, "_blank", "noopener"); }
-    catch (e) { toast.error((e as ApiError).message); }
-  }
+  const remove = useMutation({
+    mutationFn: (i: Integration) => api<{ result: string }>(`${base}/integrations/${i.id}`, { method: "DELETE" }),
+    onSuccess: (r) => { toast.success(r.result === "hidden" ? "Removed (its message history is kept)" : "Removed"); qc.invalidateQueries({ queryKey: ["biz", id] }); },
+    onError: (e: ApiError) => toast.error(e.message),
+  });
+  const [reconnect, setReconnect] = useState<Integration | null>(null);
+  const [setupFor, setSetupFor] = useState<Integration | null>(null);
   const categories = [...new Set((providers.data ?? []).map((p) => p.category))];
 
   return (
@@ -77,10 +80,18 @@ export default function IntegrationsPage() {
                           {i.webhook_url}<CopyIcon className="size-3 shrink-0" /></button></div>
                     )}
                     <div className="flex flex-wrap gap-2">
-                      {i.provider === "google" && i.status !== "connected" && <Button size="sm" onClick={() => consent(i)}><ExternalLinkIcon /> Authorise with Google</Button>}
-                      <Button size="sm" variant="outline" onClick={() => test.mutate(i)} disabled={test.isPending}>{test.isPending && test.variables?.id === i.id ? <Loader2Icon className="animate-spin" /> : null}Test</Button>
+                      {i.status === "disconnected" ? <>
+                        <Button size="sm" onClick={() => setReconnect(i)}><PlugZapIcon /> Reconnect</Button>
+                      </> : <>
+                        {i.provider === "google" && i.status !== "connected" && <Button size="sm" onClick={() => consent(base, i)}><ExternalLinkIcon /> Authorise with Google</Button>}
+                        <Button size="sm" variant="outline" onClick={() => test.mutate(i)} disabled={test.isPending}>{test.isPending && test.variables?.id === i.id ? <Loader2Icon className="animate-spin" /> : null}Test</Button>
+                      </>}
+                      {i.provider === "google" && <Button size="sm" variant="outline" onClick={() => setSetupFor(i)}><SettingsIcon /> Google setup</Button>}
                       <Button size="sm" variant="outline" onClick={() => setLogsFor(i)}>Activity</Button>
-                      <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { if (confirm(`Disconnect ${i.name}?`)) disconnect.mutate(i); }}>Disconnect</Button>
+                      {i.status !== "disconnected" && <Button size="sm" variant="ghost" className="text-destructive" disabled={disconnect.isPending}
+                        onClick={() => { if (confirm(`Disconnect ${i.name}? Its stored keys are deleted${i.provider === "google" ? " and access is withdrawn at Google" : ""}.`)) disconnect.mutate(i); }}>Disconnect</Button>}
+                      <Button size="sm" variant="ghost" className="text-destructive" disabled={remove.isPending}
+                        onClick={() => { if (confirm(`Remove ${i.name} from the list?${i.status !== "disconnected" ? " It will be disconnected first." : ""}`)) remove.mutate(i); }}><Trash2Icon /> Remove</Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -112,6 +123,13 @@ export default function IntegrationsPage() {
         );
       })}
       {connect && <ConnectDialog provider={connect} onClose={() => setConnect(null)} />}
+      {reconnect && providers.data && <ReconnectDialog integration={reconnect} provider={providers.data.find((p) => p.code === reconnect.provider)!} onClose={() => setReconnect(null)} />}
+      <Dialog open={!!setupFor} onOpenChange={(v) => !v && setSetupFor(null)}>
+        <DialogContent wide>
+          <DialogHeader><DialogTitle>Google Cloud setup</DialogTitle><DialogDescription>Enter these exactly in your OAuth client, then press Authorise with Google.</DialogDescription></DialogHeader>
+          <GoogleSetup />
+        </DialogContent>
+      </Dialog>
       <Dialog open={!!logsFor} onOpenChange={(v) => !v && setLogsFor(null)}>
         <DialogContent wide>
           <DialogHeader><DialogTitle>{logsFor?.name} — activity</DialogTitle></DialogHeader>
@@ -149,12 +167,12 @@ function ConnectDialog({ provider, onClose }: { provider: Provider; onClose: () 
     mutationFn: () => {
       const config: Record<string, string> = {}, credentials: Record<string, string> = {};
       for (const f of provider.fields) if (values[f.name]) (f.secret ? credentials : config)[f.name] = values[f.name]!;
-      return api<Integration & { consent_url?: string }>(`${base}/integrations`, { body: { provider: provider.code, name, config, credentials } });
+      return api<Integration & { consent_url?: string }>(`${base}/integrations`, { query: { origin: window.location.origin }, body: { provider: provider.code, name, config, credentials } });
     },
     onSuccess: (i) => {
       qc.invalidateQueries({ queryKey: ["biz", id] });
+      if (i.consent_url) { toast.success("Saved — now sign in to Google and allow access"); window.location.assign(i.consent_url); return; }
       toast.success(`${i.name} added`);
-      if (i.consent_url) window.open(i.consent_url, "_blank", "noopener");
       onClose();
     },
     onError: (e: ApiError) => toast.error(e.message),
@@ -162,9 +180,10 @@ function ConnectDialog({ provider, onClose }: { provider: Provider; onClose: () 
   const missing = provider.fields.some((f) => f.required && !values[f.name]);
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
+      <DialogContent wide={provider.oauth}>
         <DialogHeader><DialogTitle>Connect {provider.label}</DialogTitle><DialogDescription>{provider.docs}</DialogDescription></DialogHeader>
         <div className="grid gap-4">
+          {provider.oauth && <GoogleSetup />}
           <Field label="Name in the ERP"><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
           {provider.fields.map((f) => (
             <Field key={f.name} label={f.label} required={f.required} hint={f.help || (f.secret ? "Encrypted at rest; never displayed again" : undefined)}>
@@ -175,6 +194,82 @@ function ConnectDialog({ provider, onClose }: { provider: Provider; onClose: () 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button disabled={missing || !name || save.isPending} onClick={() => save.mutate()}>{save.isPending && <Loader2Icon className="animate-spin" />} Connect</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Send this tab to Google's consent screen; Google returns to the ERP's callback, which comes back here. */
+async function consent(base: string, i: Integration) {
+  try {
+    const r = await api<{ consent_url: string }>(`${base}/integrations/${i.id}/consent-url`, { query: { origin: window.location.origin } });
+    window.location.assign(r.consent_url);
+  } catch (e) { toast.error((e as ApiError).message); }
+}
+
+function CopyRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1"><p className="text-xs font-medium">{label}</p>
+      <button type="button" className="flex w-full items-center justify-between gap-2 rounded-md border bg-card px-2 py-1.5 text-left font-mono text-xs break-all hover:bg-accent"
+        onClick={() => { void navigator.clipboard.writeText(value); toast.success("Copied"); }}>{value}<CopyIcon className="size-3.5 shrink-0" /></button></div>
+  );
+}
+
+/** The exact values Google Cloud Console asks for, for the address this ERP is open at. */
+function GoogleSetup() {
+  const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
+  const setup = useBizQuery<{ javascript_origins: string[]; redirect_uris: string[]; warnings: string[]; scopes: string[]; apis: string[] }>(
+    ["google-setup", origin], "/integrations/google-setup", { origin });
+  if (setup.isLoading) return <Skeleton className="h-40" />;
+  if (!setup.data) return null;
+  const d = setup.data;
+  return (
+    <div className="space-y-3 rounded-lg border bg-muted/40 p-3 text-sm">
+      <ol className="list-decimal space-y-1 pl-5 text-muted-foreground">
+        <li>console.cloud.google.com → APIs &amp; Services → Library: enable <b>{d.apis.join(" and ")}</b>.</li>
+        <li>OAuth consent screen: External (or Internal for Workspace). While it is in Testing, add your Gmail under <b>Test users</b>.</li>
+        <li>Credentials → Create credentials → OAuth client ID → <b>Web application</b>, and paste:</li>
+      </ol>
+      {d.javascript_origins.map((o) => <CopyRow key={o} label="Authorized JavaScript origins" value={o} />)}
+      {d.redirect_uris.map((u) => <CopyRow key={u} label="Authorized redirect URIs" value={u} />)}
+      <p className="text-xs text-muted-foreground">4. Copy the Client ID and Client secret Google shows into the fields below. Changes in Google can take a few minutes to apply.</p>
+      {d.warnings.map((w) => <p key={w} className="flex gap-1.5 text-xs text-amber-700 dark:text-warning"><TriangleAlertIcon className="mt-0.5 size-3.5 shrink-0" />{w}</p>)}
+    </div>
+  );
+}
+
+function ReconnectDialog({ integration, provider, onClose }: { integration: Integration; provider: Provider; onClose: () => void }) {
+  const { base, id } = useBusiness();
+  const qc = useQueryClient();
+  const secrets = provider.fields.filter((f) => f.secret);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const save = useMutation({
+    mutationFn: () => api<Integration>(`${base}/integrations/${integration.id}/credentials`, { body: values }),
+    onSuccess: async (i) => {
+      qc.invalidateQueries({ queryKey: ["biz", id] });
+      if (i.provider === "google") { toast.success("Keys saved — now allow access in Google"); await consent(base, i); return; }
+      toast.success(`${i.name} reconnected`);
+      onClose();
+    },
+    onError: (e: ApiError) => toast.error(e.message),
+  });
+  const missing = secrets.some((f) => f.required && !values[f.name]);
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent wide={provider.oauth}>
+        <DialogHeader><DialogTitle>Reconnect {integration.name}</DialogTitle><DialogDescription>The old keys were deleted when it was disconnected. Enter them again.</DialogDescription></DialogHeader>
+        <div className="grid gap-4">
+          {provider.oauth && <GoogleSetup />}
+          {secrets.map((f) => (
+            <Field key={f.name} label={f.label} required={f.required}>
+              <Input type="password" autoComplete="off" value={values[f.name] ?? ""} onChange={(e) => setValues({ ...values, [f.name]: e.target.value })} />
+            </Field>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button disabled={missing || save.isPending} onClick={() => save.mutate()}>{save.isPending && <Loader2Icon className="animate-spin" />} {provider.oauth ? "Save & authorise" : "Reconnect"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

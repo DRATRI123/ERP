@@ -377,6 +377,82 @@ def test_msg91_sms(ishop, fake, db):
 # ---------------------------------------------------------------------------- Google
 
 
+def test_google_setup_values_origin_cancel_disconnect_and_remove(ishop, fake, db):
+    from urllib.parse import parse_qs, urlparse
+
+    setup = ishop.get("/integrations/google-setup", origin="http://localhost:3000")
+    assert setup["javascript_origins"] == ["http://localhost:3000"]
+    assert setup["redirect_uris"] == ["http://localhost:3000/api/v1/hooks/google/oauth/callback"]
+    assert setup["warnings"] == []
+    odd = ishop.get("/integrations/google-setup", origin="https://evil.example")  # not this server: fall back
+    assert odd["redirect_uris"] == ["https://erp.test/api/v1/hooks/google/oauth/callback"] and odd["warnings"]
+    lan = ishop.get("/integrations/google-setup", origin="http://192.168.1.5:3000")
+    assert lan["redirect_uris"][0].startswith("https://erp.test")  # not a host this server answers to
+    assert ishop.get("/integrations/google-setup", origin="http://127.0.0.1:3000")["warnings"] == []
+
+    r = ishop.post("/integrations?origin=http://localhost:3000", {"provider": "google", "name": "Google", "config": {},
+                   "credentials": {"client_id": "cid", "client_secret": "sec"}})
+    assert r["oauth_redirect_uri"] == "http://localhost:3000/api/v1/hooks/google/oauth/callback"
+    q = parse_qs(urlparse(r["consent_url"]).query)
+    assert q["redirect_uri"] == ["http://localhost:3000/api/v1/hooks/google/oauth/callback"]
+
+    cancelled = ishop.api.c.get("/api/v1/hooks/google/oauth/callback", params={"error": "access_denied", "state": q["state"][0]})
+    assert cancelled.status_code == 400 and "cancelled" in cancelled.text
+    assert "http://localhost:3000/integrations" in cancelled.text  # link back to the ERP
+
+    seen: dict = {}
+
+    def token(req: httpx.Request) -> dict:
+        seen.update(parse_qs(req.content.decode()))
+        return {"access_token": "at", "refresh_token": "rt-1"}
+
+    fake.on("POST", "https://oauth2.googleapis.com/token", token)
+    fake.on("POST", "https://oauth2.googleapis.com/revoke", lambda req: {})
+    ok = ishop.api.c.get("/api/v1/hooks/google/oauth/callback", params={"code": "c", "state": q["state"][0]})
+    assert ok.status_code == 200 and "Google is connected" in ok.text
+    assert seen["redirect_uri"] == ["http://localhost:3000/api/v1/hooks/google/oauth/callback"]  # same as consent
+
+    iid = r["id"]
+    out = ishop.post(f"/integrations/{iid}/disconnect", {}, expect=200)
+    assert out["status"] == "disconnected" and not out["has_credentials"]
+    assert b"token=rt-1" in fake.last("https://oauth2.googleapis.com/revoke").content
+    ishop.post(f"/integrations/{iid}/disconnect", {}, expect=200)  # again: still fine
+    r2 = ishop.api.c.get(f"{ishop.base}/integrations/{iid}/consent-url", headers=ishop.h)
+    assert r2.status_code == 409 and "Reconnect" in r2.json()["error"]["message"]
+    dup = ishop.post("/integrations", {"provider": "google", "name": "Google", "config": {},
+                     "credentials": {"client_id": "cid", "client_secret": "sec"}}, expect=409)
+    assert "Remove it first" in dup["error"]["message"]
+
+    back = ishop.post(f"/integrations/{iid}/credentials", {"client_id": "cid2", "client_secret": "sec2"}, expect=200)
+    assert back["status"] == "pending"  # reconnect: authorise again
+    gone = ishop.api.c.delete(f"{ishop.base}/integrations/{iid}", headers=ishop.h)
+    assert gone.status_code == 200 and gone.json()["result"] == "deleted"
+    assert ishop.get("/integrations") == []
+    connect(ishop, "google", {}, {"client_id": "cid", "client_secret": "sec"}, name="Google")  # name free again
+
+    # A pending (never authorised) one can be removed straight away too.
+    p = connect(ishop, "google", {}, {"client_id": "x", "client_secret": "y"}, name="Google 2")
+    assert ishop.api.c.delete(f"{ishop.base}/integrations/{p['id']}", headers=ishop.h).json()["result"] == "deleted"
+
+
+def test_removed_integration_with_history_is_hidden(ishop, fake, db):
+    from app.modules.integrations.models import Integration, OutboundMessage
+
+    from app.modules.integrations.models import MessageChannel, MessageStatus
+
+    r = connect(ishop, "msg91", {"invoice_flow_id": "f"}, {"auth_key": "k"}, name="SMS")
+    db.add(OutboundMessage(business_id=uuid.UUID(ishop.bid), integration_id=uuid.UUID(r["id"]), channel=MessageChannel.SMS,
+                           recipient="9800000000", status=MessageStatus.SENT, variables={}))
+    db.commit()
+    out = ishop.api.c.delete(f"{ishop.base}/integrations/{r['id']}", headers=ishop.h).json()
+    assert out["result"] == "hidden"
+    assert ishop.get("/integrations") == []
+    db.expire_all()
+    i = db.get(Integration, uuid.UUID(r["id"]))
+    assert i.removed_at is not None and i.status.value == "disconnected" and i.credentials_encrypted is None
+    db.rollback()
+    connect(ishop, "msg91", {"invoice_flow_id": "f"}, {"auth_key": "k"}, name="SMS")  # the name is free again
+    assert ishop.api.c.delete(f"{ishop.base}/integrations/{r['id']}", headers=ishop.h).status_code == 404
 def test_google_oauth_gmail_and_drive(ishop, fake, db, smtp):
     from urllib.parse import parse_qs, urlparse
 
@@ -399,7 +475,7 @@ def test_google_oauth_gmail_and_drive(ishop, fake, db, smtp):
 
     fake.on("POST", "https://oauth2.googleapis.com/token", token)
     bad = ishop.api.c.get("/api/v1/hooks/google/oauth/callback", params={"code": "auth-code", "state": "forged"})
-    assert bad.status_code == 422
+    assert bad.status_code == 400 and "expired or was tampered" in bad.text  # a readable page, not JSON
     ok = ishop.api.c.get("/api/v1/hooks/google/oauth/callback", params={"code": "auth-code", "state": q["state"][0]})
     assert ok.status_code == 200
     assert ishop.get("/integrations")[0]["status"] == "connected"

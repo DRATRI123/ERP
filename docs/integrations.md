@@ -28,7 +28,7 @@ the `/test` endpoint after connecting.
 | Provider | What it does | You need |
 |---|---|---|
 | `smtp` | E-mail invoices (PDF attached) | SMTP host/port, username, password. Gmail/Workspace: an **App Password**. Microsoft 365: `smtp.office365.com:587` with SMTP AUTH enabled for the mailbox |
-| `google` | Gmail sending; database backups to Google Drive | Google Cloud project with Gmail API + Drive API enabled, OAuth client (Web), redirect URI `{ERP_PUBLIC_BASE_URL}/api/v1/hooks/google/oauth/callback`. Connect, then open the returned `consent_url` once |
+| `google` | Gmail sending; database backups to Google Drive | Google Cloud project with Gmail API + Drive API enabled, OAuth client (Web), Authorized JavaScript origin = the address the ERP is opened at (e.g. `http://localhost:3000` or `https://erp.example.com`); Authorized redirect URI = that address + `/api/v1/hooks/google/oauth/callback`. Both are shown (copyable) in the connect dialog and via `GET /integrations/google-setup?origin=`. The origin is used only if this server answers to it (localhost, `ERP_PUBLIC_BASE_URL`, `ERP_ALLOWED_HOSTS`, `ERP_CORS_ORIGINS`); otherwise `ERP_PUBLIC_BASE_URL`. The redirect URI travels in the signed state, so the token exchange uses the same one |
 | `whatsapp_cloud` | WhatsApp invoices (PDF) + delivery/read receipts | Meta Business account, WhatsApp phone number ID, permanent access token, app secret, an **approved Utility template** with a DOCUMENT header and body variables {{1}} name, {{2}} number, {{3}} amount. Webhook URL + verify token from the integration |
 | `msg91` | SMS invoice notifications | MSG91 auth key and a **DLT-approved** flow with variables `name`, `number`, `amount`, `link`. `POST …/test-sms?to=` sends one real SMS |
 | `razorpay` | Payment links; paid links become receipts automatically | Key ID/secret, webhook secret; webhook event `payment_link.paid` to the integration's webhook URL; settlement bank account from your chart |
@@ -53,3 +53,15 @@ recorded for review, not applied.
 PhonePe, PayU, WooCommerce, Shiprocket, Outlook via Microsoft Graph, Google Sheets/Contacts/
 Calendar, Tally *import*, pushing stock levels to Shopify, and the no-code automation builder
 (e.g. "send every invoice on WhatsApp automatically") — the queue and connectors it needs exist.
+
+## Disconnect and remove
+
+* `POST /integrations/{id}/disconnect` works from any state (pending, error, connected, already
+  disconnected), deletes the stored secrets and, for Google, revokes the refresh token at Google
+  (best effort — an offline Google never blocks it).
+* A disconnected integration can be reconnected with `POST /integrations/{id}/credentials`.
+* `DELETE /integrations/{id}` disconnects if needed and deletes it. When messages, payment links
+  or gateway payments refer to it, it is hidden instead (`removed_at`, migration 0027) and its
+  name freed so the same name can be connected again.
+* The Google callback always answers with a readable page (cancelled, not a test user, expired
+  link, redirect URI mismatch) with a link back to Integrations, never raw JSON.

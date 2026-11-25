@@ -67,19 +67,35 @@ def providers(_: Manage) -> list[dict[str, Any]]:
 
 @router.get("/integrations")
 def list_integrations(access: Manage, db: DB) -> list[dict[str, Any]]:
-    rows = db.scalars(select(Integration).where(Integration.business_id == access.business.id)
-                      .order_by(Integration.name))
+    rows = db.scalars(select(Integration).where(Integration.business_id == access.business.id,
+                                                Integration.removed_at.is_(None)).order_by(Integration.name))
     return [_out(i) for i in rows]
 
 
+@router.get("/integrations/google-setup")
+def google_setup(_: Manage, origin: str | None = Query(None, max_length=200,
+                                                       description="The address the ERP is open at (window.location.origin)")) -> dict[str, Any]:
+    """The values to paste into Google Cloud Console for the OAuth client."""
+    return svc.oauth_setup(origin)
+
+
+@router.delete("/integrations/{integration_id}")
+def remove_integration(integration_id: uuid.UUID, access: Manage, db: DB) -> dict[str, Any]:
+    """Disconnect (if needed) and remove. Kept hidden when messages or payments refer to it."""
+    result = svc.remove(db, access, svc.get_integration(db, access, integration_id))
+    db.commit()
+    return {"result": result}
+
+
 @router.post("/integrations", status_code=status.HTTP_201_CREATED)
-def connect(body: ConnectIn, access: Manage, db: DB) -> dict[str, Any]:
+def connect(body: ConnectIn, access: Manage, db: DB,
+            origin: str | None = Query(None, max_length=200)) -> dict[str, Any]:
     i = svc.connect(db, access, provider=body.provider, name=body.name, config=body.config, creds=body.credentials)
     db.commit()
     out = _out(i)
     if i.provider == "google":
-        out["oauth_redirect_uri"] = svc.oauth_redirect_uri()
-        out["consent_url"] = svc.google_consent_url(db, access, i)
+        out["oauth_redirect_uri"] = svc.oauth_redirect_uri(origin)
+        out["consent_url"] = svc.google_consent_url(db, access, i, origin)
     return out
 
 
@@ -113,9 +129,10 @@ def disconnect(integration_id: uuid.UUID, access: Manage, db: DB) -> dict[str, A
 
 
 @router.get("/integrations/{integration_id}/consent-url")
-def consent_url(integration_id: uuid.UUID, access: Manage, db: DB) -> dict[str, str]:
+def consent_url(integration_id: uuid.UUID, access: Manage, db: DB,
+                origin: str | None = Query(None, max_length=200)) -> dict[str, str]:
     i = svc.get_integration(db, access, integration_id)
-    return {"consent_url": svc.google_consent_url(db, access, i), "redirect_uri": svc.oauth_redirect_uri()}
+    return {"consent_url": svc.google_consent_url(db, access, i, origin), "redirect_uri": svc.oauth_redirect_uri(origin)}
 
 
 @router.get("/integrations/{integration_id}/logs")
