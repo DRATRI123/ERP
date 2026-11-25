@@ -134,6 +134,23 @@ PostgreSQL.
   gives amounts and due dates. `/ecr.txt` is the EPFO ECR 2.0 file, and
   `/payslips/{employee_id}` a printable payslip. Not covered: surcharge, marginal relief near
   ₹12 lakh, the old regime and its deductions, and Form 16.
+* **Sales follow-through** (migration 0026; modules leads, service, dispatch):
+  * **Leads** (`/leads`): stages new → contacted → qualified → proposal → won / lost (lost needs a
+    reason), a log of calls / visits / WhatsApp with the next follow-up date, a "due today" list,
+    pipeline value per stage, win rate and sources; "won" makes or links the customer (by mobile).
+  * **Warranty / AMC / service** (`/service`, module off by default): products carry
+    `warranty_months`; finalizing a sales invoice registers one warranty per serial (or line),
+    cancelled with the invoice. AMCs are added and renewed (from the day after the old one ends).
+    A service call found by serial is marked covered when a contract runs that day.
+  * **Dispatch** (`/dispatch`): pending → packed → out (vehicle, driver, transporter, LR) →
+    delivered (receiver or a POD photo stored in the document library, optional GPS) or failed
+    (reason). New permission `dispatch.update` (billing operator, branch manager).
+  * **Discount approval:** `settings.discount_limit_percent` caps the highest non-scheme line
+    discount on sales invoices and orders. Above it, finalize returns 409
+    `discount_approval_required`; the biller requests approval, a holder of the new
+    `discounts.approve` permission approves in the app or reads a 6-digit code (HMAC of the
+    request with the server secret, never stored; 15 minutes, five tries) that the biller sends
+    as `discount_code` on finalize.
 * **Stock extras** (migration 0025):
   * **Packs for every business:** a product's "bigger unit" (12 in a box, 25 kg in a bag, 10 in
     a strip) bills as packs + loose; stock and prices stay per base unit.

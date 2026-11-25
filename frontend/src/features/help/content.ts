@@ -420,6 +420,68 @@ export const HELP: HelpTopic[] = [
     related: ["damage"],
   },
   {
+    id: "leads", title: "Leads and follow-ups", group: "Selling", routes: ["/leads"],
+    summary: "Every enquiry until it becomes an order: who to call today, what was said, and the pipeline value.",
+    sections: [
+      { heading: "Work the list", steps: [
+        "Leads & follow-ups → New lead: name, firm, mobile, where it came from, expected value and when to follow up.",
+        "Due today lists everyone to call. Open a lead, tap Call or WhatsApp, then log what was said and the next date (+1d, +3d, +7d).",
+        "Move the stage as it goes: Contacted → Interested → Quotation sent. Lost needs a reason, so you learn why.",
+      ] },
+      { heading: "Won", steps: [
+        "Won — make customer creates the customer (or links the one with the same mobile). Make quotation opens a quotation for them.",
+      ] },
+    ],
+    related: ["customers"],
+  },
+  {
+    id: "service", title: "Service, warranty and AMC", group: "Selling", routes: ["/service"],
+    summary: "Warranty registered on every sale, paid AMCs with renewal reminders, and service calls with who is covered.",
+    sections: [
+      { heading: "Set up", steps: [
+        "Settings → Modules → switch on Service & AMC.",
+        "Edit a product → Warranty (months). Each sale then registers a warranty per serial number (or per line).",
+        "New AMC for maintenance contracts you sell; bill the AMC amount on a normal invoice.",
+      ] },
+      { heading: "Service calls", steps: [
+        "Service call → type the serial number: the warranty or AMC is found and the call is marked covered or chargeable.",
+        "Update → Being fixed / Waiting for parts / Resolved with what was done. Chargeable repairs: make an invoice.",
+        "Renewals due lists AMCs ending in 30 days; Renew starts the next year the day after.",
+      ] },
+    ],
+    related: ["sales"],
+  },
+  {
+    id: "dispatch", title: "Dispatch and proof of delivery", group: "Selling", routes: ["/dispatch"],
+    summary: "Pack, send with a vehicle, and close each delivery with who received it and a photo of the signed copy.",
+    sections: [
+      { heading: "Daily flow", steps: [
+        "Dispatch & delivery → Not dispatched: final invoices and challans of the last 30 days. Add to dispatch.",
+        "Packed, then Send with vehicle number, driver, transporter and LR number.",
+        "On delivery the driver taps Delivered on the phone: receiver's name, photo of the signed bill (camera opens) and location.",
+        "Not delivered with the reason keeps it in the list to send again.",
+      ] },
+    ],
+    tips: ["Give delivery staff the Billing Operator role — it can update deliveries but not change prices."],
+    related: ["sales"],
+  },
+  {
+    id: "discount-approval", title: "Discount approval", group: "Selling", routes: ["/approvals"],
+    summary: "Stop billers giving more discount than allowed without a manager's OK.",
+    sections: [
+      { heading: "Set the limit", steps: [
+        "Settings → Business → Discount limit, e.g. 10 %. Scheme discounts don't count; owners and managers are not limited.",
+      ] },
+      { heading: "When a bill is over the limit", steps: [
+        "Saving the bill asks for approval; it stays as a draft. Ask a manager sends the request.",
+        "The manager opens Discount approvals: Approve there, or read out the 6-digit code shown.",
+        "The biller types the code (or presses Try again after approval) and the bill is saved.",
+        "A code works once, for 15 minutes, and only up to the discount asked.",
+      ] },
+    ],
+    related: ["sales"],
+  },
+  {
     id: "sale-or-return", title: "Sale or return (consignment)", group: "Selling", routes: ["/sale-or-return"],
     summary: "Send goods on a delivery challan; invoice what the customer sells and take back what they don't.",
     sections: [

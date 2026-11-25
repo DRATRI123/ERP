@@ -126,6 +126,8 @@ class CounterPaymentIn(BaseModel):
 
 class FinalizeIn(BaseModel):
     payments: list[CounterPaymentIn] = Field(default_factory=list, max_length=5)
+    discount_code: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^\d{6}$")] | None = Field(
+        None, description="A manager's 6-digit code approving a discount above the limit")
 
 
 class ConvertIn(BaseModel):

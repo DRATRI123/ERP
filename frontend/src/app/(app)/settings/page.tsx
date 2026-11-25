@@ -19,6 +19,7 @@ import { Input, NativeSelect } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchParams } from "next/navigation";
+import { BillingRules } from "@/features/settings/billing-rules";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModulesSettings } from "@/features/settings/modules";
 import { useApiQuery, useBizQuery, useBusiness } from "@/hooks/use-business";
@@ -50,7 +51,7 @@ function SettingsTabs() {
           <TabsTrigger value="modules">Modules</TabsTrigger>
           {isOwner && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
-        <TabsContent value="business"><BusinessProfile editable={isOwner || can("business.settings")} /></TabsContent>
+        <TabsContent value="business"><BusinessProfile editable={isOwner || can("business.settings")} /><BillingRules editable={isOwner || can("business.settings")} /></TabsContent>
         <TabsContent value="branches"><Branches editable={isOwner || can("branches.manage")} /></TabsContent>
         <TabsContent value="numbering"><Numbering editable={isOwner || can("business.settings")} /></TabsContent>
         <TabsContent value="templates">

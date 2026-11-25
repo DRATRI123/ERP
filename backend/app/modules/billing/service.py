@@ -635,7 +635,7 @@ def _stock_movements(db: Session, access: BusinessAccess, doc: Document, spec: D
 
 
 def finalize(db: Session, access: BusinessAccess, doc: Document, *,
-             payments: list[dict[str, Any]] | None = None) -> Document:
+             payments: list[dict[str, Any]] | None = None, discount_code: str | None = None) -> Document:
     spec = spec_of(doc)
     require_for(access, spec, "create")
     if doc.status != DocStatus.DRAFT:
@@ -656,6 +656,10 @@ def finalize(db: Session, access: BusinessAccess, doc: Document, *,
         from app.modules.pharmacy.service import check_prescription
 
         check_prescription(db, doc, access.business.settings)
+    if spec.side == Side.SALES:
+        from app.modules.crm.discounts import check as check_discount
+
+        check_discount(db, access, doc, code=discount_code)
     if doc.doc_type == DocType.PURCHASE_INVOICE:
         if not doc.supplier_invoice_no:
             raise ValidationFailed("Enter the supplier's invoice number")
@@ -715,6 +719,13 @@ def finalize(db: Session, access: BusinessAccess, doc: Document, *,
 
         paid_with_points = sum((Decimal(p["amount"]) for p in (payments or []) if str(p.get("mode")) == "loyalty"), ZERO)
         earn_for_invoice(db, access.business, doc, redeemed_value=paid_with_points, user_id=access.user.id)
+    if doc.doc_type == DocType.SALES_INVOICE:
+        from app.modules.businesses.modules import is_enabled
+
+        if is_enabled(access.business.settings, "service"):
+            from app.modules.crm.service_desk import register_warranties
+
+            register_warranties(db, access.business.id, doc)
     if doc.doc_type == DocType.SALES_INVOICE and party is None and doc.balance_due != 0:
         raise ValidationFailed("A cash sale without a customer must be paid in full")
     if doc.doc_type in (DocType.SALES_INVOICE, DocType.DEBIT_NOTE) and party is not None \
@@ -787,6 +798,9 @@ def cancel(db: Session, access: BusinessAccess, doc: Document, *, reason: str, o
         from app.modules.stockx.loyalty import reverse_for_invoice
 
         reverse_for_invoice(db, access.business, doc, on, user_id=access.user.id)
+        from app.modules.crm.service_desk import cancel_for_document
+
+        cancel_for_document(db, doc)
     doc.status = DocStatus.CANCELLED
     doc.cancelled_at = datetime.now(UTC)
     doc.cancelled_by_id = access.user.id

@@ -7,11 +7,14 @@ import { PageHeader } from "@/components/data/page-header";
 import { DocumentEditor } from "@/features/billing/document-editor";
 
 function Inner() {
-  const draft = useSearchParams().get("draft") ?? undefined;
+  const sp = useSearchParams();
+  const draft = sp.get("draft") ?? undefined;
+  const party = sp.get("party");
+  const preset = { docType: sp.get("type") ?? undefined, party: party ? { id: party, name: sp.get("party_name") ?? "" } : undefined };
   return (
     <>
       <PageHeader title={draft ? "Edit draft" : "New sale"} description="Scan or search items, choose the customer, take payment — done." />
-      <DocumentEditor side="sales" draftId={draft} key={draft ?? "new"} />
+      <DocumentEditor side="sales" draftId={draft} preset={preset} key={draft ?? `new-${preset.docType ?? ""}-${party ?? ""}`} />
     </>
   );
 }

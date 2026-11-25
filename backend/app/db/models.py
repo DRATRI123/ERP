@@ -11,6 +11,7 @@ from app.modules.businesses import models as business_models  # noqa: F401
 from app.modules.catalog import models as catalog_models  # noqa: F401
 from app.modules.claims import models as claim_models  # noqa: F401
 from app.modules.compliance import models as compliance_models  # noqa: F401
+from app.modules.crm import models as crm_models  # noqa: F401
 from app.modules.developer import models as developer_models  # noqa: F401
 from app.modules.digest import models as digest_models  # noqa: F401
 from app.modules.events import models as event_models  # noqa: F401

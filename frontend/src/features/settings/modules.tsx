@@ -10,14 +10,14 @@ import { useBizMutation } from "@/hooks/use-business";
 import { useModules, type ModuleKey } from "@/hooks/use-modules";
 
 type Preset = { label: string; hint: string; on: ModuleKey[] };
-const ALL: ModuleKey[] = ["pharmacy", "cheques", "tds", "interest", "damage", "loyalty", "field", "manufacturing", "pricing", "catalogue", "payroll", "claims", "licences", "automation", "developer"];
+const ALL: ModuleKey[] = ["pharmacy", "cheques", "tds", "interest", "damage", "loyalty", "field", "leads", "service", "dispatch", "manufacturing", "pricing", "catalogue", "payroll", "claims", "licences", "automation", "developer"];
 /** Starting points; every switch can still be changed afterwards. */
 const PRESETS: Preset[] = [
-  { label: "Medical store / pharmacy", hint: "Retail or wholesale chemist", on: ["pharmacy", "cheques", "tds", "damage", "loyalty", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
-  { label: "Manufacturer (Ayurveda, FMCG…)", hint: "Makes and sells its own products", on: ["manufacturing", "field", "damage", "cheques", "tds", "interest", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
-  { label: "Distributor / wholesaler", hint: "Buys and sells to shops", on: ["field", "damage", "cheques", "tds", "interest", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
-  { label: "Retail shop", hint: "Counter billing", on: ["damage", "loyalty", "cheques", "pricing", "catalogue", "payroll", "claims", "automation"] },
-  { label: "Services / clinic / office", hint: "No stock trading", on: ["tds", "payroll", "claims", "licences", "automation"] },
+  { label: "Medical store / pharmacy", hint: "Retail or wholesale chemist", on: ["dispatch", "pharmacy", "cheques", "tds", "damage", "loyalty", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
+  { label: "Manufacturer (Ayurveda, FMCG…)", hint: "Makes and sells its own products", on: ["leads", "dispatch", "manufacturing", "field", "damage", "cheques", "tds", "interest", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
+  { label: "Distributor / wholesaler", hint: "Buys and sells to shops", on: ["leads", "dispatch", "field", "damage", "cheques", "tds", "interest", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
+  { label: "Retail shop", hint: "Counter billing", on: ["service", "damage", "loyalty", "cheques", "pricing", "catalogue", "payroll", "claims", "automation"] },
+  { label: "Services / clinic / office", hint: "No stock trading", on: ["leads", "service", "tds", "payroll", "claims", "licences", "automation"] },
 ];
 
 /** Settings → Modules: each business switches on only what it uses. */

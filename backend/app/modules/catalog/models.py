@@ -139,6 +139,8 @@ class Product(UUIDPrimaryKey, Timestamps, Base):
     # Loose selling: stock and prices are per base unit (tablet); a pack (strip) holds pack_size.
     pack_size: Mapped[Decimal | None] = mapped_column(Quantity())
     pack_label: Mapped[str | None] = mapped_column(String(16))
+    # Months of warranty given on sale; each sale then registers a warranty (Service & AMC).
+    warranty_months: Mapped[int | None] = mapped_column(Integer)
 
     attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

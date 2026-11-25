@@ -135,6 +135,7 @@ class ProductBase(BaseModel):
     rack: Annotated[str, StringConstraints(strip_whitespace=True, max_length=30)] | None = None
     pack_size: QtyIn | None = Field(None, gt=0, description="Stock units in one pack (e.g. 10 tablets per strip)")
     pack_label: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=16)] | None = None
+    warranty_months: Annotated[int, Field(ge=1, le=120)] | None = Field(None, description="Warranty registered on each sale")
 
 
 class ProductIn(ProductBase):
@@ -198,6 +199,7 @@ class ProductOut(ORM):
     drug_schedule: DrugSchedule = DrugSchedule.NONE
     pack_size: Decimal | None = None
     pack_label: str | None = None
+    warranty_months: int | None = None
     attributes: dict[str, Any]
     is_active: bool
     archived_at: datetime | None

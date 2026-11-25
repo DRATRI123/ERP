@@ -184,7 +184,8 @@ def finalize_document(document_id: uuid.UUID, access: Access, db: DB,
                       body: FinalizeIn | None = None) -> DocumentOut:
     """Assign the number, freeze party details, post stock and take counter payments."""
     doc = service.finalize(db, access, service.get_document(db, access, document_id),
-                           payments=[p.model_dump() for p in (body.payments if body else [])])
+                           payments=[p.model_dump() for p in (body.payments if body else [])],
+                           discount_code=body.discount_code if body else None)
     db.commit()
     return _out(doc)
 

@@ -269,6 +269,18 @@ Also:
 * `challan_returns`: unsold goods returned against a delivery challan line, with the stock
   adjustment that brought them back at the cost they left at.
 
+## Leads, service, dispatch and discount approval (migration 0026)
+
+* `leads` and `lead_activities` (stage, expected value, owner, next follow-up; call / visit /
+  WhatsApp / e-mail / meeting / note log).
+* `service_contracts` (warranty or AMC: customer, product, serial, period, visits, amount,
+  invoice and line it came from, renewal link) and `service_tickets` (complaint, covered,
+  status, engineer, resolution, chargeable invoice).
+* `dispatches` (one per invoice / challan: status, packages, vehicle, driver, transporter, LR,
+  times, receiver, POD file, GPS, failure reason).
+* `discount_approvals` (bill, discount asked, limit, status, expiry, tries, who decided).
+* On `products`: `warranty_months`.
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |

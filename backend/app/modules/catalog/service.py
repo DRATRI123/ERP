@@ -21,7 +21,7 @@ PRODUCT_FIELDS = [
     "unit_id", "purchase_price", "selling_price", "wholesale_price", "mrp", "prices_include_tax",
     "gst_rate", "cess_rate", "track_inventory", "batch_tracking", "serial_tracking",
     "reorder_level", "reorder_quantity", "attributes", "is_active",
-    "ptr", "pts", "composition", "rack", "drug_schedule", "pack_size", "pack_label",
+    "ptr", "pts", "composition", "rack", "drug_schedule", "pack_size", "pack_label", "warranty_months",
 ]
 # Changing these after stock has moved would make the stock ledger meaningless.
 _STOCK_LOCKED_FIELDS = {"unit_id", "track_inventory", "batch_tracking", "serial_tracking", "kind"}

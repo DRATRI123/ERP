@@ -36,6 +36,7 @@ const schema = z.object({
   drug_schedule: z.enum(["none", "g", "h", "h1", "x", "narcotic"]),
   pack_size: z.string().regex(/^\d*(\.\d{0,3})?$/, "Enter a number").optional(),
   pack_label: z.string().max(16).optional(),
+  warranty_months: z.string().regex(/^\d{0,3}$/, "Whole months").optional(),
   prices_include_tax: z.boolean(),
   track_inventory: z.boolean(), batch_tracking: z.boolean(), serial_tracking: z.boolean(),
 });
@@ -49,7 +50,9 @@ export const SCHEDULES = [
 export function ProductDialog({ open, onOpenChange, product }: { open: boolean; onOpenChange: (v: boolean) => void; product?: Product }) {
   const { base, id } = useBusiness();
   const qc = useQueryClient();
-  const pharmacy = useModules().on("pharmacy");
+  const modules = useModules();
+  const pharmacy = modules.on("pharmacy");
+  const service = modules.on("service");
   const units = useBizQuery<{ id: string; code: string; name: string }[]>(["units"], "/units", undefined, { enabled: open });
   const cats = useBizQuery<{ id: string; name: string }[]>(["categories"], "/categories", undefined, { enabled: open });
   const n = (v: unknown) => (v === null || v === undefined ? "" : String(Number(v)));
@@ -62,7 +65,7 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
       reorder_level: n(product.reorder_level), prices_include_tax: product.prices_include_tax,
       track_inventory: product.track_inventory, batch_tracking: product.batch_tracking, serial_tracking: product.serial_tracking,
       ptr: n(product.ptr), pts: n(product.pts), composition: (product.composition as string | null) ?? "", rack: (product.rack as string | null) ?? "",
-      drug_schedule: ((product.drug_schedule as string) ?? "none") as Values["drug_schedule"], pack_size: n(product.pack_size), pack_label: (product.pack_label as string | null) ?? "",
+      drug_schedule: ((product.drug_schedule as string) ?? "none") as Values["drug_schedule"], pack_size: n(product.pack_size), pack_label: (product.pack_label as string | null) ?? "", warranty_months: product.warranty_months ? String(product.warranty_months) : "",
     } : undefined,
     defaultValues: { name: "", sku: "", unit_id: "", kind: "goods", gst_rate: "18", prices_include_tax: false, track_inventory: true, batch_tracking: false, serial_tracking: false, drug_schedule: "none" },
   });
@@ -123,6 +126,7 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
               {perPack ? `One ${packLabel || "pack"} = ${Number(packSize)} units = ₹${perPack}. Bill in packs or loose; stock and prices stay per unit.` : "Stock and prices are per base unit. Add a pack to bill by box, case, strip or bag too."}
             </p>
           </fieldset>
+          {service && <Field label="Warranty (months)" error={err.warranty_months?.message} hint="Registered on each sale" className="sm:col-span-2"><Input inputMode="numeric" placeholder="12" {...form.register("warranty_months")} /></Field>}
           <div className="grid gap-3 rounded-lg border p-3 sm:col-span-4 sm:grid-cols-2">
             {([["prices_include_tax", "Prices include GST"], ["track_inventory", "Track stock"], ["batch_tracking", "Batches & expiry"], ["serial_tracking", "Serial numbers"]] as const).map(([k, label]) => (
               <label key={k} className="flex items-center justify-between gap-2 text-sm">{label}

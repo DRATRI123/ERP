@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PartyPicker } from "@/components/pickers/party-picker";
+import { DiscountGate, type DiscountGateInfo } from "@/features/billing/discount-gate";
 import { PartyDialog } from "@/features/parties/party-form";
 import { DoctorSelect, REGISTER_SCHEDULES, RX_SCHEDULES, ScheduleBadge, SubstitutesDialog } from "@/features/pharmacy/pharmacy";
 import { ProductSearch, type ProductSearchHandle } from "@/components/pickers/product-search";
@@ -55,25 +56,29 @@ const MODES = [
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 /** Loads a draft (if editing one), then renders the editor initialised from it. */
-export function DocumentEditor({ side, draftId }: { side: "sales" | "purchase"; draftId?: string }) {
+type Preset = { docType?: string; party?: { id: string; name: string } };
+
+export function DocumentEditor({ side, draftId, preset }: { side: "sales" | "purchase"; draftId?: string; preset?: Preset }) {
   const { base, id: bizId } = useBusiness();
   const draft = useQuery({
     queryKey: ["biz", bizId, "documents", draftId], enabled: !!draftId && !!bizId,
     queryFn: () => api<DocumentFull>(`${base}/documents/${draftId}`),
   });
   if (draftId && !draft.data) return draft.error ? <EmptyState title="Draft not found" /> : <Skeleton className="h-96" />;
-  return <Editor side={side} draftId={draftId} draft={draft.data} />;
+  return <Editor side={side} draftId={draftId} draft={draft.data} preset={preset} />;
 }
 
-function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?: string; draft?: DocumentFull }) {
+function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; draftId?: string; draft?: DocumentFull; preset?: Preset }) {
   const router = useRouter();
   const { base, id: bizId, can, isOwner } = useBusiness();
   const types = side === "sales" ? SALES_TYPES : PURCHASE_TYPES;
   const modules = useModules();
   const tr = useT();
   const pharmacy = modules.on("pharmacy");
-  const [docType, setDocType] = useState<DocType>(draft?.doc_type ?? (side === "sales" ? "sales_invoice" : "purchase_invoice"));
-  const [party, setParty] = useState<Party | null>(draft?.party_id ? ({ id: draft.party_id, name: draft.party_name ?? "" } as Party) : null);
+  const [docType, setDocType] = useState<DocType>(draft?.doc_type
+    ?? (preset?.docType && (types as readonly string[]).includes(preset.docType) ? (preset.docType as DocType) : side === "sales" ? "sales_invoice" : "purchase_invoice"));
+  const [party, setParty] = useState<Party | null>(draft?.party_id ? ({ id: draft.party_id, name: draft.party_name ?? "" } as Party)
+    : preset?.party ? ({ id: preset.party.id, name: preset.party.name } as Party) : null);
   const [partyName, setPartyName] = useState(draft && !draft.party_id ? (draft.party_name ?? "") : "");
   const [docDate, setDocDate] = useState(draft?.doc_date ?? todayISO());
   const [dueDate, setDueDate] = useState(draft?.due_date ?? "");
@@ -174,6 +179,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
     if (!ok) throw new Error("This device's storage is full — the bill could not be saved offline.");
     return null;
   }
+  const [gate, setGate] = useState<DiscountGateInfo | null>(null);
   const save = useMutation({
     networkMode: "always", // offline, finalize queues the bill on this device
     mutationFn: async (finalize: boolean) => {
@@ -188,11 +194,20 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
         throw e;
       }
       if (!finalize) return doc;
-      return api<DocumentFull>(`${base}/documents/${doc.id}/finalize`, {
-        body: { payments: payments.filter((p) => Number(p.amount) > 0).map((p) => ({ mode: p.mode, amount: p.amount, reference: p.reference || undefined })) },
-      });
+      const pays = payments.filter((p) => Number(p.amount) > 0).map((p) => ({ mode: p.mode, amount: p.amount, reference: p.reference || undefined }));
+      try {
+        return await api<DocumentFull>(`${base}/documents/${doc.id}/finalize`, { body: { payments: pays } });
+      } catch (e) {
+        if (e instanceof ApiError && e.code === "discount_approval_required") {
+          const d = (e.details ?? {}) as { discount_percent?: string; limit_percent?: string; pending?: boolean };
+          setGate({ docId: doc.id, percent: String(d.discount_percent ?? ""), limit: String(d.limit_percent ?? ""), payments: pays, pending: !!d.pending });
+          return undefined;
+        }
+        throw e;
+      }
     },
     onSuccess: (doc, finalize) => {
+      if (doc === undefined) return; // waiting for discount approval
       if (doc === null) {
         toast.success("Saved on this device — it will be sent when the internet is back", { description: `About ${money(grand)}` });
         setLines([]); setPayments([]); setParty(null); setPartyName(""); setNotes("");
@@ -462,6 +477,8 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
       )}
       <PartyDialog kind={side === "sales" ? "customers" : "suppliers"} open={newParty !== null} initialName={newParty ?? undefined}
         onOpenChange={(v) => !v && setNewParty(null)} onSaved={(p) => { setParty(p); setNewParty(null); }} />
+      {gate && <DiscountGate gate={gate} onClose={() => router.replace(`/sales/new?draft=${gate.docId}`)}
+        onDone={(doc) => { toast.success(`Saved ${doc.number}`); router.push(`/documents/${doc.id}?print=1`); }} />}
     </div>
   );
 }
