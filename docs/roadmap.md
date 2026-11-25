@@ -120,6 +120,30 @@ PostgreSQL.
     overdue amounts, and stock value.
   * Shown per business and in total, for today, this month or this financial year.
   * A six-month sales chart. Clicking a business opens its dashboard.
+* **GST compliance** (GST page tabs; migration 0022):
+  * **GSTR-2B reconciliation** (`POST /gst/2b-reconcile` with the portal's JSON): purchase
+    bills of the period are matched by supplier GSTIN and bill number. Numbers like "INV/0012"
+    and "inv-12" are treated as the same.
+    * Results: matched (within ₹1), amount differs, only in 2B (not recorded), and only in
+      books. The last group is the ITC at risk, totalled.
+    * Exportable as CSV.
+  * **GSTR-9** key tables (4, 5, 6, 9, 17 HSN) for a financial year from the books.
+  * **CMP-08** quarter by quarter at the composition rate (1 / 5 / 6 %), with reverse-charge
+    tax and due dates, plus the **GSTR-4** year totals.
+  * **RCM self-invoices** (section 31(3)(f)): lists reverse-charge purchases from unregistered
+    suppliers. Each gets a numbered (`RCM/{FY}/…`), printable self-invoice, once.
+  * **Job work / ITC-04** (section 143):
+    * Challans to send goods to a job worker and receive them back. Stock moves to and from an
+      automatic godown per job worker.
+    * ITC-04 lists what was sent and received in the period, and what is still with the job
+      worker. Inputs are due back within 1 year and capital goods within 3, with an overdue
+      flag. Exportable as CSV.
+  * **Section 194Q tracker:** purchases per supplier in the year against ₹50 lakh, with TDS at
+    0.1% on the excess.
+  * **Form 26Q deductee file:** a CSV of payments with TDS for the quarterly return.
+  * Not built: direct e-invoice / e-way bill generation through a GSP. It needs a paid GSP
+    account and its API credentials. IRN and e-way numbers are still recorded after generating
+    them on the portal.
 * **Offline billing:**
   * The web app keeps a copy of the product list (up to 5,000 products, refreshed every 30
     minutes) and the signed-in profile in the browser. Tokens are not stored.

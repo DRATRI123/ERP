@@ -16,6 +16,7 @@ import { Field } from "@/components/ui/form-field";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBizMutation, useBizQuery, useBusiness } from "@/hooks/use-business";
+import { openFile } from "@/lib/api";
 import { downloadCsv } from "@/lib/csv";
 import { date, money, todayISO } from "@/lib/format";
 
@@ -24,7 +25,7 @@ interface Month { month: string; deducted: string; deposited: string; balance: s
 interface Register { rows: Row[]; sections: { section: string; count: number; gross: string; tds: string }[]; total_tds: string; months?: Month[] }
 
 export default function TdsPage() {
-  const { can, isOwner } = useBusiness();
+  const { can, isOwner, base } = useBusiness();
   const [dir, setDir] = useState<"out" | "in">("out");
   const [period, setPeriod] = useState(PRESETS.this_fy!());
   const reg = useBizQuery<Register>(["tds-register"], "/reports/tds", { direction: dir, date_from: period.from, date_to: period.to });
@@ -69,6 +70,7 @@ export default function TdsPage() {
               ]} />
             </Card>
           )}
+          {dir === "out" && <Tds194q />}
           {(d?.sections.length ?? 0) > 0 && (
             <Card><CardHeader><CardTitle>By section</CardTitle></CardHeader><CardContent className="flex flex-wrap gap-2">
               {d!.sections.map((s) => <Badge key={s.section} variant="outline" className="h-auto py-1.5 text-sm">{s.section} · {s.count} · <b className="num ml-1">{money(s.tds)}</b></Badge>)}
@@ -76,7 +78,8 @@ export default function TdsPage() {
           )}
           <Card className="overflow-hidden">
             <div className="flex items-center justify-between border-b px-4 py-3"><h2 className="font-semibold">Entries</h2>
-              {d?.rows.length ? <Button size="sm" variant="outline" onClick={exportCsv}><DownloadIcon /> CSV for the return</Button> : null}</div>
+              <div className="flex gap-2">{dir === "out" && <Button size="sm" variant="outline" onClick={() => openFile(`${base}/tds/26q.csv`, { date_from: period.from, date_to: period.to }, `26Q-${period.from}-${period.to}.csv`)}><DownloadIcon /> 26Q deductee file</Button>}
+                {d?.rows.length ? <Button size="sm" variant="outline" onClick={exportCsv}><DownloadIcon /> CSV for the return</Button> : null}</div></div>
             {!d?.rows.length ? <EmptyState title="No TDS in this period" description={dir === "out" ? "When recording a payment to a supplier, tick “Deduct TDS” and choose the section." : "When a customer pays less because they deducted TDS, tick “Customer deducted TDS” while recording the receipt."} /> : (
               <StaticTable rows={d.rows} rowKey={(r) => r.payment_id} columns={[
                 { key: "p", header: "Party", mobile: "title", cell: (r) => <div><p className="font-medium">{r.party_name}</p><p className="text-xs text-muted-foreground">{r.number} · PAN {r.pan ?? <span className="text-destructive">missing (20%)</span>}</p></div> },
@@ -120,5 +123,22 @@ function DepositDialog({ month, onClose }: { month: Month; onClose: () => void }
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Tds194q() {
+  const q = useBizQuery<{ financial_year: string; rows: { party_id: string; name: string; pan: string | null; purchases: string; excess: string; tds: string; near: boolean }[]; note: string }>(["tds-194q"], "/tds/194q");
+  const rows = (q.data?.rows ?? []).filter((r) => Number(r.excess) > 0 || r.near);
+  if (!rows.length) return null;
+  return (
+    <Card className="overflow-hidden"><CardHeader><CardTitle>Section 194Q — purchases over ₹50 lakh from one supplier (FY {q.data?.financial_year})</CardTitle></CardHeader>
+      <StaticTable rows={rows} rowKey={(r) => r.party_id} columns={[
+        { key: "n", header: "Supplier", mobile: "title", cell: (r) => <div><p className="font-medium">{r.name}</p><p className="text-xs text-muted-foreground">PAN {r.pan ?? "missing (5%)"}</p></div> },
+        { key: "p", header: "Purchases this year", align: "right", cell: (r) => <span className="num">{money(r.purchases)}</span> },
+        { key: "e", header: "Above ₹50 lakh", align: "right", cell: (r) => r.near ? <Badge variant="warning">Near the limit</Badge> : <span className="num">{money(r.excess)}</span> },
+        { key: "t", header: "TDS @ 0.1%", align: "right", mobile: "aside", cell: (r) => <span className="num font-medium">{money(r.tds)}</span> },
+      ]} />
+      <CardContent className="border-t text-xs text-muted-foreground">Applies only if your turnover last year was over ₹10 crore. {q.data?.note}</CardContent>
+    </Card>
   );
 }

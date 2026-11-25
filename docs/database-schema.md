@@ -228,6 +228,13 @@ Also:
 | `visits` | One visit: salesman, customer, beat, date and time, outcome, note, latitude/longitude, order and payment produced, next visit |
 | `sales_targets` | Monthly sales and collection target per salesman (unique per business, salesman, month) |
 
+## GST compliance (migration 0022)
+
+| Table | Purpose |
+|---|---|
+| `rcm_self_invoices` | Self-invoice number and date for one reverse-charge purchase bill (unique per bill) |
+| `job_work_challans` | Job-work challan: out (sent) or in (received back, linked to the sent one), inputs or capital goods, job worker, our and the job worker's godown, the stock transfer, lines with value |
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |

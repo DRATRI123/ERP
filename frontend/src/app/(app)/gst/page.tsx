@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { MoneyTable, type MCol } from "@/components/data/money-table";
 import { PageHeader } from "@/components/data/page-header";
+import { AnnualPanel, Gstr2bPanel, JobWorkPanel, RcmPanel } from "@/features/gst/compliance-panels";
 import { EwayPanel } from "@/features/gst/eway-panel";
 import { ErrorState, TableSkeleton } from "@/components/data/states";
 import { PeriodPicker, PRESETS } from "@/components/pickers/period";
@@ -45,7 +46,9 @@ export default function GstPage() {
         actions={<PeriodPicker value={period} onChange={setPeriod} />} />
       <Tabs defaultValue="gstr1">
         <TabsList><TabsTrigger value="gstr1">GSTR-1</TabsTrigger><TabsTrigger value="gstr3b">GSTR-3B</TabsTrigger>
-          <TabsTrigger value="hsn">HSN summary</TabsTrigger><TabsTrigger value="sales">Sales register</TabsTrigger><TabsTrigger value="purchases">Purchase register</TabsTrigger><TabsTrigger value="eway">E-way bills</TabsTrigger></TabsList>
+          <TabsTrigger value="hsn">HSN summary</TabsTrigger><TabsTrigger value="sales">Sales register</TabsTrigger><TabsTrigger value="purchases">Purchase register</TabsTrigger><TabsTrigger value="eway">E-way bills</TabsTrigger>
+          <TabsTrigger value="2b">2B reconcile</TabsTrigger><TabsTrigger value="annual">Annual / composition</TabsTrigger>
+          <TabsTrigger value="rcm">RCM self-invoice</TabsTrigger><TabsTrigger value="jobwork">Job work (ITC-04)</TabsTrigger></TabsList>
         <TabsContent value="gstr1" className="space-y-4">
           {g1.isLoading ? <Card><TableSkeleton /></Card> : g1.error ? <Card><ErrorState error={g1.error} /></Card> : g1.data && <>
             <div className="flex items-center justify-between"><Badge variant="warning">{String(g1.data.status)}</Badge>
@@ -85,6 +88,10 @@ export default function GstPage() {
           </TabsContent>
         ))}
         <TabsContent value="eway"><EwayPanel /></TabsContent>
+        <TabsContent value="2b"><Gstr2bPanel period={period} /></TabsContent>
+        <TabsContent value="annual"><AnnualPanel /></TabsContent>
+        <TabsContent value="rcm"><RcmPanel /></TabsContent>
+        <TabsContent value="jobwork"><JobWorkPanel period={period} /></TabsContent>
       </Tabs>
     </>
   );

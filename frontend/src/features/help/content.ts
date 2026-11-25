@@ -611,6 +611,32 @@ export const HELP: HelpTopic[] = [
     related: ["sales", "reports"],
   },
   {
+    id: "gst-compliance", title: "GSTR-2B match, GSTR-9, composition, RCM and job work", group: "Money", routes: [],
+    summary: "Monthly ITC check against GSTR-2B, the annual return, composition returns, reverse-charge self-invoices and job-work challans.",
+    sections: [
+      { heading: "GSTR-2B reconciliation (every month, before GSTR-3B)", steps: [
+        "GST portal → Returns → GSTR-2B → choose the month → Download JSON.",
+        "GST & tax → choose the same period → 2B reconcile → Upload GSTR-2B JSON.",
+        "“Not in 2B — ITC at risk”: you recorded the bill but the supplier hasn't filed it. Call the supplier before claiming that ITC.",
+        "“Amount differs”: compare the bill. “Not in your books”: record the purchase, or fix its bill number.",
+      ] },
+      { heading: "Annual and composition", steps: [
+        "Annual / composition → GSTR-9 tables from your books; compare with the portal's pre-filled figures.",
+        "If you are a composition dealer: choose your rate; CMP-08 tax per quarter (due the 18th after the quarter) and GSTR-4 totals (due 30 June).",
+      ] },
+      { heading: "Reverse charge from unregistered suppliers", steps: [
+        "Record the purchase with “Reverse charge” ticked.",
+        "RCM self-invoice → Make self-invoice → print it and keep it with the bill.",
+      ] },
+      { heading: "Job work", steps: [
+        "Job work → Send to job worker: the job worker (a supplier), goods and quantities, the process. Stock moves to their godown; no GST is charged.",
+        "When goods come back: Receive back on that challan.",
+        "Inputs must return within 1 year (capital goods 3 years) — overdue ones are flagged. Download the ITC-04 CSV for the return.",
+      ] },
+    ],
+    related: ["gst", "tds"],
+  },
+  {
     id: "reports", title: "Reports and scheduled e-mails", group: "Money", routes: ["/reports"],
     summary: "Profit & loss, balance sheet, cash flow, trial balance, day book, receivables/payables aging and stock valuation.",
     sections: [
