@@ -72,3 +72,6 @@ class Scheme(UUIDPrimaryKey, Timestamps, Base):
     valid_from: Mapped[date | None] = mapped_column(Date)
     valid_to: Mapped[date | None] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Who pays for the scheme: the manufacturer / distributor it is claimed from, and the share they bear.
+    claim_party_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("parties.id", ondelete="SET NULL"))
+    claim_percent: Mapped[Decimal] = mapped_column(Rate(), default=Decimal(100), nullable=False)

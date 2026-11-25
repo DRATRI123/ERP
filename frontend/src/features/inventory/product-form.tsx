@@ -114,12 +114,15 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
             <Field label="Drug schedule" className="sm:col-span-2"><NativeSelect {...form.register("drug_schedule")}>{SCHEDULES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</NativeSelect></Field>
             <Field label="PTR" hint="Price to retailer" error={err.ptr?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("ptr")} /></Field>
             <Field label="PTS" hint="Price to stockist" error={err.pts?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("pts")} /></Field>
-            <Field label="Pack size" error={err.pack_size?.message} hint="Units in one pack, to sell loose" className="sm:col-span-2"><Input inputMode="decimal" placeholder="10" {...form.register("pack_size")} /></Field>
-            <Field label="Pack name" className="sm:col-span-2"><Input placeholder="strip" {...form.register("pack_label")} /></Field>
-            <p className="self-end pb-2 text-xs text-muted-foreground sm:col-span-2">
-              {perPack ? `One ${packLabel || "pack"} = ${Number(packSize)} units = ₹${perPack}. Stock and prices stay per unit.` : "Stock and prices are per unit (e.g. per tablet)."}
-            </p>
           </fieldset>}
+          <fieldset className="grid gap-4 rounded-lg border p-3 sm:col-span-6 sm:grid-cols-6">
+            <legend className="px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Bigger unit (optional)</legend>
+            <Field label="Units in one pack" error={err.pack_size?.message} hint={pharmacy ? "e.g. 10 tablets in a strip" : "e.g. 12 pieces in a box, 25 kg in a bag"} className="sm:col-span-2"><Input inputMode="decimal" placeholder={pharmacy ? "10" : "12"} {...form.register("pack_size")} /></Field>
+            <Field label="Pack name" className="sm:col-span-2"><Input placeholder={pharmacy ? "strip" : "box"} {...form.register("pack_label")} /></Field>
+            <p className="self-end pb-2 text-xs text-muted-foreground sm:col-span-2">
+              {perPack ? `One ${packLabel || "pack"} = ${Number(packSize)} units = ₹${perPack}. Bill in packs or loose; stock and prices stay per unit.` : "Stock and prices are per base unit. Add a pack to bill by box, case, strip or bag too."}
+            </p>
+          </fieldset>
           <div className="grid gap-3 rounded-lg border p-3 sm:col-span-4 sm:grid-cols-2">
             {([["prices_include_tax", "Prices include GST"], ["track_inventory", "Track stock"], ["batch_tracking", "Batches & expiry"], ["serial_tracking", "Serial numbers"]] as const).map(([k, label]) => (
               <label key={k} className="flex items-center justify-between gap-2 text-sm">{label}

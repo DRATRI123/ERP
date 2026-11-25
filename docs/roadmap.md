@@ -134,6 +134,29 @@ PostgreSQL.
   gives amounts and due dates. `/ecr.txt` is the EPFO ECR 2.0 file, and
   `/payslips/{employee_id}` a printable payslip. Not covered: surcharge, marginal relief near
   ₹12 lakh, the old regime and its deductions, and Form 16.
+* **Stock extras** (migration 0025):
+  * **Packs for every business:** a product's "bigger unit" (12 in a box, 25 kg in a bag, 10 in
+    a strip) bills as packs + loose; stock and prices stay per base unit.
+  * **Barcode labels** (`/inventory/labels`): A4 sticker sheets of 65, 40 or 24 and 50 × 25 /
+    38 × 25 mm thermal rolls, with shop name, product, price and MRP; a half-used sheet can skip
+    labels. Items without a barcode print their SKU, which billing scans the same way.
+  * **Stock audit** (`/stock-audit`): the books' quantity per item and batch, counted by phone
+    camera (the browser's BarcodeDetector — Chrome on Android), a USB/Bluetooth scanner or typing.
+    The count is kept on the device until posted as a physical count; a full audit sets uncounted
+    items to zero.
+  * **Scheme claims** (Pricing & schemes → Scheme claims; `/scheme-claims` API): schemes name who reimburses them and their share.
+    Unclaimed free goods (at purchase price) and scheme discounts (as given) on final sales
+    invoices are listed per manufacturer; a claim locks its lines, settling posts
+    Dr Accounts payable / Cr 4240 Scheme Claims Received, rejecting frees the lines.
+  * **Sale or return** (`/sale-or-return`): per delivery-challan line, sent / invoiced / returned /
+    still with the customer, and "goods back" returns stock at the cost it left at.
+  * **Moving from other software:** `POST /data/import/{kind}` understands Busy, Marg, Vyapar and
+    Tally column names (Item Name, Main Unit, Tax Category "GST 12%", Party Name, GST No, state
+    names…) and makes a code from the name when there is none. `POST /data/import-tally` reads a
+    Tally masters XML export (parsed with defusedxml, so entity tricks are refused): Sundry
+    Debtors / Creditors with GSTIN, state, address and credit period, and stock items with unit,
+    HSN, GST rate and opening quantity at rate, optionally posting opening balances and opening
+    stock. Existing names are skipped; any error rolls everything back.
 * **Accounts extras** (Accounting tabs; migration 0023):
   * **Budgets:** monthly amounts per income or expense account, optionally per cost centre
     (`PUT /budgets`).

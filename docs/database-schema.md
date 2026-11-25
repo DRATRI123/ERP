@@ -258,6 +258,17 @@ Also:
 * New system accounts: 2220 PF Payable, 2221 ESI Payable, 2222 Professional Tax Payable and
   6015 Employer PF & ESI.
 
+## Stock: scheme claims and sale-or-return (migration 0025)
+
+* On `schemes`: `claim_party_id` (the manufacturer or distributor who reimburses the scheme) and
+  `claim_percent` (their share, default 100).
+* `scheme_claims`: number, claim date, party, period, `line_ids` (the sales lines claimed, so a
+  line is claimed once; a rejected claim frees them), free quantity, claim and settled amounts,
+  status (open / settled / rejected) and the credit note reference. Settling posts
+  Dr Accounts payable / Cr 4240 Scheme Claims Received (journal source `claim`).
+* `challan_returns`: unsold goods returned against a delivery challan line, with the stock
+  adjustment that brought them back at the cost they left at.
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |

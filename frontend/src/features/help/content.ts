@@ -361,6 +361,94 @@ export const HELP: HelpTopic[] = [
     related: ["inventory"],
   },
   {
+    id: "stock-audit", title: "Stock audit with your phone", group: "Stock", routes: ["/stock-audit"],
+    summary: "Count the shelves by scanning: the phone camera, a USB / Bluetooth scanner, or typing the code. Differences correct the stock.",
+    sections: [
+      { heading: "Count", steps: [
+        "Stock audit → choose the godown. Every item and batch with stock is listed with what the books say.",
+        "Scan each piece (one scan = one more), or type the count. − and + adjust it.",
+        "The count is saved on the phone as you go, so a lost connection or a closed tab loses nothing.",
+      ] },
+      { heading: "Post", steps: [
+        "Spot check: only the items you counted are corrected.",
+        "Full audit: switch it on and anything you did not count is set to zero.",
+        "Post count: the differences go to Stock adjustments, and the stock is now what you counted.",
+      ] },
+    ],
+    tips: ["Camera scanning works in Chrome on Android. On iPhone use a Bluetooth scanner or type the code."],
+    related: ["inventory", "labels"],
+  },
+  {
+    id: "labels", title: "Barcode labels", group: "Stock", routes: ["/inventory/labels"],
+    summary: "Print price stickers with barcodes on A4 sticker sheets (65, 40 or 24 per sheet) or on a thermal label printer.",
+    sections: [
+      { heading: "Print", steps: [
+        "Products & inventory → Labels. Search or scan the products; the number of labels starts at the stock in hand.",
+        "Choose the label size and what to show (shop name, product, price, MRP).",
+        "On a half-used sheet, Skip used labels starts printing further down.",
+        "Print. In the print window set scale to 100 % (no “fit to page”).",
+      ] },
+    ],
+    tips: ["Products without a barcode print their SKU as the barcode, and billing scans it the same way."],
+    related: ["inventory", "stock-audit"],
+  },
+  {
+    id: "units", title: "Selling in packs and loose", group: "Stock", routes: ["/inventory"],
+    summary: "Stock and price are kept per base unit; a pack (box, case, strip, bag) lets you bill in packs or loose too.",
+    sections: [
+      { heading: "Set it", steps: [
+        "Edit the product → Bigger unit: units in one pack (e.g. 12) and its name (box).",
+        "On a bill the line shows packs + loose, and +1 box adds a whole pack.",
+      ] },
+    ],
+    related: ["inventory"],
+  },
+  {
+    id: "scheme-claims", title: "Scheme claims from manufacturers", group: "Stock", routes: ["/pricing"],
+    summary: "Free goods and scheme discounts you give on a company's behalf, claimed back from that company.",
+    sections: [
+      { heading: "Set up", steps: [
+        "Pricing & schemes → edit a scheme → Claim it from: the manufacturer or distributor, and their share (100 % if they bear it all).",
+      ] },
+      { heading: "Claim", steps: [
+        "Pricing & schemes → Scheme claims → pick the period. Free goods are valued at your purchase price, discounts at the discount given.",
+        "View & claim shows every bill line; Make claim records it so the same lines are never claimed twice.",
+        "When their credit note comes: Credit received. You owe them that much less, booked as scheme income.",
+        "Rejected frees the lines to be claimed again.",
+      ] },
+    ],
+    related: ["damage"],
+  },
+  {
+    id: "sale-or-return", title: "Sale or return (consignment)", group: "Selling", routes: ["/sale-or-return"],
+    summary: "Send goods on a delivery challan; invoice what the customer sells and take back what they don't.",
+    sections: [
+      { heading: "How it works", steps: [
+        "Make a delivery challan for the goods you send. Stock leaves at once.",
+        "When the customer tells you what sold, convert the challan to an invoice for that quantity.",
+        "Sale or return shows, per challan line, what was sent, sold, returned and is still with them.",
+        "Goods back: enter what came back; it returns to stock at the cost it left at.",
+      ] },
+    ],
+    related: ["sales"],
+  },
+  {
+    id: "import", title: "Moving from Tally, Busy or Marg", group: "Workspace", routes: ["/import"],
+    summary: "Bring items, customers and suppliers — with opening balances and opening stock — from your old software.",
+    sections: [
+      { heading: "From Tally", steps: [
+        "In Tally: Gateway → Export → Masters → All Masters, XML. Upload Master.xml in Import data → Tally XML.",
+        "Choose the year start and godown to bring opening balances and stock, then Check file and Import.",
+      ] },
+      { heading: "From Busy, Marg, Vyapar or Excel", steps: [
+        "Export the item list or party list to Excel. Upload it as it is in Import data → Excel / CSV.",
+        "Column names like Item Name, Main Unit, Tax Category, Sale Price, Party Name, GST No and Station are understood.",
+        "Check file shows every bad row; nothing is saved until all rows are good.",
+      ] },
+    ],
+    related: ["inventory"],
+  },
+  {
     id: "loyalty", title: "Loyalty points", group: "Selling", routes: ["/loyalty"],
     summary: "Customers earn points on every bill and spend them at the counter — a simple way to bring them back.",
     sections: [

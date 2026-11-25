@@ -19,7 +19,7 @@ from app.modules.audit import service as audit
 from app.modules.catalog.models import Product
 from app.modules.integrations.data_io import read_rows
 from app.modules.parties.models import Party
-from app.modules.stockx import claims, loyalty, purchase_import
+from app.modules.stockx import claims, consignment, loyalty, purchase_import, schemes
 from app.modules.stockx.models import ClaimStatus, DamageClaim, DamageReason
 
 router = APIRouter(prefix="/businesses/{business_id}", tags=["stock"])
@@ -182,6 +182,98 @@ def reject_claim(claim_id: uuid.UUID, body: RejectIn, access: StockEdit, db: DB)
     c = claims.reject_claim(db, access, claims.get_claim(db, access, claim_id), reason=body.reason)
     db.commit()
     return _claim_out(db, c)
+
+
+# ---------------------------------------------------------------------------- scheme claims
+Reports = Annotated[BusinessAccess, Depends(require("reports.view"))]
+PurchaseEdit = Annotated[BusinessAccess, Depends(require("purchases.view", "purchases.edit"))]
+
+
+class SchemeClaimIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    party_id: uuid.UUID
+    date_from: date
+    date_to: date
+    claim_date: date = Field(default_factory=local_today)
+    notes: Annotated[str, StringConstraints(max_length=500)] | None = None
+
+
+def _scheme_claim_out(db: DB, c: Any) -> dict[str, Any]:
+    party = db.get(Party, c.party_id)
+    return {"id": c.id, "number": c.number, "claim_date": c.claim_date, "party_id": c.party_id,
+            "party_name": party.name if party else None, "date_from": c.date_from, "date_to": c.date_to,
+            "lines": len(c.line_ids), "free_quantity": c.free_quantity, "claim_amount": c.claim_amount,
+            "settled_amount": c.settled_amount, "status": c.status, "settlement_ref": c.settlement_ref,
+            "settled_on": c.settled_on, "notes": c.notes}
+
+
+@router.get("/scheme-claims/claimable")
+def scheme_claimable(access: Reports, db: DB, date_from: date, date_to: date,
+                     party_id: uuid.UUID | None = None) -> dict[str, Any]:
+    if date_to < date_from:
+        raise ValidationFailed("End date is before start date")
+    return schemes.claimable(db, access, party_id=party_id, date_from=date_from, date_to=date_to)
+
+
+@router.get("/scheme-claims")
+def scheme_claims(access: Reports, db: DB) -> list[dict[str, Any]]:
+    return [_scheme_claim_out(db, c) for c in schemes.list_claims(db, access)]
+
+
+@router.get("/scheme-claims/{claim_id}")
+def scheme_claim(claim_id: uuid.UUID, access: Reports, db: DB) -> dict[str, Any]:
+    c = schemes.get_claim(db, access, claim_id)
+    return {**_scheme_claim_out(db, c), "items": schemes.claim_lines(db, access, c)}
+
+
+@router.post("/scheme-claims", status_code=status.HTTP_201_CREATED)
+def create_scheme_claim(body: SchemeClaimIn, access: PurchaseEdit, db: DB) -> dict[str, Any]:
+    c = schemes.create_claim(db, access, party_id=body.party_id, date_from=body.date_from, date_to=body.date_to,
+                             on=body.claim_date, notes=body.notes)
+    db.commit()
+    return _scheme_claim_out(db, c)
+
+
+@router.post("/scheme-claims/{claim_id}/settle")
+def settle_scheme_claim(claim_id: uuid.UUID, body: SettleIn, access: PurchaseEdit, db: DB) -> dict[str, Any]:
+    c = schemes.settle(db, access, schemes.get_claim(db, access, claim_id), amount=body.amount, on=body.on,
+                       reference=body.reference)
+    db.commit()
+    return _scheme_claim_out(db, c)
+
+
+@router.post("/scheme-claims/{claim_id}/reject")
+def reject_scheme_claim(claim_id: uuid.UUID, body: RejectIn, access: PurchaseEdit, db: DB) -> dict[str, Any]:
+    c = schemes.reject(db, access, schemes.get_claim(db, access, claim_id), reason=body.reason)
+    db.commit()
+    return _scheme_claim_out(db, c)
+
+
+# ---------------------------------------------------------------------------- sale-or-return
+InvView = Annotated[BusinessAccess, Depends(require("invoices.view"))]
+
+
+class ReturnLineIn(BaseModel):
+    line_id: uuid.UUID
+    quantity: Qty
+
+
+class ChallanReturnIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    on: date = Field(default_factory=local_today)
+    lines: list[ReturnLineIn] = Field(min_length=1, max_length=500)
+
+
+@router.get("/sale-or-return")
+def sale_or_return(access: InvView, db: DB, party_id: uuid.UUID | None = None, open_only: bool = True) -> dict[str, Any]:
+    return consignment.report(db, access, party_id=party_id, open_only=open_only)
+
+
+@router.post("/documents/{document_id}/return-unsold", status_code=status.HTTP_201_CREATED)
+def return_unsold(document_id: uuid.UUID, body: ChallanReturnIn, access: StockEdit, db: DB) -> dict[str, Any]:
+    out = consignment.return_unsold(db, access, document_id, on=body.on, lines=[ln.model_dump() for ln in body.lines])
+    db.commit()
+    return {"returned": len(out), "stock_document_id": out[0].stock_document_id}
 
 
 # ---------------------------------------------------------------------------- loyalty

@@ -83,12 +83,15 @@ class SchemeIn(BaseModel):
     valid_from: date | None = None
     valid_to: date | None = None
     is_active: bool = True
+    claim_party_id: uuid.UUID | None = Field(None, description="Manufacturer / distributor who reimburses the scheme")
+    claim_percent: Decimal = Field(Decimal(100), ge=0, le=100, max_digits=8, decimal_places=4)
 
 
 class SchemeOut(SchemeIn):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     product_name: str | None = None
+    claim_party_name: str | None = None
     updated_at: datetime
 
 
@@ -110,6 +113,9 @@ def _pl_out(db: DB, pl: PriceList) -> PriceListOut:
 def _scheme_out(db: DB, s: Scheme) -> SchemeOut:
     out = SchemeOut.model_validate(s, from_attributes=True)
     out.product_name = _names(db, {s.product_id}).get(s.product_id) if s.product_id else None
+    if s.claim_party_id:
+        party = db.get(Party, s.claim_party_id)
+        out.claim_party_name = party.name if party else None
     return out
 
 

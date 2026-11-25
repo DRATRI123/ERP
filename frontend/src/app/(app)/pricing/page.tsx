@@ -18,13 +18,16 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBizMutation, useBizQuery, useBusiness } from "@/hooks/use-business";
 import { date, money, qty } from "@/lib/format";
-import type { Product } from "@/lib/types";
+import { PartyPicker } from "@/components/pickers/party-picker";
+import { SchemeClaims } from "@/features/pricing/scheme-claims";
+import type { Party, Product } from "@/lib/types";
 
 interface Item { product_id: string; product_name?: string | null; min_quantity: string; price: string }
 interface PriceList { id: string; name: string; base: string; adjust_percent: string; prices_include_tax: boolean | null; is_active: boolean; items: Item[]; customers: number }
 interface Scheme {
   id: string; name: string; kind: "free_goods" | "discount"; product_id: string | null; category_id: string | null; min_quantity: string;
   free_quantity: string; discount_percent: string; valid_from: string | null; valid_to: string | null; is_active: boolean; product_name?: string | null;
+  claim_party_id: string | null; claim_percent: string; claim_party_name?: string | null;
 }
 type SchemeDraft = Omit<Scheme, "id" | "product_name">;
 
@@ -38,9 +41,10 @@ export default function PricingPage() {
     <>
       <PageHeader title="Pricing & schemes" description="Customer-type price lists (hospitals, doctors, stockists) with quantity breaks, and trade schemes like 10 + 1 free." />
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList><TabsTrigger value="lists">Price lists</TabsTrigger><TabsTrigger value="schemes">Schemes</TabsTrigger></TabsList>
+        <TabsList><TabsTrigger value="lists">Price lists</TabsTrigger><TabsTrigger value="schemes">Schemes</TabsTrigger><TabsTrigger value="claims">Scheme claims</TabsTrigger></TabsList>
         <TabsContent value="lists"><PriceLists manage={manage} /></TabsContent>
         <TabsContent value="schemes"><Schemes manage={manage} /></TabsContent>
+        <TabsContent value="claims"><SchemeClaims /></TabsContent>
       </Tabs>
     </>
   );
@@ -153,7 +157,7 @@ function Schemes({ manage }: { manage: boolean }) {
   const [deleting, setDeleting] = useState<Scheme | null>(null);
   const remove = useBizMutation("DELETE", () => `/schemes/${deleting?.id}`, { invalidate: [["schemes"]], success: "Scheme deleted" });
   const empty: SchemeDraft = { name: "", kind: "free_goods", product_id: null, category_id: null, min_quantity: "10", free_quantity: "1",
-    discount_percent: "0", valid_from: null, valid_to: null, is_active: true };
+    discount_percent: "0", valid_from: null, valid_to: null, is_active: true, claim_party_id: null, claim_percent: "100" };
   const today = new Date().toISOString().slice(0, 10);
   if (list.error) return <Card><ErrorState error={list.error} retry={() => list.refetch()} /></Card>;
   return (
@@ -177,6 +181,7 @@ function Schemes({ manage }: { manage: boolean }) {
                   </div>
                   <p className="text-sm">{s.kind === "free_goods" ? `Buy ${qty(s.min_quantity)}, get ${qty(s.free_quantity)} free` : `${Number(s.discount_percent)} % off on ${qty(s.min_quantity)} or more`}
                     <span className="text-muted-foreground"> · {s.product_id ? s.product_name ?? "product" : `category ${catName.get(s.category_id ?? "") ?? ""}`}</span></p>
+                  {s.claim_party_name && <p className="text-xs text-muted-foreground">Claimed from {s.claim_party_name}{Number(s.claim_percent) < 100 ? ` (${Number(s.claim_percent)} %)` : ""}</p>}
                   {(s.valid_from || s.valid_to) && <p className="text-xs text-muted-foreground">{s.valid_from ? date(s.valid_from) : "now"} → {s.valid_to ? date(s.valid_to) : "no end"}</p>}
                   {manage && <div className="flex justify-end border-t pt-2">
                     <Button size="icon" variant="ghost" aria-label="Edit scheme" onClick={() => setEditing({ id: s.id, draft: { ...s }, name: s.product_name ?? "", key: `${s.id}-${Date.now()}` })}><PencilIcon /></Button>
@@ -199,7 +204,8 @@ function SchemeDialog({ id, initial, categories, productName, onClose }: {
   id?: string; initial: SchemeDraft; categories: { id: string; name: string }[]; productName: string; onClose: () => void;
 }) {
   const [d, setD] = useState<SchemeDraft>({ ...initial, min_quantity: String(Number(initial.min_quantity)), free_quantity: String(Number(initial.free_quantity)),
-    discount_percent: String(Number(initial.discount_percent)) });
+    discount_percent: String(Number(initial.discount_percent)), claim_percent: String(Number(initial.claim_percent ?? 100)) });
+  const [claimFrom, setClaimFrom] = useState<Party | null>(initial.claim_party_id ? ({ id: initial.claim_party_id, name: initial.claim_party_name ?? "" } as Party) : null);
   const [target, setTarget] = useState<"product" | "category">(initial.category_id ? "category" : "product");
   const [pickedName, setPickedName] = useState(productName);
   const set = (patch: Partial<SchemeDraft>) => setD((x) => ({ ...x, ...patch }));
@@ -216,7 +222,8 @@ function SchemeDialog({ id, initial, categories, productName, onClose }: {
           save.mutate({ name: d.name, kind: d.kind, min_quantity: d.min_quantity, is_active: d.is_active,
             product_id: target === "product" ? d.product_id : null, category_id: target === "category" ? d.category_id : null,
             free_quantity: d.kind === "free_goods" ? d.free_quantity : "0", discount_percent: d.kind === "discount" ? d.discount_percent : "0",
-            valid_from: d.valid_from || null, valid_to: d.valid_to || null });
+            valid_from: d.valid_from || null, valid_to: d.valid_to || null,
+            claim_party_id: claimFrom?.id ?? null, claim_percent: claimFrom ? d.claim_percent || "100" : "100" });
         }}>
           <Field label="Name" htmlFor="sc-name" className="sm:col-span-2"><Input id="sc-name" value={d.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} placeholder="Diwali 10 + 1" /></Field>
           <Field label="Type" htmlFor="sc-kind"><NativeSelect id="sc-kind" value={d.kind} onChange={(e) => set({ kind: e.target.value as Scheme["kind"] })}>
@@ -239,6 +246,8 @@ function SchemeDialog({ id, initial, categories, productName, onClose }: {
             : <Field label="Discount %" htmlFor="sc-disc"><Input id="sc-disc" inputMode="decimal" value={d.discount_percent} onChange={(e) => set({ discount_percent: e.target.value.replace(/[^\d.]/g, "") })} /></Field>}
           <Field label="From" htmlFor="sc-from" hint="Empty = from today"><Input id="sc-from" type="date" value={d.valid_from ?? ""} onChange={(e) => set({ valid_from: e.target.value || null })} /></Field>
           <Field label="Until" htmlFor="sc-to" hint="Empty = no end"><Input id="sc-to" type="date" value={d.valid_to ?? ""} onChange={(e) => set({ valid_to: e.target.value || null })} /></Field>
+          <Field label="Claim it from (optional)" hint="Manufacturer or distributor who pays for this scheme"><PartyPicker kind="suppliers" value={claimFrom} onChange={setClaimFrom} placeholder="We bear it ourselves" /></Field>
+          {claimFrom && <Field label="Their share %" htmlFor="sc-share" hint="100 = they pay all of it"><Input id="sc-share" inputMode="decimal" value={d.claim_percent} onChange={(e) => set({ claim_percent: e.target.value.replace(/[^\d.]/g, "") })} /></Field>}
           <DialogFooter className="items-center sm:col-span-2 sm:justify-between">
             <label className="flex items-center gap-2 text-sm"><Switch checked={d.is_active} onCheckedChange={(v) => set({ is_active: v })} /> Active</label>
             <div className="flex gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

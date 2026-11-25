@@ -1,5 +1,5 @@
 import {
-  BanknoteIcon, BarChart3Icon, RouteIcon, PackageXIcon, StarIcon, BookOpenIcon, PercentIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
+  BanknoteIcon, BarChart3Icon, FileUpIcon, PackageOpenIcon, ScanLineIcon, RouteIcon, PackageXIcon, StarIcon, BookOpenIcon, PercentIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
   LayoutDashboardIcon, PlugIcon, ReceiptIndianRupeeIcon, SettingsIcon, ShoppingCartIcon, TruckIcon, UsersIcon,
   IdCardIcon, LifeBuoyIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, StethoscopeIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
 } from "lucide-react";
@@ -25,6 +25,8 @@ export const NAV: NavItem[] = [
   { href: "/sales", label: "Sales & Invoices", icon: ReceiptIndianRupeeIcon, any: ["invoices.view"], group: "main", shortcut: "s" },
   { href: "/purchases", label: "Purchases", icon: ShoppingCartIcon, any: ["purchases.view"], group: "main", shortcut: "p" },
   { href: "/inventory", label: "Products & Inventory", icon: BoxesIcon, any: ["products.view", "stock.view"], group: "main", shortcut: "i" },
+  { href: "/stock-audit", label: "Stock audit", icon: ScanLineIcon, any: ["stock.view"], group: "main" },
+  { href: "/sale-or-return", label: "Sale or return", icon: PackageOpenIcon, any: ["invoices.view"], group: "main" },
   { href: "/damage", label: "Damage & claims", icon: PackageXIcon, any: ["stock.view"], group: "main", module: "damage" },
   { href: "/manufacturing", label: "Manufacturing", icon: FactoryIcon, any: ["stock.view"], group: "main", module: "manufacturing" },
   { href: "/pricing", label: "Pricing & Schemes", icon: TagsIcon, any: ["products.view"], group: "main", module: "pricing" },
@@ -46,6 +48,7 @@ export const NAV: NavItem[] = [
   { href: "/documents", label: "Documents", icon: FileTextIcon, group: "manage" },
   { href: "/licences", label: "Licences", icon: ShieldCheckIcon, group: "manage", module: "licences" },
   { href: "/automation", label: "Automation", icon: BotIcon, group: "manage", module: "automation" },
+  { href: "/import", label: "Import data", icon: FileUpIcon, any: ["products.manage", "customers.manage", "suppliers.manage"], group: "manage" },
   { href: "/integrations", label: "Integrations", icon: PlugIcon, any: ["integrations.manage"], group: "manage" },
   { href: "/developer", label: "Developer API", icon: CodeXmlIcon, any: ["developer.manage"], group: "manage", module: "developer" },
   { href: "/users", label: "Users & Permissions", icon: UserCogIcon, any: ["users.view"], group: "manage", shortcut: "u" },

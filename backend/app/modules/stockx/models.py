@@ -7,7 +7,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, ForeignKey, Index, String, UniqueConstraint, Uuid
+from sqlalchemy import JSON, CheckConstraint, Date, ForeignKey, Index, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
@@ -95,3 +95,48 @@ class LoyaltyEntry(UUIDPrimaryKey, Timestamps, Base):
     entry_date: Mapped[date] = mapped_column(Date, nullable=False)
     note: Mapped[str | None] = mapped_column(String(200))
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"))
+
+
+class SchemeClaimStatus(enum.StrEnum):
+    OPEN = "open"  # sent to the manufacturer, waiting
+    SETTLED = "settled"  # credit note received
+    REJECTED = "rejected"
+
+
+class SchemeClaim(UUIDPrimaryKey, Timestamps, Base):
+    """What a manufacturer owes us for the free goods and scheme discounts we gave on their behalf.
+    ``line_ids`` are the sales lines claimed, so a line is never claimed twice."""
+
+    __tablename__ = "scheme_claims"
+    __table_args__ = (UniqueConstraint("business_id", "number"),)
+
+    business_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("businesses.id", ondelete="RESTRICT"), nullable=False)
+    number: Mapped[str] = mapped_column(String(40), nullable=False)
+    claim_date: Mapped[date] = mapped_column(Date, nullable=False)
+    party_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("parties.id", ondelete="RESTRICT"), nullable=False, index=True)
+    date_from: Mapped[date] = mapped_column(Date, nullable=False)
+    date_to: Mapped[date] = mapped_column(Date, nullable=False)
+    line_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    free_quantity: Mapped[Decimal] = mapped_column(Quantity(), default=Decimal(0), nullable=False)
+    claim_amount: Mapped[Decimal] = mapped_column(Money(), nullable=False)
+    settled_amount: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), nullable=False)
+    status: Mapped[SchemeClaimStatus] = mapped_column(str_enum(SchemeClaimStatus, 10), nullable=False)
+    settlement_ref: Mapped[str | None] = mapped_column(String(60))
+    settled_on: Mapped[date | None] = mapped_column(Date)
+    notes: Mapped[str | None] = mapped_column(String(500))
+    created_by_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+
+class ChallanReturn(UUIDPrimaryKey, Timestamps, Base):
+    """Goods sent on sale-or-return (delivery challan) that came back unsold."""
+
+    __tablename__ = "challan_returns"
+    __table_args__ = (CheckConstraint("quantity > 0", name="challan_return_quantity_positive"),)
+
+    business_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("businesses.id", ondelete="RESTRICT"), nullable=False)
+    document_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("documents.id", ondelete="RESTRICT"), nullable=False, index=True)
+    line_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("document_lines.id", ondelete="RESTRICT"), nullable=False, index=True)
+    return_date: Mapped[date] = mapped_column(Date, nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Quantity(), nullable=False)
+    stock_document_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("stock_documents.id", ondelete="RESTRICT"), nullable=False)
+    created_by_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)

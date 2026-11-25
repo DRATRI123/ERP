@@ -134,6 +134,12 @@ def save_scheme(db: Session, access: BusinessAccess, data: dict[str, Any], s: Sc
         raise ValidationFailed("Give a discount between 0 and 100 %")
     if s.valid_from and s.valid_to and s.valid_to < s.valid_from:
         raise ValidationFailed("The scheme ends before it starts")
+    if s.claim_party_id:
+        from app.modules.parties.models import Party
+
+        party = db.get(Party, s.claim_party_id)
+        if party is None or party.business_id != access.business.id:
+            raise ValidationFailed("Claim-from party not found")
     db.flush()
     audit.record(db, action="scheme.saved", entity_type="scheme", entity_id=s.id, business_id=access.business.id,
                  actor_id=access.user.id, changes={"name": s.name, "kind": s.kind.value})

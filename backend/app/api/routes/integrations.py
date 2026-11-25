@@ -256,7 +256,10 @@ async def import_data(kind: str, access: Annotated[BusinessAccess, Depends(requi
     data = await file.read()
     if len(data) > 10 * 1024 * 1024:
         raise ValidationFailed("Files up to 10 MB")
-    rows = data_io.read_rows(file.filename or "upload.csv", data)
+    from app.modules.integrations.migrate import normalise_rows
+
+    rows = normalise_rows(data_io.read_rows(file.filename or "upload.csv", data),
+                          "products" if kind == "products" else "parties")
     if kind == "products":
         result = data_io.import_products(db, access, rows, dry_run=dry_run)
     elif kind in ("customers", "suppliers"):
@@ -264,6 +267,23 @@ async def import_data(kind: str, access: Annotated[BusinessAccess, Depends(requi
                                         rows, dry_run=dry_run)
     else:
         raise ValidationFailed("kind must be products, customers or suppliers")
+    db.commit()
+    return result
+
+
+@router.post("/data/import-tally", tags=["data"])
+async def import_tally(access: Annotated[BusinessAccess, Depends(require_any(
+        "products.manage", "customers.manage", "suppliers.manage"))], db: DB, file: UploadFile = File(...),
+                       dry_run: bool = False, opening_date: date | None = None,
+                       warehouse_id: uuid.UUID | None = None) -> dict:
+    """Tally masters export (XML): customers, suppliers and stock items, with opening balances and
+    opening stock on ``opening_date`` when given. Nothing is written if any entry fails."""
+    from app.modules.integrations.migrate import import_tally as run
+
+    data = await file.read()
+    if len(data) > 20 * 1024 * 1024:
+        raise ValidationFailed("Files up to 20 MB")
+    result = run(db, access, data, opening_date=opening_date, warehouse_id=warehouse_id, dry_run=dry_run)
     db.commit()
     return result
 

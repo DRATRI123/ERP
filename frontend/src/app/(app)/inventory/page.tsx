@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRightLeftIcon, BoxesIcon, PackagePlusIcon, SlidersHorizontalIcon, WarehouseIcon } from "lucide-react";
+import { ArrowRightLeftIcon, BoxesIcon, PackagePlusIcon, ScanLineIcon, SlidersHorizontalIcon, TagIcon, WarehouseIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
@@ -75,7 +76,9 @@ function InventoryPage() {
     <>
       <PageHeader title="Products & inventory" description="Your catalogue, live stock by warehouse and batch, and every movement."
         actions={<>
+          <Button asChild variant="outline"><Link href="/inventory/labels"><TagIcon /> Labels</Link></Button>
           {editStock && <>
+            <Button asChild variant="outline"><Link href="/stock-audit"><ScanLineIcon /> Audit</Link></Button>
             <Button variant="outline" onClick={() => setStockMode("adjustment")}><SlidersHorizontalIcon /> Adjust</Button>
             <Button variant="outline" onClick={() => setStockMode("transfer")}><ArrowRightLeftIcon /> Transfer</Button>
           </>}
