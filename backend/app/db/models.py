@@ -14,6 +14,7 @@ from app.modules.compliance import models as compliance_models  # noqa: F401
 from app.modules.developer import models as developer_models  # noqa: F401
 from app.modules.digest import models as digest_models  # noqa: F401
 from app.modules.events import models as event_models  # noqa: F401
+from app.modules.field import models as field_models  # noqa: F401
 from app.modules.files import models as file_models  # noqa: F401
 from app.modules.integrations import models as integration_models  # noqa: F401
 from app.modules.inventory import models as inventory_models  # noqa: F401

@@ -71,7 +71,8 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   catalogue link where buyers order from their phone; per-business modules (Settings → Modules)
   so each business shows only what it uses; a post-dated cheque register with cheque
   printing, TDS on payments and receipts with challan tracking, and interest on overdue bills; import of a
-  distributor's Excel/CSV bill that learns their item names; damage and breakage claims; loyalty points;
+  distributor's Excel/CSV bill that learns their item names; damage and breakage claims; loyalty points; field sales with beats, a phone page
+  for orders, collections and visit notes, and monthly targets;
   for a medical store, pharmacy billing with salts and
   substitutes, rack, PTR/PTS, strip + loose selling, doctors, prescriptions required for
   Schedule H/H1/X, the H1 register, doctor-wise sales and an automatic near-expiry discount. Every page has an ⓘ guide, and Help & guide

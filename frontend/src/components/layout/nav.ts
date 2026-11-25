@@ -1,5 +1,5 @@
 import {
-  BanknoteIcon, BarChart3Icon, PackageXIcon, StarIcon, BookOpenIcon, PercentIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
+  BanknoteIcon, BarChart3Icon, RouteIcon, PackageXIcon, StarIcon, BookOpenIcon, PercentIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
   LayoutDashboardIcon, PlugIcon, ReceiptIndianRupeeIcon, SettingsIcon, ShoppingCartIcon, TruckIcon, UsersIcon,
   IdCardIcon, LifeBuoyIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, StethoscopeIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
 } from "lucide-react";
@@ -29,6 +29,7 @@ export const NAV: NavItem[] = [
   { href: "/manufacturing", label: "Manufacturing", icon: FactoryIcon, any: ["stock.view"], group: "main", module: "manufacturing" },
   { href: "/pricing", label: "Pricing & Schemes", icon: TagsIcon, any: ["products.view"], group: "main", module: "pricing" },
   { href: "/catalogue", label: "WhatsApp catalogue", icon: MessageCircleIcon, any: ["business.settings", "invoices.view"], group: "main", module: "catalogue" },
+  { href: "/field", label: "Field sales", icon: RouteIcon, any: ["customers.view"], group: "main", module: "field" },
   { href: "/customers", label: "Customers", icon: UsersIcon, any: ["customers.view"], group: "main", shortcut: "c" },
   { href: "/suppliers", label: "Suppliers", icon: TruckIcon, any: ["suppliers.view"], group: "main" },
   { href: "/loyalty", label: "Loyalty points", icon: StarIcon, any: ["customers.view"], group: "main", module: "loyalty" },

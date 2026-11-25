@@ -120,6 +120,22 @@ PostgreSQL.
     overdue amounts, and stock value.
   * Shown per business and in total, for today, this month or this financial year.
   * A six-month sales chart. Clicking a business opens its dashboard.
+* **Field sales** (module `field`, migration 0021; under `/businesses/{id}/field`):
+  * **Beats:** a named route of customers in visiting order, a weekday and a salesman (any
+    member of the business).
+  * **The day** (`GET /field/day`): the salesman's beat for today's weekday (or one chosen).
+    Each customer shows phone, address, dues (with `customer_balances.view`), credit hold, last
+    visit and today's outcome. Other salesmen's days are for `reports.view` only.
+  * **Visits** (`POST /field/visits`): outcome (order, payment, both, no order, closed, other),
+    note, optional GPS position, the order or payment it produced, and the next visit date.
+  * **Orders** from the field are sales orders with the salesman as `salesperson_id`; invoices
+    converted from them keep it.
+  * **Targets** (`PUT /field/targets`, `users.manage`): monthly sales and collection targets.
+    `GET /field/targets` shows for each salesman:
+    * net sales (invoices less returns where they are the salesperson);
+    * orders, collections (receipts they recorded) and visits / productive visits;
+    * % achieved and whether they are on pace for the days gone.
+  * Without `reports.view`, a salesman sees only their own row.
 * **Supplier bill import** (`POST /purchases/import/preview` with the file, then `POST /purchases/import`):
   * Reads the distributor's CSV or Excel bill. Columns are recognised by their usual names
     (item name / product / description, code, barcode, HSN, qty, free / scheme qty, rate / PTR,

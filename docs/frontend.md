@@ -102,6 +102,23 @@ CI runs these plus `npm audit`, and an end-to-end job that installs with `setup.
   near-expiry discount sits under it while Pharmacy is on.
 * `/settings?tab=modules` opens the tab directly; the old `?tab=pharmacy` also lands there.
 
+## Field sales
+
+`/field` has four tabs.
+
+* **My day** is built for the phone: today's beat as cards with dues, last visit, call / WhatsApp
+  / map links.
+  * *Order* opens a product search with quantities and books a sales order with the salesman as
+    salesperson.
+  * *Collect* opens the payment dialog for that customer.
+  * *Note* records the outcome, a note and the next visit, with the location if the phone allows.
+  * Customers off the beat can be picked too.
+* **Targets:** month picker, and per salesman target vs sales with a progress bar and on
+  pace / behind, plus orders, collections and visits. *Set target* is for `users.manage`.
+* **Beats:** create or edit a beat with its day, salesman and an ordered customer list (add,
+  move up / down, remove).
+* **Visits:** every visit of a day with time, outcome, note and a map link.
+
 ## Supplier bill import, damage and loyalty
 
 * **Purchases → Import supplier bill** (`/purchases/import`): supplier, bill number and date,

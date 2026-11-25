@@ -264,6 +264,31 @@ export const HELP: HelpTopic[] = [
 
   // ------------------------------------------------------------------ stock
   {
+    id: "field", title: "Field sales: beats, salesman's day, targets", group: "Selling", routes: ["/field"],
+    summary: "Give each salesman a route (beat) of customers; on their phone they take orders, collect money and note every visit; you see targets vs achievement.",
+    sections: [
+      { heading: "Set up (manager)", steps: [
+        "Settings → Modules → switch on Field sales.",
+        "Users & Permissions → invite each salesman (role Sales executive). If they collect money, also give them “Record payments”.",
+        "Field sales → Beats → New beat: name, day of the week, salesman, and the customers in visiting order.",
+        "Field sales → Targets → Set target per salesman per month (sales and collection).",
+      ] },
+      { heading: "The salesman's day (on the phone)", steps: [
+        "Field sales → My day shows today's beat: each shop with its dues, last visit, call / WhatsApp / map.",
+        "Order: search products, set quantities, Book order — a sales order with them as salesperson.",
+        "Collect: record cash / UPI / cheque against the shop's bills.",
+        "Note: outcome (order, payment, no order, shop closed…), a note, next visit date; location is saved if allowed.",
+        "A shop not on the beat? “Visit another customer”.",
+      ] },
+      { heading: "Following up", steps: [
+        "Targets shows sales (invoices where they are the salesperson, less returns), orders, collections and visits, with “on pace / behind” for the days gone.",
+        "Visits lists every visit of a day with time, outcome, note and a map link.",
+        "Convert sales orders into invoices as usual (Sales → the order → Convert): the salesperson carries over.",
+      ] },
+    ],
+    related: ["sales", "customers", "payments"],
+  },
+  {
     id: "purchase-import", title: "Import a supplier's bill (Excel / CSV)", group: "Buying", routes: ["/purchases/import"],
     summary: "Your distributor sends the bill as a file: upload it instead of typing every line. Items you match once are remembered for that supplier.",
     sections: [

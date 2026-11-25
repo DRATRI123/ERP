@@ -2,11 +2,11 @@
 
 import { useBizQuery } from "@/hooks/use-business";
 
-export type ModuleKey = "pharmacy" | "cheques" | "tds" | "interest" | "damage" | "loyalty" | "manufacturing" | "pricing" | "catalogue" | "payroll" | "claims" | "licences" | "automation" | "developer";
+export type ModuleKey = "pharmacy" | "cheques" | "tds" | "interest" | "damage" | "loyalty" | "field" | "manufacturing" | "pricing" | "catalogue" | "payroll" | "claims" | "licences" | "automation" | "developer";
 export interface ModuleInfo { key: ModuleKey; label: string; description: string; enabled: boolean; default: boolean }
 
 /** Defaults while the business's choice loads: everything on except pharmacy (as on the server). */
-const DEFAULT_OFF = new Set<string>(["pharmacy", "interest", "loyalty"]);
+const DEFAULT_OFF = new Set<string>(["pharmacy", "interest", "loyalty", "field"]);
 
 export function isModuleOn(modules: Record<string, boolean> | undefined, key: string) {
   return modules?.[key] ?? !DEFAULT_OFF.has(key);

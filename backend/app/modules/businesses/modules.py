@@ -36,6 +36,8 @@ MODULES: tuple[Module, ...] = (
     Module("damage", "Damage & breakage claims",
            "Write off broken, leaking or damaged stock and claim it from the supplier until they credit it.", True),
     Module("loyalty", "Loyalty points", "Customers earn points on every bill and spend them as payment.", False),
+    Module("field", "Field sales",
+           "Beats / routes for salesmen, a phone page for orders, collections and visit notes, and monthly targets.", False),
     Module("manufacturing", "Manufacturing", "Recipes, production runs, batch costing and quality control.", True),
     Module("pricing", "Price lists & schemes", "Customer price lists, \"10 + 1\" and quantity-discount schemes.", True),
     Module("catalogue", "WhatsApp catalogue", "A link where buyers order from their phone.", True),

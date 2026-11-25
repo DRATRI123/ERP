@@ -220,6 +220,14 @@ Also:
 * `journal_entries.source_type` also accepts `claim`.
 * New system account: 6095 Loyalty Rewards.
 
+## Field sales (migration 0021)
+
+| Table | Purpose |
+|---|---|
+| `beats` | Route: name (unique per business), weekday 0–6 or any, salesman (user), customer ids in visiting order, active |
+| `visits` | One visit: salesman, customer, beat, date and time, outcome, note, latitude/longitude, order and payment produced, next visit |
+| `sales_targets` | Monthly sales and collection target per salesman (unique per business, salesman, month) |
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |
