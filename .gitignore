@@ -18,3 +18,6 @@ node_modules/
 .next/
 target/
 .DS_Store
+
+# what setup/start last installed and built (tools/stamp.py)
+/.setup-state.json

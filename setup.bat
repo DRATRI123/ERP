@@ -27,23 +27,25 @@ if errorlevel 1 (
   goto :fail
 )
 
-rem ---------------------------------------------------------------- backend
-echo [1/6] Python packages (first run takes a few minutes)...
+rem ---------------------------------------------------------------- packages and web app
+echo [1/5] Packages and web app (first run takes several minutes; later runs only redo what changed)...
 if not exist "backend\.venv\Scripts\python.exe" (
   python -m venv backend\.venv || goto :fail
+  call "backend\.venv\Scripts\activate.bat"
+  python -m pip install --quiet --upgrade pip || goto :fail
+) else (
+  call "backend\.venv\Scripts\activate.bat"
 )
-call "backend\.venv\Scripts\activate.bat"
-python -m pip install --quiet --upgrade pip || goto :fail
-python -m pip install --quiet -e backend || goto :fail
+call tools\refresh.bat || goto :fail
 
-echo [2/6] Settings and secret keys...
+echo [2/5] Settings and secret keys...
 python backend\scripts\init_env.py || goto :fail
 
-echo [3/6] Database...
+echo [3/5] Database...
 pushd backend
 python -m app.cli migrate || (popd & goto :fail)
 
-echo [4/6] Owner account...
+echo [4/5] Owner account...
 python -m app.cli owner-exists >nul 2>nul
 if errorlevel 1 (
   echo   Create the owner account ^(you^). The password is typed hidden.
@@ -61,22 +63,10 @@ if errorlevel 1 (
 )
 popd
 
-rem ---------------------------------------------------------------- frontend
-echo [5/6] Web app packages...
-pushd frontend
-call npm ci --no-audit --no-fund --loglevel=error || (popd & goto :fail)
-echo [6/6] Building the web app...
-call npm run build || (popd & goto :fail)
-popd
-
-rem Real-time service (only used when Redis is configured in backend\.env)
-pushd services\realtime
-call npm ci --no-audit --no-fund --loglevel=error >nul 2>nul && call npm run build >nul 2>nul
-popd
-
 echo.
 echo  ==============================================
 echo   Done. Double-click start.bat to open the ERP.
+echo   To get new code later: double-click update.bat ^(git pull + start^).
 echo  ==============================================
 echo   Your data and keys are in backend\data and backend\.env - back both up.
 echo.

@@ -2,9 +2,11 @@
 # Private ERP — start everything locally (macOS / Linux). Ctrl+C stops it all.
 set -euo pipefail
 cd "$(dirname "$0")"
-[ -x backend/.venv/bin/python ] && [ -f frontend/.next/BUILD_ID ] || { echo "Run ./setup.sh first."; exit 1; }
+[ -x backend/.venv/bin/python ] && [ -f backend/.env ] || { echo "Run ./setup.sh first."; exit 1; }
 # shellcheck disable=SC1091
 source backend/.venv/bin/activate
+echo "Checking for changes since last start..."
+tools/refresh.sh
 (cd backend && python -m app.cli migrate >/dev/null)
 mkdir -p backend/data/logs
 pids=()

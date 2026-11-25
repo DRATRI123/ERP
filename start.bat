@@ -3,10 +3,16 @@ setlocal EnableExtensions
 title Private ERP
 cd /d "%~dp0"
 if not exist "backend\.venv\Scripts\python.exe" goto :needsetup
-if not exist "frontend\.next\BUILD_ID" goto :needsetup
+if not exist "backend\.env" goto :needsetup
+
+rem Close an ERP that is already running, so files can be updated and ports are free.
+taskkill /FI "WINDOWTITLE eq ERP - *" /T /F >nul 2>nul
+
+echo Checking for changes since last start...
+call "backend\.venv\Scripts\activate.bat"
+call tools\refresh.bat || (echo. & echo Updating failed - read the message above. & pause & exit /b 1)
 
 echo Starting Private ERP...
-call "backend\.venv\Scripts\activate.bat"
 pushd backend
 python -m app.cli migrate >nul || (popd & echo Database update failed - run setup.bat & pause & exit /b 1)
 popd

@@ -10,20 +10,22 @@ command -v "$PY" >/dev/null || die "Python 3.12+ is required (https://www.python
 "$PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' || die "Python 3.12 or newer is required."
 command -v node >/dev/null || die "Node.js 22 LTS is required (https://nodejs.org/)."
 
-say "[1/6] Python packages"
-[ -x backend/.venv/bin/python ] || "$PY" -m venv backend/.venv
+say "[1/5] Packages and web app (first run takes several minutes; later runs only redo what changed)"
+if [ ! -x backend/.venv/bin/python ]; then
+  "$PY" -m venv backend/.venv
+  backend/.venv/bin/python -m pip install --quiet --upgrade pip
+fi
 # shellcheck disable=SC1091
 source backend/.venv/bin/activate
-python -m pip install --quiet --upgrade pip
-python -m pip install --quiet -e backend
+tools/refresh.sh
 
-say "[2/6] Settings and secret keys"
+say "[2/5] Settings and secret keys"
 python backend/scripts/init_env.py
 
-say "[3/6] Database"
+say "[3/5] Database"
 (cd backend && python -m app.cli migrate)
 
-say "[4/6] Owner account"
+say "[4/5] Owner account"
 if (cd backend && python -m app.cli owner-exists >/dev/null 2>&1); then
   echo "Owner account already exists."
 else
@@ -38,11 +40,6 @@ else
   fi
 fi
 
-say "[5/6] Web app packages"
-(cd frontend && npm ci --no-audit --no-fund --loglevel=error)
-say "[6/6] Building the web app"
-(cd frontend && npm run build)
-(cd services/realtime && npm ci --no-audit --no-fund --loglevel=error >/dev/null && npm run build >/dev/null) || true
 
-say "Done. Run ./start.sh to open the ERP."
+say "Done. Run ./start.sh to open the ERP (./update.sh later gets new code: git pull + start)."
 echo "Your data and keys are in backend/data and backend/.env — back both up."

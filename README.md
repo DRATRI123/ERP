@@ -95,13 +95,22 @@ You need **Python 3.12+** ([python.org](https://www.python.org/downloads/) — o
 
 **Windows**
 
-1. Double-click **`setup.bat`** (first time, and again after every update). It installs
-   everything, creates `backend\.env` with new secret keys, sets up the database, asks for your
-   e-mail, name and password (hidden), and offers a sample *Demo* business to explore.
+1. Double-click **`setup.bat`** — **once**. It installs everything, creates `backend\.env` with
+   new secret keys, sets up the database, asks for your e-mail, name and password (hidden), and
+   offers a sample *Demo* business to explore.
 2. Double-click **`start.bat`** — the ERP opens at <http://localhost:3000>.
-3. **`stop.bat`** stops it; **`backup.bat`** takes an encrypted backup now.
+3. **New code:** double-click **`update.bat`** (stops the ERP, `git pull`, starts it). Or
+   `git pull` yourself and double-click `start.bat`.
+4. **`stop.bat`** stops it; **`backup.bat`** takes an encrypted backup now.
 
-**macOS / Linux:** `./setup.sh` once, then `./start.sh` (Ctrl+C stops it).
+Updates only redo what changed (`tools/stamp.py` remembers a fingerprint of each step in
+`.setup-state.json`): Python packages only when `backend/pyproject.toml` changes, web packages
+only when `frontend/package-lock.json` changes, and the web build only when files in
+`frontend/` change. Database changes are applied on every start. With nothing new, `start.bat`
+skips all of it; the first start after this change redoes everything once.
+
+**macOS / Linux:** `./setup.sh` once, then `./start.sh` (Ctrl+C stops it); `./update.sh` for
+new code.
 
 Your data lives in `backend/data` and your keys in `backend/.env` — back up both (the backup
 key is needed to restore backups). PDFs use Microsoft Edge or Google Chrome automatically. The
