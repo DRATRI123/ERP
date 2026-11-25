@@ -25,6 +25,8 @@ import { useDebounced } from "@/hooks/use-debounce";
 import { api, ApiError } from "@/lib/api";
 import { dec, decStr, money, qty, todayISO } from "@/lib/format";
 import { DOC_LABEL, PURCHASE_TYPES, SALES_TYPES, type DocType, type DocumentFull, type DocumentLine, type Party, type Product } from "@/lib/types";
+import { useT } from "@/lib/i18n";
+import { enqueueBill, estimateTotal, isNetworkError, useOnline } from "@/lib/offline";
 import { cn } from "@/lib/utils";
 
 interface Line {
@@ -32,6 +34,7 @@ interface Line {
   quantity: string; unit_price: string; discount_percent: string; gst_rate?: string; stock?: string | null;
   batched?: boolean; batch_no?: string; expiry_date?: string; mrp?: string;
   priceTyped?: boolean; // only typed rates are sent; otherwise the server prices (price lists, tiers)
+  incl?: boolean; // price includes GST (for the offline estimate)
   schedule?: string; rack?: string | null; composition?: string | null; packSize?: number; packLabel?: string | null;
 }
 const TIERS = [["retail", "Retail"], ["wholesale", "Wholesale"], ["mrp", "MRP"], ["ptr", "PTR (to retailer)"], ["pts", "PTS (to stockist)"]] as const;
@@ -67,6 +70,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   const { base, id: bizId, can, isOwner } = useBusiness();
   const types = side === "sales" ? SALES_TYPES : PURCHASE_TYPES;
   const modules = useModules();
+  const tr = useT();
   const pharmacy = modules.on("pharmacy");
   const [docType, setDocType] = useState<DocType>(draft?.doc_type ?? (side === "sales" ? "sales_invoice" : "purchase_invoice"));
   const [party, setParty] = useState<Party | null>(draft?.party_id ? ({ id: draft.party_id, name: draft.party_name ?? "" } as Party) : null);
@@ -114,8 +118,11 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
     queryFn: () => api<DocumentFull>(`${base}/documents/preview`, { body: previewBody }),
     placeholderData: (p) => p, retry: false, staleTime: 60_000,
   });
-  const totals = lines.length ? preview.data : undefined;
-  const grand = totals?.grand_total ?? "0";
+  const online = useOnline();
+  const offline = !online || (!!preview.error && isNetworkError(preview.error));
+  const estimate = estimateTotal(lines);
+  const totals = lines.length && !offline ? preview.data : undefined;
+  const grand = offline ? (lines.length ? `${estimate}.00` : "0") : (totals?.grand_total ?? "0");
   const paid = payments.reduce((s, p) => s + dec(p.amount || "0"), 0n);
   const points = useQuery({
     queryKey: ["biz", bizId, "loyalty", party?.id], enabled: side === "sales" && !!party && modules.on("loyalty"),
@@ -141,7 +148,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
         batched: p.batch_tracking && p.track_inventory, mrp: side === "purchase" && p.mrp ? String(Number(p.mrp)) : undefined,
         schedule: (p.drug_schedule as string | undefined) ?? undefined, rack: (p.rack as string | null) ?? null,
         composition: (p.composition as string | null) ?? null, packSize: p.pack_size ? Number(p.pack_size) : undefined,
-        packLabel: (p.pack_label as string | null) ?? null }];
+        packLabel: (p.pack_label as string | null) ?? null, incl: p.prices_include_tax }];
     });
   }, [side, setLines]);
   /** Swap a line to a substitute (same salt), keeping its quantity. */
@@ -155,21 +162,47 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   const remove = (key: string) => setLines((ls) => ls.filter((l) => l.key !== key));
 
   // ------------------------------------------------------------------ save / finalize
+  /** No internet: keep a sales invoice in the device's queue; it is sent when the connection returns. */
+  function queueOffline() {
+    if (draftId || docType !== "sales_invoice") throw new Error("You are offline. Only new sales invoices can be saved offline.");
+    const paidFull = paid >= dec(grand) && payments.length > 0;
+    if (!party && !paidFull) throw new Error("Offline walk-in sales must be paid in full.");
+    const ok = enqueueBill(bizId, {
+      client_ref: `off-${uid()}${uid()}${uid()}`, label: `${party?.name ?? (partyName || "Walk-in")} · ${lines.length} item${lines.length === 1 ? "" : "s"}`,
+      estimate: grand, body, pay_mode: paidFull ? payments[0]!.mode : null,
+    });
+    if (!ok) throw new Error("This device's storage is full — the bill could not be saved offline.");
+    return null;
+  }
   const save = useMutation({
+    networkMode: "always", // offline, finalize queues the bill on this device
     mutationFn: async (finalize: boolean) => {
-      const doc = draftId
+      if (finalize && offline) return queueOffline();
+      let doc: DocumentFull;
+      try {
+        doc = draftId
         ? await api<DocumentFull>(`${base}/documents/${draftId}`, { method: "PATCH", body: { ...body, doc_type: undefined } })
         : await api<DocumentFull>(`${base}/documents`, { body: { ...body, client_ref: `ui-${uid()}${uid()}` } });
+      } catch (e) {
+        if (finalize && isNetworkError(e)) return queueOffline();
+        throw e;
+      }
       if (!finalize) return doc;
       return api<DocumentFull>(`${base}/documents/${doc.id}/finalize`, {
         body: { payments: payments.filter((p) => Number(p.amount) > 0).map((p) => ({ mode: p.mode, amount: p.amount, reference: p.reference || undefined })) },
       });
     },
     onSuccess: (doc, finalize) => {
+      if (doc === null) {
+        toast.success("Saved on this device — it will be sent when the internet is back", { description: `About ${money(grand)}` });
+        setLines([]); setPayments([]); setParty(null); setPartyName(""); setNotes("");
+        search.current?.focus();
+        return;
+      }
       toast.success(finalize ? `${DOC_LABEL[doc.doc_type]} ${doc.number} saved` : "Draft saved");
       router.push(`/documents/${doc.id}${finalize ? "?print=1" : ""}`);
     },
-    onError: (e: ApiError) => toast.error(e.message, { description: Object.values(e.fieldErrors)[0] }),
+    onError: (e: Error) => toast.error(e.message, { description: e instanceof ApiError ? Object.values(e.fieldErrors)[0] : undefined }),
   });
   const needsRx = pharmacy && side === "sales" && lines.some((l) => l.schedule && RX_SCHEDULES.has(l.schedule));
   const needsRxNo = pharmacy && side === "sales" && lines.some((l) => l.schedule && REGISTER_SCHEDULES.has(l.schedule));
@@ -177,7 +210,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   const missingBatch = side === "purchase" && docType === "purchase_invoice" && lines.some((l) => l.batched && !l.batch_no?.trim());
   const canSave = lines.length > 0 && lines.every((l) => Number(l.quantity) > 0) && !save.isPending && !missingBatch;
   const canFinalize = canSave && !rxMissing;
-  const finalizeLabel = docType === "sales_invoice" || docType === "purchase_invoice" ? "Save & finalize" : "Save & issue";
+  const finalizeLabel = tr(docType === "sales_invoice" || docType === "purchase_invoice" ? "Save & finalize" : "Save & issue");
 
   // ------------------------------------------------------------------ shortcuts
   useEffect(() => {
@@ -205,30 +238,30 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
       <div className="min-w-0 space-y-4">
         <Card>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Field label="Document">
+            <Field label={tr("Document")}>
               <NativeSelect value={docType} onChange={(e) => setDocType(e.target.value as DocType)} disabled={!!draftId}>
-                {types.map((t) => <option key={t} value={t}>{DOC_LABEL[t]}</option>)}
+                {types.map((t) => <option key={t} value={t}>{tr(DOC_LABEL[t])}</option>)}
               </NativeSelect>
             </Field>
-            <Field label={<>{side === "sales" ? "Customer" : "Supplier"} <kbd className="rounded border px-1 text-[10px] text-muted-foreground">F4</kbd></>} className="sm:col-span-2">
+            <Field label={<>{tr(side === "sales" ? "Customer" : "Supplier")} <kbd className="rounded border px-1 text-[10px] text-muted-foreground">F4</kbd></>} className="sm:col-span-2">
               <PartyPicker ref={partyBtn} kind={side === "sales" ? "customers" : "suppliers"} value={party} onChange={setParty}
-                placeholder={side === "sales" ? "Walk-in customer" : "Choose supplier"}
+                placeholder={tr(side === "sales" ? "Walk-in customer" : "Choose supplier")}
                 onCreate={(isOwner || can(side === "sales" ? "customers.manage" : "suppliers.manage")) ? setNewParty : undefined} />
             </Field>
-            <Field label="Date" htmlFor="doc-date"><Input id="doc-date" type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} /></Field>
+            <Field label={tr("Date")} htmlFor="doc-date"><Input id="doc-date" type="date" value={docDate} onChange={(e) => setDocDate(e.target.value)} /></Field>
             {side === "sales" && !party && (
-              <Field label="Walk-in name (optional)" className="sm:col-span-2"><Input value={partyName} onChange={(e) => setPartyName(e.target.value)} placeholder="Printed on the bill" /></Field>
+              <Field label={tr("Walk-in name (optional)")} className="sm:col-span-2"><Input value={partyName} onChange={(e) => setPartyName(e.target.value)} placeholder="Printed on the bill" /></Field>
             )}
             {side === "purchase" && (
-              <Field label="Supplier bill no." htmlFor="doc-supplier-no"><Input id="doc-supplier-no" value={supplierNo} onChange={(e) => setSupplierNo(e.target.value)} /></Field>
+              <Field label={tr("Supplier bill no.")} htmlFor="doc-supplier-no"><Input id="doc-supplier-no" value={supplierNo} onChange={(e) => setSupplierNo(e.target.value)} /></Field>
             )}
             {side === "sales" && (
-              <Field label="Rate" htmlFor="doc-tier" hint={tier === "ptr" || tier === "pts" ? "Pharma trade rate" : undefined}>
-                <NativeSelect id="doc-tier" value={tier} onChange={(e) => setTier(e.target.value)}>{TIERS.filter(([v]) => pharmacy || (v !== "ptr" && v !== "pts")).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</NativeSelect>
+              <Field label={tr("Rate")} htmlFor="doc-tier" hint={tier === "ptr" || tier === "pts" ? "Pharma trade rate" : undefined}>
+                <NativeSelect id="doc-tier" value={tier} onChange={(e) => setTier(e.target.value)}>{TIERS.filter(([v]) => pharmacy || (v !== "ptr" && v !== "pts")).map(([v, l]) => <option key={v} value={v}>{tr(l)}</option>)}</NativeSelect>
               </Field>
             )}
             {side === "sales" && party && <CreditPanel partyId={party.id} />}
-            {party && <Field label="Due date" htmlFor="doc-due"><Input id="doc-due" type="date" value={dueDate} min={docDate} onChange={(e) => setDueDate(e.target.value)} /></Field>}
+            {party && <Field label={tr("Due date")} htmlFor="doc-due"><Input id="doc-due" type="date" value={dueDate} min={docDate} onChange={(e) => setDueDate(e.target.value)} /></Field>}
           </CardContent>
         </Card>
 
@@ -251,16 +284,16 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
         <Card className="overflow-visible">
           <div className="border-b p-3"><ProductSearch ref={search} onPick={addProduct} /></div>
           {lines.length === 0 ? (
-            <EmptyState title="Add items to start" description="Scan a barcode or type a product name, SKU or HSN, then press Enter. F2 jumps back here." />
+            <EmptyState title={tr("Add items to start")} description="Scan a barcode or type a product name, SKU or HSN, then press Enter. F2 jumps back here." />
           ) : (
             <div className="md:overflow-x-auto">
               <table className="w-full text-sm max-md:block">
                 <thead className="bg-muted/40 text-xs text-muted-foreground uppercase max-md:hidden">
                   <tr>
-                    <th className="w-8 px-3 py-2 text-left">#</th><th className="px-3 py-2 text-left">Item</th>
-                    <th className="w-36 px-2 py-2 text-center">Qty</th><th className="w-32 px-2 py-2 text-right">Rate</th>
-                    <th className="w-20 px-2 py-2 text-right">Disc %</th><th className="hidden w-16 px-2 py-2 text-right md:table-cell">GST</th>
-                    <th className="w-32 px-3 py-2 text-right">Amount</th><th className="w-10" />
+                    <th className="w-8 px-3 py-2 text-left">#</th><th className="px-3 py-2 text-left">{tr("Item")}</th>
+                    <th className="w-36 px-2 py-2 text-center">{tr("Qty")}</th><th className="w-32 px-2 py-2 text-right">{tr("Rate")}</th>
+                    <th className="w-20 px-2 py-2 text-right">{tr("Disc %")}</th><th className="hidden w-16 px-2 py-2 text-right md:table-cell">GST</th>
+                    <th className="w-32 px-3 py-2 text-right">{tr("Amount")}</th><th className="w-10" />
                   </tr>
                 </thead>
                 <tbody className="divide-y max-md:block">
@@ -291,7 +324,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                           ) : <BatchSelect productId={l.product_id} value={l.batch_no ?? ""} onChange={(b) => update(l.key, { batch_no: b || undefined })} />)}
                         </td>
                         <td className="px-2 py-2 max-md:p-0">
-                          <span className="text-[10px] text-muted-foreground uppercase md:hidden">Qty</span>
+                          <span className="text-[10px] text-muted-foreground uppercase md:hidden">{tr("Qty")}</span>
                           <div className="flex items-center justify-center gap-1 max-md:justify-start">
                             <Button type="button" variant="ghost" size="icon-sm" className="size-7" onClick={() => update(l.key, { quantity: String(Math.max(1, Number(l.quantity || 0) - 1)) })} aria-label="Decrease"><MinusIcon /></Button>
                             <Input value={l.quantity} inputMode="decimal" onChange={(e) => update(l.key, { quantity: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 w-14 px-1 text-center" aria-label="Quantity" />
@@ -304,9 +337,9 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                             </div>
                           )}
                         </td>
-                        <td className="px-2 py-2 max-md:p-0"><span className="text-[10px] text-muted-foreground uppercase md:hidden">Rate</span><Input value={l.priceTyped || !t ? l.unit_price : String(Number(t.unit_price))} inputMode="decimal" onChange={(e) => update(l.key, { unit_price: e.target.value.replace(/[^\d.]/g, ""), priceTyped: true })} className="num h-8 text-right" aria-label="Rate" />
+                        <td className="px-2 py-2 max-md:p-0"><span className="text-[10px] text-muted-foreground uppercase md:hidden">{tr("Rate")}</span><Input value={l.priceTyped || !t ? l.unit_price : String(Number(t.unit_price))} inputMode="decimal" onChange={(e) => update(l.key, { unit_price: e.target.value.replace(/[^\d.]/g, ""), priceTyped: true })} className="num h-8 text-right" aria-label="Rate" />
                           {typeof t?.custom_fields === "object" && (t.custom_fields as Record<string, string>)?.scheme && <p className="mt-0.5 text-right text-[11px] text-primary">{(t.custom_fields as Record<string, string>).scheme}</p>}</td>
-                        <td className="px-2 py-2 max-md:p-0"><span className="text-[10px] text-muted-foreground uppercase md:hidden">Disc %</span><Input value={l.discount_percent} inputMode="decimal" placeholder="0" onChange={(e) => update(l.key, { discount_percent: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 text-right" aria-label="Discount percent" /></td>
+                        <td className="px-2 py-2 max-md:p-0"><span className="text-[10px] text-muted-foreground uppercase md:hidden">{tr("Disc %")}</span><Input value={l.discount_percent} inputMode="decimal" placeholder="0" onChange={(e) => update(l.key, { discount_percent: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 text-right" aria-label="Discount percent" /></td>
                         <td className="num hidden px-2 py-2 text-right text-muted-foreground md:table-cell">{l.gst_rate ? `${Number(l.gst_rate)}%` : "—"}</td>
                         <td className="num px-3 py-2 text-right font-medium max-md:col-span-2 max-md:self-center max-md:p-0 max-md:text-left max-md:text-base">{t ? money(t.line_total) : preview.isFetching ? <Skeleton className="ml-auto h-4 w-16 max-md:ml-0" /> : "—"}</td>
                         <td className="px-1 max-md:justify-self-end max-md:p-0"><Button type="button" variant="ghost" size="icon-sm" onClick={() => remove(l.key)} aria-label="Remove line"><Trash2Icon className="text-muted-foreground" /></Button></td>
@@ -327,45 +360,46 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
           )}
           <div className="flex items-center justify-between border-t px-3 py-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setLines((ls) => [...ls, { key: uid(), product_id: null, name: "", quantity: "1", unit_price: "", discount_percent: "", gst_rate: "18" }])}>
-              <PlusIcon /> Add service / custom line
+              <PlusIcon /> {tr("Add service / custom line")}
             </Button>
             <span className="text-xs text-muted-foreground">{lines.length} item{lines.length === 1 ? "" : "s"} · {qty(lines.reduce((s, l) => s + Number(l.quantity || 0), 0))} units</span>
           </div>
         </Card>
         {missingBatch && <p className="text-sm text-amber-700 dark:text-warning">Enter the batch number for each batch-tracked item (printed on the pack).</p>}
-        <Card><CardContent><Field label="Notes (printed)"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-14" /></Field></CardContent></Card>
+        <Card><CardContent><Field label={tr("Notes (printed)")}><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-14" /></Field></CardContent></Card>
       </div>
 
       <div className="xl:sticky xl:top-20 xl:self-start">
         <Card>
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Summary</CardTitle>
+            <CardTitle>{tr("Summary")}</CardTitle>
             {preview.isFetching ? <Loader2Icon className="size-4 animate-spin text-muted-foreground" /> : totals && <Badge variant="blue">{totals.is_interstate ? "Inter-state · IGST" : "Intra-state · CGST+SGST"}</Badge>}
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            {preview.error && <p className="rounded-md bg-destructive/5 px-2 py-1.5 text-xs text-destructive">{(preview.error as ApiError).message}</p>}
-            <Row label="Subtotal" value={totals?.subtotal} />
-            {totals && Number(totals.discount_total) > 0 && <Row label="Discount" value={`-${totals.discount_total}`} />}
-            <Row label="Taxable value" value={totals?.taxable_total} />
+            {offline ? <p className="rounded-md bg-warning/15 px-2 py-1.5 text-xs text-amber-800 dark:text-warning">Offline: the total below is approximate. Save & finalize keeps the bill on this device and sends it when you are back online.</p>
+              : preview.error && <p className="rounded-md bg-destructive/5 px-2 py-1.5 text-xs text-destructive">{(preview.error as ApiError).message}</p>}
+            <Row label={tr("Subtotal")} value={totals?.subtotal} />
+            {totals && Number(totals.discount_total) > 0 && <Row label={tr("Discount")} value={`-${totals.discount_total}`} />}
+            <Row label={tr("Taxable value")} value={totals?.taxable_total} />
             {tax.map(([k, v]) => <Row key={k} label={k!} value={v} />)}
             {totals && Number(totals.cess_total) > 0 && <Row label="Cess" value={totals.cess_total} />}
-            {totals && Number(totals.round_off) !== 0 && <Row label="Round off" value={totals.round_off} />}
+            {totals && Number(totals.round_off) !== 0 && <Row label={tr("Round off")} value={totals.round_off} />}
             <div className="flex items-baseline justify-between border-t pt-3">
-              <span className="font-medium">Total</span>
+              <span className="font-medium">{tr("Total")}</span>
               <span className="num text-3xl font-semibold tracking-tight">{money(grand)}</span>
             </div>
           </CardContent>
           {(docType === "sales_invoice" || docType === "purchase_invoice") && (
             <CardContent className="space-y-3 border-t">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">{side === "sales" ? "Payment received" : "Payment made"}</p>
-                {payments.length > 0 && <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setPayments([])}>Clear</Button>}
+                <p className="text-sm font-medium">{tr(side === "sales" ? "Payment received" : "Payment made")}</p>
+                {payments.length > 0 && <Button variant="link" size="sm" className="h-auto p-0" onClick={() => setPayments([])}>{tr("Clear")}</Button>}
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {MODES.slice(0, 3).map((m) => (
                   <Button key={m.v} type="button" variant="outline" size="sm" disabled={dec(grand) <= 0n}
                     onClick={() => setPayments([{ key: uid(), mode: m.v, amount: decStr(dec(grand)), reference: "" }])}>
-                    <m.icon /> {m.label}
+                    <m.icon /> {tr(m.label)}
                   </Button>
                 ))}
               </div>
@@ -389,11 +423,11 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
               ))}
               {payments.length > 0 && payments.length < 5 && (
                 <Button variant="ghost" size="sm" onClick={() => setPayments((ps) => [...ps, { key: uid(), mode: "cash", amount: due > 0n ? decStr(due) : "", reference: "" }])}>
-                  <PlusIcon /> Split payment
+                  <PlusIcon /> {tr("Split payment")}
                 </Button>
               )}
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Balance due</span>
+                <span className="text-muted-foreground">{tr("Balance due")}</span>
                 <span className={cn("num font-medium", due > 0n ? "text-amber-600 dark:text-warning" : "text-primary")}>{money(decStr(due > 0n ? due : 0n))}</span>
               </div>
               {side === "sales" && !party && due > 0n && lines.length > 0 && (
@@ -408,7 +442,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
               {save.isPending ? <Loader2Icon className="animate-spin" /> : <CheckCircle2Icon />} {finalizeLabel} <kbd className="ml-auto rounded bg-white/15 px-1.5 text-[11px]">F9</kbd>
             </Button>
             <Button variant="outline" disabled={!canSave} onClick={() => save.mutate(false)}>
-              <SaveIcon /> Save draft <kbd className="ml-auto rounded border px-1.5 text-[11px] text-muted-foreground">Ctrl S</kbd>
+              <SaveIcon /> {tr("Save draft")} <kbd className="ml-auto rounded border px-1.5 text-[11px] text-muted-foreground">Ctrl S</kbd>
             </Button>
           </CardContent>
         </Card>

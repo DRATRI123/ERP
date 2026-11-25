@@ -6,7 +6,7 @@
 <title>{{ title }} {{ doc.number or "Draft" }}</title>
 <style>
   @page { size: {{ page_size }}; margin: 2mm; }
-  body { margin: 0; font-family: {{ cfg.font_family }}; font-size: {{ cfg.font_size_pt }}pt;
+  body { margin: 0; font-family: {{ cfg.font_family }}, "Noto Sans", "Noto Sans Devanagari", "Noto Sans Gujarati", "Nirmala UI", Mangal, Shruti, sans-serif; font-size: {{ cfg.font_size_pt }}pt;
          color: #000; background: #fff; }
   .c { text-align: center; }
   .r { text-align: right; }
@@ -37,10 +37,10 @@
     <div class="b">{{ title }}{% if cancelled %} — CANCELLED{% elif draft %} — DRAFT{% endif %}</div>
   </div>
   <table>
-    <tr><td>No: {{ doc.number or "DRAFT" }}</td><td class="r">{{ doc.doc_date.strftime("%d-%m-%Y") }}</td></tr>
+    <tr><td>{{ L("No") }}: {{ doc.number or "DRAFT" }}</td><td class="r">{{ doc.doc_date.strftime("%d-%m-%Y") }}</td></tr>
     {% if doc.doctor_id and doc.doctor %}<tr><td colspan="2">Dr. {{ doc.doctor.name }}{% if doc.doctor.registration_no %} (Reg. {{ doc.doctor.registration_no }}){% endif %}</td></tr>{% endif %}
-    {% if doc.patient_name %}<tr><td colspan="2">Patient: {{ doc.patient_name }}{% if doc.rx_number %} · Rx {{ doc.rx_number }}{% endif %}</td></tr>{% endif %}
-    <tr><td colspan="2">{{ buyer.name or doc.party_name or "Cash Sale" }}{% if buyer.gstin %} · {{ buyer.gstin }}{% endif %}</td></tr>
+    {% if doc.patient_name %}<tr><td colspan="2">{{ L("Patient") }}: {{ doc.patient_name }}{% if doc.rx_number %} · Rx {{ doc.rx_number }}{% endif %}</td></tr>{% endif %}
+    <tr><td colspan="2">{{ buyer.name or doc.party_name or L("Cash Sale") }}{% if buyer.gstin %} · {{ buyer.gstin }}{% endif %}</td></tr>
   </table>
   <hr>
   <table>
@@ -53,23 +53,23 @@
   </table>
   <hr>
   <table>
-    <tr><td>Taxable</td><td class="r">{{ doc.taxable_total | money }}</td></tr>
+    <tr><td>{{ L("Taxable") }}</td><td class="r">{{ doc.taxable_total | money }}</td></tr>
     {% if doc.cgst_total %}<tr><td>CGST</td><td class="r">{{ doc.cgst_total | money }}</td></tr>{% endif %}
     {% if doc.sgst_total %}<tr><td>{{ sgst_label }}</td><td class="r">{{ doc.sgst_total | money }}</td></tr>{% endif %}
     {% if doc.igst_total %}<tr><td>IGST</td><td class="r">{{ doc.igst_total | money }}</td></tr>{% endif %}
     {% if doc.cess_total %}<tr><td>Cess</td><td class="r">{{ doc.cess_total | money }}</td></tr>{% endif %}
-    {% if doc.round_off %}<tr><td>Round off</td><td class="r">{{ doc.round_off | money }}</td></tr>{% endif %}
-    <tr class="b big"><td>TOTAL</td><td class="r">₹{{ doc.grand_total | money }}</td></tr>
-    {% if doc.amount_paid %}<tr><td>Paid</td><td class="r">{{ doc.amount_paid | money }}</td></tr>
-    <tr class="b"><td>Balance</td><td class="r">{{ doc.balance_due | money }}</td></tr>{% endif %}
+    {% if doc.round_off %}<tr><td>{{ L("Round off") }}</td><td class="r">{{ doc.round_off | money }}</td></tr>{% endif %}
+    <tr class="b big"><td>{{ L("TOTAL") }}</td><td class="r">₹{{ doc.grand_total | money }}</td></tr>
+    {% if doc.amount_paid %}<tr><td>{{ L("Paid") }}</td><td class="r">{{ doc.amount_paid | money }}</td></tr>
+    <tr class="b"><td>{{ L("Balance") }}</td><td class="r">{{ doc.balance_due | money }}</td></tr>{% endif %}
   </table>
   {% if cfg.show_amount_in_words %}<div>{{ words }}</div>{% endif %}
-  {% if upi_qr %}<div class="c"><img class="qr" src="{{ upi_qr }}" alt="UPI"><br>Scan to pay</div>{% endif %}
+  {% if upi_qr %}<div class="c"><img class="qr" src="{{ upi_qr }}" alt="UPI"><br>{{ L("Scan to pay") }}</div>{% endif %}
   {% if irn_qr %}<div class="c"><img class="qr" src="{{ irn_qr }}" alt="IRN"><br>IRN {{ doc.irn }}</div>{% endif %}
   {% if doc.eway_bill_no %}<div class="c">E-way bill {{ doc.eway_bill_no }}</div>{% endif %}
   <hr>
   <div class="c">{{ cfg.footer_text or "Thank you!" }}</div>
-  <div class="c">{{ copy }}</div>
+  <div class="c">{{ L(copy) }}</div>
 </div>
 {% endfor %}
 </body>

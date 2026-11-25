@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { useBusiness } from "@/hooks/use-business";
 import { useDebounced } from "@/hooks/use-debounce";
 import { api, ApiError, type Page } from "@/lib/api";
+import { useT } from "@/lib/i18n";
+import { isNetworkError, isOnline, lookupCached, searchCached } from "@/lib/offline";
 import { money, qty } from "@/lib/format";
 import type { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -22,6 +24,7 @@ export const ProductSearch = forwardRef<ProductSearchHandle, { onPick: (p: Produ
   function ProductSearch({ onPick, placeholder }, ref) {
     const { base, id } = useBusiness();
     const input = useRef<HTMLInputElement>(null);
+    const t = useT();
     const [q, setQ] = useState("");
     const [open, setOpen] = useState(false);
     const [active, setActive] = useState(0);
@@ -31,8 +34,16 @@ export const ProductSearch = forwardRef<ProductSearchHandle, { onPick: (p: Produ
 
     const { data, isFetching } = useQuery({
       queryKey: ["biz", id, "products", "billing-search", term], enabled: term.length >= 1,
-      queryFn: () => api<Page<Product>>(`${base}/products`, { query: { q: term, limit: 8, with_stock: true } }),
-      staleTime: 10_000,
+      queryFn: async () => {
+        if (!isOnline()) return { items: searchCached(id, term), total: 0, limit: 8, offset: 0 } as Page<Product>;
+        try {
+          return await api<Page<Product>>(`${base}/products`, { query: { q: term, limit: 8, with_stock: true } });
+        } catch (e) {
+          if (isNetworkError(e)) return { items: searchCached(id, term), total: 0, limit: 8, offset: 0 } as Page<Product>;
+          throw e;
+        }
+      },
+      staleTime: 10_000, networkMode: "always", // offline it searches the saved copy
     });
     const items = term ? (data?.items ?? []) : [];
 
@@ -50,9 +61,13 @@ export const ProductSearch = forwardRef<ProductSearchHandle, { onPick: (p: Produ
       // Exact barcode / SKU first — what a scanner sends.
       setLooking(true);
       try {
+        const cached = !isOnline() ? lookupCached(id, code) : undefined;
+        if (cached) { pick(cached); return; }
         const p = await api<Product>(`${base}/products/lookup`, { query: { code } });
         pick(p);
       } catch (e) {
+        const cached = isNetworkError(e) ? lookupCached(id, code) : undefined;
+        if (cached) { pick(cached); return; }
         if (items[active]) pick(items[active]);
         else if (e instanceof ApiError && e.status === 404) toast.error(`No product with code “${code}”`);
       } finally {
@@ -64,7 +79,7 @@ export const ProductSearch = forwardRef<ProductSearchHandle, { onPick: (p: Produ
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <input
-          ref={input} value={q} placeholder={placeholder ?? "Scan barcode or search product (F2)"}
+          ref={input} value={q} placeholder={placeholder ?? t("Scan barcode or search product (F2)")}
           className="h-11 w-full rounded-lg border border-input bg-card pr-10 pl-9 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25"
           onChange={(e) => { setQ(e.target.value); setOpen(true); setActive(0); }}
           onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)}

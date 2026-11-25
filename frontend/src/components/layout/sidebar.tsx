@@ -10,21 +10,23 @@ import { GROUP_LABEL, visibleNav, type NavItem } from "@/components/layout/nav";
 import { Tooltip } from "@/components/ui/switch";
 import { useBusiness } from "@/hooks/use-business";
 import { useModules } from "@/hooks/use-modules";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/stores/business";
 
 function NavLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed: boolean; onNavigate?: () => void }) {
   const path = usePathname();
+  const t = useT();
   const active = path === item.href || path.startsWith(`${item.href}/`);
   const link = (
     <Link href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined}
       className={cn("group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground/80 transition-colors hover:bg-accent hover:text-foreground",
         active && "bg-sidebar-active text-primary hover:bg-sidebar-active hover:text-primary", collapsed && "justify-center px-0")}>
       <item.icon className={cn("size-4 shrink-0", active ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
-      {!collapsed && <span className="truncate">{item.label}</span>}
+      {!collapsed && <span className="truncate">{t(item.label)}</span>}
     </Link>
   );
-  return collapsed ? <Tooltip content={item.label}>{link}</Tooltip> : link;
+  return collapsed ? <Tooltip content={t(item.label)}>{link}</Tooltip> : link;
 }
 
 export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: boolean; onNavigate?: () => void }) {
@@ -35,6 +37,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
   const folded = useWorkspace((s) => s.foldedGroups);
   const toggleGroup = useWorkspace((s) => s.toggleGroup);
   const path = usePathname();
+  const t = useT();
   return (
     <div className="flex h-full flex-col">
       <div className={cn("flex h-14 items-center px-4", collapsed && "justify-center px-2")}>
@@ -52,7 +55,7 @@ export function SidebarContent({ collapsed = false, onNavigate }: { collapsed?: 
               {!collapsed && (
                 <button type="button" onClick={() => toggleGroup(g)} aria-expanded={!isFolded}
                   className="flex w-full items-center justify-between px-2.5 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase hover:text-foreground">
-                  {GROUP_LABEL[g]}<ChevronDownIcon className={cn("size-3.5 transition-transform", isFolded && "-rotate-90")} />
+                  {t(GROUP_LABEL[g])}<ChevronDownIcon className={cn("size-3.5 transition-transform", isFolded && "-rotate-90")} />
                 </button>
               )}
               {shown.map((item) => <NavLink key={item.href} item={item} collapsed={collapsed} onNavigate={onNavigate} />)}

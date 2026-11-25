@@ -120,6 +120,31 @@ PostgreSQL.
     overdue amounts, and stock value.
   * Shown per business and in total, for today, this month or this financial year.
   * A six-month sales chart. Clicking a business opens its dashboard.
+* **Offline billing:**
+  * The web app keeps a copy of the product list (up to 5,000 products, refreshed every 30
+    minutes) and the signed-in profile in the browser. Tokens are not stored.
+  * With no connection, product search and barcode lookup use that copy. The bill shows an
+    approximate total, and *Save & finalize* puts the sales invoice in a local queue.
+    * Walk-in bills must be paid in full.
+    * Only new sales invoices can be saved offline.
+  * The queue is sent when the connection returns: automatically every minute, or with
+    *Send now* from the cloud badge in the top bar.
+    * Each bill is created with its `client_ref`, which makes a retried create return the same
+      document, and is then finalized.
+    * A "paid in full" bill is paid for the server's exact total.
+    * Refused bills stay in the queue with the reason until discarded.
+  * A service worker (production builds only) caches the built files and visited pages so the
+    app opens without internet. API calls are never cached. It also ships with an install
+    manifest and icon.
+* **Hindi and Gujarati:**
+  * The account menu has a Language choice (English / हिन्दी / ગુજરાતી), remembered per
+    device. It covers the menu, phone tab bar, top bar, page titles and the billing screen;
+    other text stays English.
+  * Print templates have *Printed labels*: `en`, `hi`, `gu`, `en_hi` or `en_gu` (bilingual,
+    e.g. "Bill to / बिल प्राप्तकर्ता"), on A4 and thermal. Titles, column heads, totals and copy
+    labels are translated. Amount in words stays English.
+  * Templates fall back to Noto / Nirmala / Mangal / Shruti fonts for Devanagari and Gujarati.
+    The Docker image already installs Noto.
 * **Field sales** (module `field`, migration 0021; under `/businesses/{id}/field`):
   * **Beats:** a named route of customers in visiting order, a weekday and a salesman (any
     member of the business).

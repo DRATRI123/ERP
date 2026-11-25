@@ -30,6 +30,7 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.modules.billing.doctypes import SPECS, DocType
 from app.modules.billing.models import Document, TaxMode
+from app.modules.billing.print_labels import LabelLanguage, translator
 from app.modules.gst.gstin import STATE_CODES
 from app.modules.gst.tax import ZERO
 from app.modules.gst.words import rupees_in_words
@@ -75,6 +76,7 @@ class TemplateConfig(BaseModel):
     terms_text: str | None = Field(None, max_length=3000)
     bank_details: str | None = Field(None, max_length=500)
     signature_label: str = Field("Authorised Signatory", max_length=60)
+    label_language: LabelLanguage = Field(LabelLanguage.EN, description="Printed labels: en, hi, gu, or bilingual en_hi / en_gu")
     watermark_text: str | None = Field(None, max_length=40)
     columns: list[str] = Field(default_factory=lambda: [
         "sno", "description", "hsn", "qty", "unit", "rate", "discount", "taxable", "gst_rate",
@@ -204,8 +206,9 @@ def render_html(doc: Document, config: TemplateConfig, *, business_name: str) ->
                                        doc.balance_due, doc.number or "Invoice"))
     irn_qr = _qr_data_url(doc.irn_signed_qr) if doc.irn_signed_qr else None
     template = _env.get_template("thermal.html.j2" if config.thermal else "document.html.j2")
+    t = translator(config.label_language)
     return template.render(
-        doc=doc, cfg=config, title=config.title or title_for(doc), page_size=config.page_css(),
+        doc=doc, cfg=config, title=t(config.title or title_for(doc)), page_size=config.page_css(), L=t,
         seller=doc.seller_snapshot or {"name": business_name}, buyer=doc.party_snapshot or {},
         tax_rows=tax_summary(doc), words=rupees_in_words(doc.grand_total), upi_qr=upi_qr,
         irn_qr=irn_qr, sgst_label="UTGST" if doc.is_utgst else "SGST",

@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   title: { default: "Private ERP", template: "%s · Private ERP" },
   description: "Billing, GST, inventory and accounting for your businesses",
   robots: { index: false, follow: false },
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  appleWebApp: { capable: true, title: "ERP", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

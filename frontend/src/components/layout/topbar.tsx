@@ -1,10 +1,11 @@
 "use client";
 
-import { KeyboardIcon, LogOutIcon, MenuIcon, MoonIcon, PlusIcon, SearchIcon, SettingsIcon, ShieldCheckIcon, SunIcon } from "lucide-react";
+import { KeyboardIcon, LanguagesIcon, LogOutIcon, MenuIcon, MoonIcon, PlusIcon, SearchIcon, SettingsIcon, ShieldCheckIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 
+import { OfflineBadge } from "@/components/layout/offline-sync";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -13,15 +14,20 @@ import { Tooltip } from "@/components/ui/switch";
 import { useBusiness } from "@/hooks/use-business";
 import type { LiveState } from "@/hooks/use-realtime";
 import { initials } from "@/lib/format";
+import { LANGS, useT } from "@/lib/i18n";
 import { signOut } from "@/lib/session";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
+import { useWorkspace } from "@/stores/business";
 
 export function Topbar({ onMenu, onSearch, onHelp, live }: { onMenu: () => void; onSearch: () => void; onHelp: () => void; live: LiveState }) {
   const me = useAuth((s) => s.me);
   const { can, isOwner } = useBusiness();
   const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
+  const t = useT();
+  const lang = useWorkspace((s) => s.lang ?? "en");
+  const setLang = useWorkspace((s) => s.setLang);
   return (
     <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-1.5 border-b bg-background/85 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-5">
       <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenu} aria-label="Open menu"><MenuIcon /></Button>
@@ -29,10 +35,11 @@ export function Topbar({ onMenu, onSearch, onHelp, live }: { onMenu: () => void;
         aria-label="Search"
         className="flex h-9 w-full max-w-md min-w-0 items-center gap-2 rounded-md border bg-card px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent">
         <SearchIcon className="size-4 shrink-0" />
-        <span className="flex-1 truncate text-left">Search…<span className="hidden sm:inline"> or jump to</span></span>
+        <span className="flex-1 truncate text-left">{t("Search…")}<span className="hidden sm:inline"> {t("or jump to")}</span></span>
         <kbd className="hidden rounded border bg-muted px-1.5 text-[11px] font-medium sm:inline">Ctrl K</kbd>
       </button>
       <div className="ml-auto flex items-center gap-1">
+        <OfflineBadge />
         <Tooltip side="bottom" content={live === "live" ? "Live updates on" : live === "connecting" ? "Connecting to live updates…" : "Live updates unavailable — data refreshes on navigation"}>
           <span className="hidden items-center gap-1.5 px-2 text-xs text-muted-foreground sm:flex">
             <span className={cn("size-2 rounded-full", live === "live" ? "bg-success shadow-[0_0_0_3px] shadow-success/20" : live === "connecting" ? "bg-warning" : "bg-muted-foreground/40")} />
@@ -40,7 +47,7 @@ export function Topbar({ onMenu, onSearch, onHelp, live }: { onMenu: () => void;
           </span>
         </Tooltip>
         {(isOwner || can("invoices.create")) && (
-          <Button size="sm" asChild className="hidden sm:inline-flex"><Link href="/sales/new"><PlusIcon /> New invoice</Link></Button>
+          <Button size="sm" asChild className="hidden sm:inline-flex"><Link href="/sales/new"><PlusIcon /> {t("New invoice")}</Link></Button>
         )}
         <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label="Toggle dark mode">
           {resolvedTheme === "dark" ? <SunIcon /> : <MoonIcon />}
@@ -55,11 +62,17 @@ export function Topbar({ onMenu, onSearch, onHelp, live }: { onMenu: () => void;
               <p className="truncate text-xs">{me?.user.email}</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild><Link href="/settings/security"><ShieldCheckIcon /> Security & 2FA{!me?.user.mfa_enabled && <span className="ml-auto text-xs text-warning">Off</span>}</Link></DropdownMenuItem>
-            <DropdownMenuItem asChild><Link href="/settings"><SettingsIcon /> Settings</Link></DropdownMenuItem>
-            <DropdownMenuItem onSelect={onHelp}><KeyboardIcon /> Keyboard shortcuts</DropdownMenuItem>
+            <DropdownMenuItem asChild><Link href="/settings/security"><ShieldCheckIcon /> {t("Security & 2FA")}{!me?.user.mfa_enabled && <span className="ml-auto text-xs text-warning">Off</span>}</Link></DropdownMenuItem>
+            <DropdownMenuItem asChild><Link href="/settings"><SettingsIcon /> {t("Settings")}</Link></DropdownMenuItem>
+            <DropdownMenuItem onSelect={onHelp}><KeyboardIcon /> {t("Keyboard shortcuts")}</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={async () => { await signOut(); router.replace("/login"); }}><LogOutIcon /> Sign out</DropdownMenuItem>
+            <DropdownMenuLabel className="flex items-center gap-1.5 text-xs font-normal"><LanguagesIcon className="size-3.5" /> {t("Language")}</DropdownMenuLabel>
+            {LANGS.map(([code, name]) => (
+              <DropdownMenuItem key={code} onSelect={() => setLang(code)} className={lang === code ? "font-semibold text-primary" : ""}>
+                {lang === code ? "✓ " : ""}{name}</DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={async () => { await signOut(); router.replace("/login"); }}><LogOutIcon /> {t("Sign out")}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

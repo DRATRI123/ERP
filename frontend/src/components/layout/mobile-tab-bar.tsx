@@ -5,12 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useBusiness } from "@/hooks/use-business";
+import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /** Phones: the four places used all day, a big "new bill" button, and the full menu. */
 export function MobileTabBar({ onMore }: { onMore: () => void }) {
   const path = usePathname();
   const { can, isOwner } = useBusiness();
+  const t = useT();
   const sell = isOwner || can("invoices.create");
   const tabs = [
     { href: "/dashboard", label: "Home", icon: LayoutDashboardIcon, show: true },
@@ -25,14 +27,14 @@ export function MobileTabBar({ onMore }: { onMore: () => void }) {
         {tabs.length < 2 && <span />}
         <div className="flex justify-center">
           {sell ? (
-            <Link href="/sales/new" aria-label="New bill" className="relative z-10 -mt-6 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background active:scale-95">
+            <Link href="/sales/new" aria-label={t("New bill")} className="relative z-10 -mt-6 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background active:scale-95">
               <PlusIcon className="size-6" />
             </Link>
           ) : <span />}
         </div>
         {tabs[2] ? <Tab {...tabs[2]} active={active(tabs[2].href)} /> : <span />}
         <button type="button" onClick={onMore} className="flex flex-col items-center gap-0.5 text-[11px] text-muted-foreground">
-          <MenuIcon className="size-5" />More
+          <MenuIcon className="size-5" />{t("More")}
         </button>
       </div>
     </nav>
@@ -40,10 +42,11 @@ export function MobileTabBar({ onMore }: { onMore: () => void }) {
 }
 
 function Tab({ href, label, icon: Icon, active }: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; active: boolean }) {
+  const t = useT();
   return (
     <Link href={href} aria-current={active ? "page" : undefined}
       className={cn("flex flex-col items-center gap-0.5 text-[11px]", active ? "font-semibold text-primary" : "text-muted-foreground")}>
-      <Icon className="size-5" />{label}
+      <Icon className="size-5" />{t(label)}
     </Link>
   );
 }

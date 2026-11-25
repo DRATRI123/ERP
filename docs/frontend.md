@@ -102,6 +102,22 @@ CI runs these plus `npm audit`, and an end-to-end job that installs with `setup.
   near-expiry discount sits under it while Pharmacy is on.
 * `/settings?tab=modules` opens the tab directly; the old `?tab=pharmacy` also lands there.
 
+## Offline billing and languages
+
+* `lib/offline.ts` handles the offline side:
+  * a product cache in `localStorage`;
+  * the bill queue (`erp-offline-queue:{business}`), with `syncQueue` using `client_ref` so a
+    bill is never created twice;
+  * `useOnline()`, and `estimateTotal()` for the approximate offline total.
+* `OfflineSync` in the app shell refreshes the cache and sends the queue. `OfflineBadge` in the
+  top bar shows "Offline" or "N to sync" and lists queued bills.
+* `public/sw.js` is registered in production builds only. It caches `/_next/static`
+  cache-first and pages and RSC data network-first with a fallback; it never touches `/api` or
+  `/shop`.
+* `lib/i18n.ts` holds `useT()` and a dictionary of English → [Hindi, Gujarati]. It is used by the
+  sidebar, tab bar, top bar, `PageHeader` titles, product search and the bill editor. The
+  language lives in the workspace store; strings without a translation stay English.
+
 ## Field sales
 
 `/field` has four tabs.

@@ -30,7 +30,7 @@ const ALL_COLUMNS: Record<string, string> = {
 interface Config {
   paper: string; margin_mm: number; font_family: string; font_size_pt: number; primary_color: string; text_color: string; background_color: string;
   title: string | null; header_text: string | null; footer_text: string | null; terms_text: string | null; bank_details: string | null;
-  signature_label: string; watermark_text: string | null; columns: string[]; show_logo: boolean; show_tax_summary: boolean;
+  signature_label: string; label_language: string; watermark_text: string | null; columns: string[]; show_logo: boolean; show_tax_summary: boolean;
   show_amount_in_words: boolean; show_upi_qr: boolean; upi_id: string | null; upi_name: string | null; show_signature: boolean;
   logo_data_url: string | null; signature_data_url: string | null; [k: string]: unknown;
 }
@@ -38,7 +38,7 @@ interface Template { id: string; name: string; doc_types: string[]; config: Conf
 const DEFAULT: Config = {
   paper: "a4", margin_mm: 10, font_family: "Helvetica, Arial, sans-serif", font_size_pt: 9.5, primary_color: "#1f6f4a", text_color: "#111111",
   background_color: "#ffffff", title: null, header_text: null, footer_text: "Thank you for your business!", terms_text: null, bank_details: null,
-  signature_label: "Authorised Signatory", watermark_text: null, columns: ["sno", "description", "hsn", "qty", "rate", "discount", "taxable", "gst_rate", "amount"],
+  signature_label: "Authorised Signatory", label_language: "en", watermark_text: null, columns: ["sno", "description", "hsn", "qty", "rate", "discount", "taxable", "gst_rate", "amount"],
   show_logo: true, show_tax_summary: true, show_amount_in_words: true, show_upi_qr: false, upi_id: null, upi_name: null, show_signature: true,
   logo_data_url: null, signature_data_url: null,
 };
@@ -139,6 +139,9 @@ function Designer({ templates }: { templates: Template[] }) {
             <Field label="Paper"><NativeSelect value={cfg.paper} onChange={(e) => set("paper", e.target.value)}>
               <option value="a4">A4</option><option value="a5">A5</option><option value="a6">A6</option><option value="thermal_80">Thermal 80 mm</option><option value="thermal_58">Thermal 58 mm</option></NativeSelect></Field>
             <Field label="Margin (mm)"><Input type="number" min={0} max={40} value={cfg.margin_mm} onChange={(e) => set("margin_mm", Number(e.target.value))} /></Field>
+            <Field label="Printed labels" hint="Bill to, Total, Qty… in your customers' language"><NativeSelect value={cfg.label_language ?? "en"} onChange={(e) => set("label_language", e.target.value)}>
+              <option value="en">English</option><option value="hi">हिन्दी (Hindi)</option><option value="gu">ગુજરાતી (Gujarati)</option>
+              <option value="en_hi">English + हिन्दी</option><option value="en_gu">English + ગુજરાતી</option></NativeSelect></Field>
             <Field label="Font"><NativeSelect value={cfg.font_family} onChange={(e) => set("font_family", e.target.value)}>{FONTS.map((f) => <option key={f} value={f}>{f.split(",")[0]}</option>)}</NativeSelect></Field>
             <Field label="Font size (pt)"><Input type="number" step={0.5} min={6} max={16} value={cfg.font_size_pt} onChange={(e) => set("font_size_pt", Number(e.target.value))} /></Field>
             <label className="col-span-2 flex items-center justify-between text-sm">Default for invoices <Switch checked={isDefault} onCheckedChange={setIsDefault} /></label>

@@ -7,7 +7,7 @@
 <style>
   @page { size: {{ page_size }}; margin: {{ cfg.margin_mm }}mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: {{ cfg.font_family }}; font-size: {{ cfg.font_size_pt }}pt;
+  body { margin: 0; font-family: {{ cfg.font_family }}, "Noto Sans", "Noto Sans Devanagari", "Noto Sans Gujarati", "Nirmala UI", Mangal, Shruti, sans-serif; font-size: {{ cfg.font_size_pt }}pt;
          color: {{ cfg.text_color }}; background: {{ cfg.background_color }}; }
   .copy { position: relative; page-break-after: always; }
   .copy:last-child { page-break-after: auto; }
@@ -61,24 +61,24 @@
     </div>
     <div class="title">
       <h2>{{ title }}</h2>
-      <div class="muted small">{{ copy }}</div>
-      <div><b>No:</b> {{ doc.number or "DRAFT" }}</div>
-      <div><b>Date:</b> {{ doc.doc_date.strftime("%d-%m-%Y") }}</div>
-      {% if doc.due_date %}<div><b>Due:</b> {{ doc.due_date.strftime("%d-%m-%Y") }}</div>{% endif %}
-      {% if doc.place_of_supply %}<div><b>Place of supply:</b> {{ doc.place_of_supply }}{% if pos_name %}-{{ pos_name }}{% endif %}</div>{% endif %}
-      {% if doc.reverse_charge %}<div><b>Tax payable on reverse charge:</b> Yes</div>{% endif %}
-      {% if doc.supplier_invoice_no %}<div><b>Supplier inv.:</b> {{ doc.supplier_invoice_no }}</div>{% endif %}
-      {% if doc.doctor_id and doc.doctor %}<div><b>Doctor:</b> {{ doc.doctor.name }}{% if doc.doctor.registration_no %} (Reg. {{ doc.doctor.registration_no }}){% endif %}</div>{% endif %}
-      {% if doc.patient_name %}<div><b>Patient:</b> {{ doc.patient_name }}</div>{% endif %}
-      {% if doc.rx_number %}<div><b>Rx No:</b> {{ doc.rx_number }}</div>{% endif %}
-      {% if cancelled %}<div class="status">CANCELLED</div>{% endif %}
+      <div class="muted small">{{ L(copy) }}</div>
+      <div><b>{{ L("No") }}:</b> {{ doc.number or "DRAFT" }}</div>
+      <div><b>{{ L("Date") }}:</b> {{ doc.doc_date.strftime("%d-%m-%Y") }}</div>
+      {% if doc.due_date %}<div><b>{{ L("Due") }}:</b> {{ doc.due_date.strftime("%d-%m-%Y") }}</div>{% endif %}
+      {% if doc.place_of_supply %}<div><b>{{ L("Place of supply") }}:</b> {{ doc.place_of_supply }}{% if pos_name %}-{{ pos_name }}{% endif %}</div>{% endif %}
+      {% if doc.reverse_charge %}<div><b>{{ L("Tax payable on reverse charge") }}:</b> Yes</div>{% endif %}
+      {% if doc.supplier_invoice_no %}<div><b>{{ L("Supplier inv.") }}:</b> {{ doc.supplier_invoice_no }}</div>{% endif %}
+      {% if doc.doctor_id and doc.doctor %}<div><b>{{ L("Doctor") }}:</b> {{ doc.doctor.name }}{% if doc.doctor.registration_no %} (Reg. {{ doc.doctor.registration_no }}){% endif %}</div>{% endif %}
+      {% if doc.patient_name %}<div><b>{{ L("Patient") }}:</b> {{ doc.patient_name }}</div>{% endif %}
+      {% if doc.rx_number %}<div><b>{{ L("Rx No") }}:</b> {{ doc.rx_number }}</div>{% endif %}
+      {% if cancelled %}<div class="status">{{ L("CANCELLED") }}</div>{% endif %}
     </div>
   </div>
 
   <div class="grid">
     <div class="box">
-      <h3>Bill to</h3>
-      <div><b>{{ buyer.name or doc.party_name or "Cash Sale" }}</b></div>
+      <h3>{{ L("Bill to") }}</h3>
+      <div><b>{{ buyer.name or doc.party_name or L("Cash Sale") }}</b></div>
       {% set ba = buyer.billing_address %}
       {% if ba %}<div>{{ ba.address_line1 }}{% if ba.address_line2 %}, {{ ba.address_line2 }}{% endif %}</div>
       <div>{{ ba.city or "" }} {{ ba.pincode or "" }}</div>{% endif %}
@@ -88,7 +88,7 @@
     {% set sa = buyer.shipping_address %}
     {% if sa %}
     <div class="box">
-      <h3>Ship to</h3>
+      <h3>{{ L("Ship to") }}</h3>
       <div>{{ sa.address_line1 }}{% if sa.address_line2 %}, {{ sa.address_line2 }}{% endif %}</div>
       <div>{{ sa.city or "" }} {{ sa.pincode or "" }}</div>
     </div>
@@ -104,19 +104,19 @@
     <thead><tr>
       {% for c in cfg.columns %}
         {% if c == "sno" %}<th>#</th>
-        {% elif c == "description" %}<th>Item</th>
+        {% elif c == "description" %}<th>{{ L("Item") }}</th>
         {% elif c == "hsn" %}<th>HSN/SAC</th>
-        {% elif c == "batch" %}<th>Batch</th>
-        {% elif c == "expiry" %}<th>Exp.</th>
-        {% elif c == "qty" %}<th class="n">Qty</th>
-        {% elif c == "unit" %}<th>Unit</th>
-        {% elif c == "mrp" %}<th class="n">MRP</th>
-        {% elif c == "rate" %}<th class="n">Rate</th>
-        {% elif c == "discount" %}<th class="n">Disc.</th>
-        {% elif c == "taxable" %}<th class="n">Taxable</th>
-        {% elif c == "gst_rate" %}<th class="n">GST %</th>
-        {% elif c == "tax" %}<th class="n">Tax</th>
-        {% elif c == "amount" %}<th class="n">Amount</th>{% endif %}
+        {% elif c == "batch" %}<th>{{ L("Batch") }}</th>
+        {% elif c == "expiry" %}<th>{{ L("Exp.") }}</th>
+        {% elif c == "qty" %}<th class="n">{{ L("Qty") }}</th>
+        {% elif c == "unit" %}<th>{{ L("Unit") }}</th>
+        {% elif c == "mrp" %}<th class="n">{{ L("MRP") }}</th>
+        {% elif c == "rate" %}<th class="n">{{ L("Rate") }}</th>
+        {% elif c == "discount" %}<th class="n">{{ L("Disc.") }}</th>
+        {% elif c == "taxable" %}<th class="n">{{ L("Taxable") }}</th>
+        {% elif c == "gst_rate" %}<th class="n">{{ L("GST %") }}</th>
+        {% elif c == "tax" %}<th class="n">{{ L("Tax") }}</th>
+        {% elif c == "amount" %}<th class="n">{{ L("Amount") }}</th>{% endif %}
       {% endfor %}
     </tr></thead>
     <tbody>
@@ -144,22 +144,22 @@
   </table>
 
   <table class="totals">
-    <tr><td>Taxable value</td><td class="n">{{ doc.taxable_total | money }}</td></tr>
-    {% if doc.discount_total %}<tr><td>Discount included</td><td class="n">{{ doc.discount_total | money }}</td></tr>{% endif %}
+    <tr><td>{{ L("Taxable value") }}</td><td class="n">{{ doc.taxable_total | money }}</td></tr>
+    {% if doc.discount_total %}<tr><td>{{ L("Discount included") }}</td><td class="n">{{ doc.discount_total | money }}</td></tr>{% endif %}
     {% if doc.cgst_total %}<tr><td>CGST</td><td class="n">{{ doc.cgst_total | money }}</td></tr>{% endif %}
     {% if doc.sgst_total %}<tr><td>{{ sgst_label }}</td><td class="n">{{ doc.sgst_total | money }}</td></tr>{% endif %}
     {% if doc.igst_total %}<tr><td>IGST</td><td class="n">{{ doc.igst_total | money }}</td></tr>{% endif %}
     {% if doc.cess_total %}<tr><td>Cess</td><td class="n">{{ doc.cess_total | money }}</td></tr>{% endif %}
-    {% if doc.round_off %}<tr><td>Round off</td><td class="n">{{ doc.round_off | money }}</td></tr>{% endif %}
-    <tr class="grand"><td>Total</td><td class="n">₹ {{ doc.grand_total | money }}</td></tr>
-    {% if doc.amount_paid %}<tr><td>Paid</td><td class="n">{{ doc.amount_paid | money }}</td></tr>
-    <tr><td><b>Balance due</b></td><td class="n"><b>{{ doc.balance_due | money }}</b></td></tr>{% endif %}
+    {% if doc.round_off %}<tr><td>{{ L("Round off") }}</td><td class="n">{{ doc.round_off | money }}</td></tr>{% endif %}
+    <tr class="grand"><td>{{ L("Total") }}</td><td class="n">₹ {{ doc.grand_total | money }}</td></tr>
+    {% if doc.amount_paid %}<tr><td>{{ L("Paid") }}</td><td class="n">{{ doc.amount_paid | money }}</td></tr>
+    <tr><td><b>{{ L("Balance due") }}</b></td><td class="n"><b>{{ doc.balance_due | money }}</b></td></tr>{% endif %}
   </table>
-  {% if cfg.show_amount_in_words %}<div><b>Amount in words:</b> {{ words }}</div>{% endif %}
+  {% if cfg.show_amount_in_words %}<div><b>{{ L("Amount in words") }}:</b> {{ words }}</div>{% endif %}
 
   {% if cfg.show_tax_summary and doc.tax_total %}
   <table style="margin-top:8px" class="small">
-    <thead><tr><th>HSN/SAC</th><th class="n">Rate</th><th class="n">Taxable</th>
+    <thead><tr><th>HSN/SAC</th><th class="n">{{ L("Rate") }}</th><th class="n">{{ L("Taxable") }}</th>
       {% if doc.is_interstate %}<th class="n">IGST</th>{% else %}<th class="n">CGST</th><th class="n">{{ sgst_label }}</th>{% endif %}
       <th class="n">Cess</th></tr></thead>
     <tbody>
@@ -174,11 +174,11 @@
 
   <div class="foot">
     <div style="flex:1">
-      {% if cfg.bank_details %}<div><b>Bank details:</b> {{ cfg.bank_details }}</div>{% endif %}
-      {% if cfg.terms_text or doc.terms %}<div class="small"><b>Terms:</b> {{ doc.terms or cfg.terms_text }}</div>{% endif %}
-      {% if doc.notes %}<div class="small"><b>Notes:</b> {{ doc.notes }}</div>{% endif %}
+      {% if cfg.bank_details %}<div><b>{{ L("Bank details") }}:</b> {{ cfg.bank_details }}</div>{% endif %}
+      {% if cfg.terms_text or doc.terms %}<div class="small"><b>{{ L("Terms") }}:</b> {{ doc.terms or cfg.terms_text }}</div>{% endif %}
+      {% if doc.notes %}<div class="small"><b>{{ L("Notes") }}:</b> {{ doc.notes }}</div>{% endif %}
       {% if doc.irn %}<div class="small"><b>IRN:</b> {{ doc.irn }} · Ack {{ doc.irn_ack_no }}</div>{% endif %}
-      {% if doc.eway_bill_no %}<div class="small"><b>E-way bill:</b> {{ doc.eway_bill_no }}{% if doc.vehicle_no %} · Vehicle {{ doc.vehicle_no }}{% endif %}</div>{% endif %}
+      {% if doc.eway_bill_no %}<div class="small"><b>{{ L("E-way bill") }}:</b> {{ doc.eway_bill_no }}{% if doc.vehicle_no %} · Vehicle {{ doc.vehicle_no }}{% endif %}</div>{% endif %}
     </div>
     {% if irn_qr %}<div class="qr"><img src="{{ irn_qr }}" alt="e-invoice QR"></div>{% endif %}
     {% if upi_qr %}<div class="qr" style="text-align:center"><img src="{{ upi_qr }}" alt="UPI QR"><div class="small">Scan to pay ₹{{ doc.balance_due | money }}</div></div>{% endif %}
@@ -187,7 +187,7 @@
       <div>For {{ seller.name }}</div>
       {% if cfg.stamp_data_url %}<img src="{{ cfg.stamp_data_url }}" alt="">{% endif %}
       {% if cfg.signature_data_url %}<img src="{{ cfg.signature_data_url }}" alt="">{% else %}<div style="height:40px"></div>{% endif %}
-      <div>{{ cfg.signature_label }}</div>
+      <div>{{ L(cfg.signature_label) }}</div>
     </div>
     {% endif %}
   </div>

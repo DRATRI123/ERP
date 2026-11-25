@@ -1,0 +1,12 @@
+{
+  "name": "Private ERP",
+  "short_name": "ERP",
+  "description": "Billing, GST, inventory and accounting for your businesses",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#15803d",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }],
+  "shortcuts": [{ "name": "New bill", "url": "/sales/new" }, { "name": "My day (field sales)", "url": "/field" }]
+}

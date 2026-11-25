@@ -59,6 +59,42 @@ export const HELP: HelpTopic[] = [
     ],
   },
   {
+    id: "offline", title: "Billing without internet", group: "Start here", routes: [],
+    summary: "When the internet drops, keep billing. Bills are kept on the device and saved automatically when the connection returns.",
+    sections: [
+      { heading: "Prepare (once, while online)", steps: [
+        "Open the app on the billing computer or phone and sign in. It keeps a copy of your product list (refreshed every 30 minutes).",
+        "On a phone, “Add to Home screen” installs it like an app; it then opens even without internet.",
+      ] },
+      { heading: "When the internet is down", steps: [
+        "A cloud icon “Offline” appears at the top. Search and barcode scanning use the saved product list.",
+        "The total shown is approximate (marked). Take the payment and press Save & finalize: the bill is kept on this device.",
+        "Walk-in sales must be paid in full; for credit, choose the customer.",
+      ] },
+      { heading: "When it is back", steps: [
+        "Waiting bills are sent automatically within a minute — or press the cloud icon → Send now.",
+        "Each bill gets its number and exact total from the server, and its payment is recorded for that total. A bill is never saved twice.",
+        "If one is refused (e.g. out of stock of a batch), it stays under the cloud icon with the reason; fix it and bill again, then discard the queued one.",
+      ] },
+    ],
+    tips: ["Bills made offline are kept in that browser only: send them before clearing the browser's data."],
+  },
+  {
+    id: "language", title: "Hindi and Gujarati", group: "Start here", routes: [],
+    summary: "Show the menus and billing screen in हिन्दी or ગુજરાતી, and print invoices with Hindi or Gujarati labels.",
+    sections: [
+      { heading: "Screens", steps: [
+        "Account (your initials, top right) → Language → हिन्दी or ગુજરાતી. Each person chooses on their own device.",
+        "The menu, phone tab bar, page titles and the whole billing screen change; less used pages stay in English.",
+      ] },
+      { heading: "Printed invoices", steps: [
+        "Settings → Print templates → Printed labels: Hindi, Gujarati, or bilingual (English + Hindi / Gujarati).",
+        "Labels like Bill to, Qty, Rate, Total, Balance due and the title (कर बीजक / ટેક્સ ઇન્વૉઇસ) print in that language. Product and customer names print as you typed them.",
+      ] },
+    ],
+    tips: ["Type product names in Hindi or Gujarati if you like — search and printing work with them."],
+  },
+  {
     id: "dashboard", title: "Dashboard", group: "Start here", routes: ["/dashboard"],
     summary: "Today and this month at a glance for the selected business.",
     sections: [
