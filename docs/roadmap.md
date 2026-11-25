@@ -120,6 +120,20 @@ PostgreSQL.
     overdue amounts, and stock value.
   * Shown per business and in total, for today, this month or this financial year.
   * A six-month sales chart. Clicking a business opens its dashboard.
+* **Statutory payroll** (migration 0024): employees carry PF (UAN, basic + DA %, ₹15,000
+  cap), ESI (IP number), a professional-tax state and TDS on salary. The salary run calculates:
+  * PF: 12% employee and 12% employer, of which 8.33% (on at most ₹15,000) goes to EPS.
+  * ESI: 0.75% employee and 3.25% employer, rounded up, when monthly wages are up to ₹21,000.
+  * Professional tax by state slab: Gujarat, Maharashtra (₹300 in February), Karnataka, West
+    Bengal, Telangana and Andhra Pradesh.
+  * TDS under the new regime: ₹75,000 standard deduction, the 87A rebate up to ₹12 lakh, 4%
+    cess, projected over the year. A manual figure can override it.
+
+  Posting debits Salaries plus Employer PF & ESI (6015) and credits PF, ESI and PT Payable
+  (2220–2222), TDS Payable, Advances and Salaries Payable. `GET /payroll/runs/{id}/statutory`
+  gives amounts and due dates. `/ecr.txt` is the EPFO ECR 2.0 file, and
+  `/payslips/{employee_id}` a printable payslip. Not covered: surcharge, marginal relief near
+  ₹12 lakh, the old regime and its deductions, and Form 16.
 * **Accounts extras** (Accounting tabs; migration 0023):
   * **Budgets:** monthly amounts per income or expense account, optionally per cost centre
     (`PUT /budgets`).

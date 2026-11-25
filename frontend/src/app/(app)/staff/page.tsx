@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useBizMutation, useBizQuery, useBusiness } from "@/hooks/use-business";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, openFile } from "@/lib/api";
 import { date, money, todayISO } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -26,11 +26,13 @@ interface Employee {
   id: string; code: string; name: string; designation: string | null; phone: string | null; email: string | null; branch_id: string | null;
   joining_date: string; leaving_date: string | null; pay_type: "monthly" | "daily"; monthly_salary: string; daily_wage: string;
   commission_percent: string; user_id: string | null; pan: string | null; bank_account: string | null; ifsc: string | null; is_active: boolean; notes: string | null;
+  pf_enabled?: boolean; uan?: string | null; basic_percent?: string; pf_wage_cap?: boolean; esi_enabled?: boolean; esi_number?: string | null; pt_state?: string | null; tds_enabled?: boolean;
 }
 type EmployeeDraft = Omit<Employee, "id">;
 type Mark = "present" | "absent" | "half_day" | "leave" | "holiday";
 interface Line { employee_id: string; employee_name: string; pay_type: string; days_in_month: number; payable_days: string; paid_days: string;
-  base: string; sales: string; commission: string; bonus: string; deductions: string; net: string; note: string | null }
+  base: string; sales: string; commission: string; bonus: string; deductions: string; net: string; note: string | null;
+  pf_employee?: string; pf_employer?: string; esi_employee?: string; esi_employer?: string; pt?: string; tds?: string }
 interface Run { id: string; month: string; status: "draft" | "posted" | "paid"; gross: string; deductions: string; net: string; lines: Line[] }
 
 const MARKS: { v: Mark | null; label: string; short: string; cls: string }[] = [
@@ -51,7 +53,7 @@ export default function StaffPage() {
   if (!markAllowed) return <Card><EmptyState title="Not available" description="Needs payroll.manage or attendance.mark." /></Card>;
   return (
     <>
-      <PageHeader title="Staff & salary" description="Employees, attendance (mark only the exceptions) and monthly salaries with commission — posted to the books." />
+      <PageHeader title="Staff & salary" description="Employees, attendance (mark only the exceptions), monthly salaries with commission, PF, ESI, professional tax and TDS — posted to the books, with payslips." />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
@@ -194,7 +196,7 @@ function RunTable({ run, onDeleted }: { run: Run; onDeleted: () => void }) {
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-xs text-muted-foreground uppercase"><tr>
             <th className="px-4 py-2 text-left">Employee</th><th className="px-3 py-2 text-right">Paid days</th><th className="px-3 py-2 text-right">Pay</th>
-            <th className="hidden px-3 py-2 text-right md:table-cell">Commission</th><th className="w-28 px-3 py-2 text-right">Bonus</th><th className="w-28 px-3 py-2 text-right">Deductions</th><th className="px-4 py-2 text-right">Net</th></tr></thead>
+            <th className="hidden px-3 py-2 text-right md:table-cell">Commission</th><th className="w-28 px-3 py-2 text-right">Bonus</th><th className="w-28 px-3 py-2 text-right">Other deductions</th><th className="px-3 py-2 text-right">PF / ESI</th><th className="hidden px-3 py-2 text-right md:table-cell">PT / TDS</th><th className="px-4 py-2 text-right">Net</th><th /></tr></thead>
           <tbody className="divide-y">{run.lines.map((l) => (
             <tr key={l.employee_id}>
               <td className="px-4 py-2"><p className="font-medium">{l.employee_name}</p><p className="text-xs text-muted-foreground">{l.pay_type === "daily" ? "Daily wage" : "Monthly"}{l.note ? ` · ${l.note}` : ""}</p></td>
@@ -205,11 +207,15 @@ function RunTable({ run, onDeleted }: { run: Run; onDeleted: () => void }) {
                 onBlur={(e) => e.target.value !== String(Number(l.bonus) || "") && edit(l, { bonus: e.target.value || "0" })} /> : <span className="num block text-right">{money(l.bonus)}</span>}</td>
               <td className="px-3">{draft ? <Input className="num h-8 text-right" inputMode="decimal" defaultValue={Number(l.deductions) || ""} placeholder="0" aria-label={`Deductions for ${l.employee_name}`}
                 onBlur={(e) => e.target.value !== String(Number(l.deductions) || "") && edit(l, { deductions: e.target.value || "0" })} /> : <span className="num block text-right">{money(l.deductions)}</span>}</td>
+              <td className="num px-3 text-right text-xs">{Number(l.pf_employee ?? 0) || Number(l.esi_employee ?? 0) ? <>{money(l.pf_employee ?? "0")}<span className="block text-muted-foreground">{money(l.esi_employee ?? "0")}</span></> : "—"}</td>
+              <td className="num hidden px-3 text-right text-xs md:table-cell">{Number(l.pt ?? 0) || Number(l.tds ?? 0) ? <>{money(l.pt ?? "0")}<span className="block text-muted-foreground">{money(l.tds ?? "0")}</span></> : "—"}</td>
               <td className="num px-4 text-right font-semibold">{money(l.net)}</td>
+              <td className="px-2"><Button variant="ghost" size="sm" onClick={() => openFile(`${base}/payroll/runs/${run.id}/payslips/${l.employee_id}`)}>Payslip</Button></td>
             </tr>))}</tbody>
-          <tfoot className="border-t-2 font-semibold"><tr><td className="px-4 py-2" colSpan={4}>Total</td><td /><td className="num px-3 text-right">{money(run.deductions)}</td><td className="num px-4 text-right">{money(run.net)}</td></tr></tfoot>
+          <tfoot className="border-t-2 font-semibold"><tr><td className="px-4 py-2" colSpan={4}>Total</td><td /><td className="num px-3 text-right" colSpan={3}>{money(run.deductions)}</td><td className="num px-4 text-right">{money(run.net)}</td><td /></tr></tfoot>
         </table>
       </div>
+      <StatutoryBox runId={run.id} month={run.month} />
       <ConfirmDialog open={confirmPost} onOpenChange={setConfirmPost} confirm="Post" title={`Post ${monthLabel(run.month)} salaries?`}
         description="Salaries & Wages is charged and Salaries Payable owed; the run can then no longer be edited." onConfirm={() => post.mutateAsync(undefined)} />
       <ConfirmDialog open={deleting} onOpenChange={setDeleting} destructive confirm="Delete" title="Delete this draft?" onConfirm={() => del.mutateAsync(undefined)} />
@@ -258,7 +264,8 @@ function EmployeeDialog({ id, initial, onClose }: { id?: string; initial: Employ
         <form className="grid gap-4 sm:grid-cols-3" onSubmit={(e) => {
           e.preventDefault();
           save.mutate({ ...d, designation: nn(d.designation), phone: nn(d.phone), email: nn(d.email), leaving_date: nn(d.leaving_date), pan: nn(d.pan),
-            bank_account: nn(d.bank_account), ifsc: nn(d.ifsc), notes: nn(d.notes), monthly_salary: d.monthly_salary || "0", daily_wage: d.daily_wage || "0" });
+            bank_account: nn(d.bank_account), ifsc: nn(d.ifsc), notes: nn(d.notes), monthly_salary: d.monthly_salary || "0", daily_wage: d.daily_wage || "0",
+            uan: nn(d.uan ?? null), esi_number: nn(d.esi_number ?? null), basic_percent: d.basic_percent || "100" });
         }}>
           <Field label="Name" htmlFor="em-name" className="sm:col-span-2"><Input id="em-name" value={d.name} onChange={(e) => set({ name: e.target.value })} /></Field>
           <Field label="Code" htmlFor="em-code"><Input id="em-code" value={d.code} onChange={(e) => set({ code: e.target.value })} /></Field>
@@ -277,6 +284,21 @@ function EmployeeDialog({ id, initial, onClose }: { id?: string; initial: Employ
           <Field label="Bank account" htmlFor="em-bank"><Input id="em-bank" inputMode="numeric" value={d.bank_account ?? ""} onChange={(e) => set({ bank_account: e.target.value.replace(/\D/g, "") })} /></Field>
           <Field label="IFSC" htmlFor="em-ifsc"><Input id="em-ifsc" className="uppercase" value={d.ifsc ?? ""} onChange={(e) => set({ ifsc: e.target.value })} /></Field>
           <Field label="PAN" htmlFor="em-pan"><Input id="em-pan" className="uppercase" value={d.pan ?? ""} onChange={(e) => set({ pan: e.target.value })} /></Field>
+          <fieldset className="grid gap-3 rounded-lg border p-3 sm:col-span-3 sm:grid-cols-3">
+            <legend className="px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Statutory deductions</legend>
+            <label className="flex items-center gap-2 text-sm"><Switch checked={!!d.pf_enabled} onCheckedChange={(v) => set({ pf_enabled: v })} /> Provident fund (12%)</label>
+            {d.pf_enabled && <>
+              <Field label="UAN" htmlFor="em-uan"><Input id="em-uan" inputMode="numeric" maxLength={12} value={d.uan ?? ""} onChange={(e) => set({ uan: e.target.value.replace(/\D/g, "") })} /></Field>
+              <Field label="Basic + DA % of salary" htmlFor="em-basic" hint="PF is on this part"><Input id="em-basic" inputMode="decimal" value={d.basic_percent ?? "100"} onChange={(e) => set({ basic_percent: e.target.value.replace(/[^\d.]/g, "") })} /></Field>
+              <label className="flex items-center gap-2 text-sm sm:col-span-3"><Switch checked={d.pf_wage_cap !== false} onCheckedChange={(v) => set({ pf_wage_cap: v })} /> PF only on the first ₹15,000 of wages</label>
+            </>}
+            <label className="flex items-center gap-2 text-sm"><Switch checked={!!d.esi_enabled} onCheckedChange={(v) => set({ esi_enabled: v })} /> ESI (wages up to ₹21,000)</label>
+            {d.esi_enabled && <Field label="ESI IP number" htmlFor="em-esi"><Input id="em-esi" inputMode="numeric" value={d.esi_number ?? ""} onChange={(e) => set({ esi_number: e.target.value.replace(/\D/g, "") })} /></Field>}
+            <Field label="Professional tax state" htmlFor="em-pt"><NativeSelect id="em-pt" value={d.pt_state ?? ""} onChange={(e) => set({ pt_state: e.target.value || null })}>
+              <option value="">None</option><option value="24">Gujarat</option><option value="27">Maharashtra</option><option value="29">Karnataka</option>
+              <option value="19">West Bengal</option><option value="36">Telangana</option><option value="37">Andhra Pradesh</option></NativeSelect></Field>
+            <label className="flex items-center gap-2 text-sm"><Switch checked={!!d.tds_enabled} onCheckedChange={(v) => set({ tds_enabled: v })} /> TDS on salary (new regime)</label>
+          </fieldset>
           <DialogFooter className="items-center sm:col-span-3 sm:justify-between">
             <label className="flex items-center gap-2 text-sm"><Switch checked={d.is_active} onCheckedChange={(v) => set({ is_active: v })} /> Active</label>
             <div className="flex gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
@@ -288,3 +310,24 @@ function EmployeeDialog({ id, initial, onClose }: { id?: string; initial: Employ
   );
 }
 
+
+interface Statutory { pf: { rows: unknown[]; employee: string; eps: string; epf_employer: string; due_date: string }; esi: { rows: unknown[]; employee: string; employer: string; due_date: string };
+  pt: { total: string }; tds: { total: string; due_date: string } }
+
+/** What to deposit for the month: PF (ECR file), ESI, professional tax and TDS. */
+function StatutoryBox({ runId, month }: { runId: string; month: string }) {
+  const { base } = useBusiness();
+  const q = useBizQuery<Statutory>(["payroll", "statutory", runId], `/payroll/runs/${runId}/statutory`);
+  const s = q.data;
+  if (!s || (!s.pf.rows.length && !s.esi.rows.length && !Number(s.pt.total) && !Number(s.tds.total))) return null;
+  const pf = Number(s.pf.employee) + Number(s.pf.eps) + Number(s.pf.epf_employer);
+  return (
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t bg-muted/30 px-4 py-3 text-sm">
+      {s.pf.rows.length > 0 && <span>PF <b className="num">{money(String(pf))}</b> <span className="text-xs text-muted-foreground">by {date(s.pf.due_date)}</span>
+        <Button variant="link" size="sm" className="h-auto px-1" onClick={() => openFile(`${base}/payroll/runs/${runId}/ecr.txt`, undefined, `ECR-${month.slice(0, 7)}.txt`)}>ECR file</Button></span>}
+      {s.esi.rows.length > 0 && <span>ESI <b className="num">{money(String(Number(s.esi.employee) + Number(s.esi.employer)))}</b> <span className="text-xs text-muted-foreground">by {date(s.esi.due_date)}</span></span>}
+      {Number(s.pt.total) > 0 && <span>Professional tax <b className="num">{money(s.pt.total)}</b></span>}
+      {Number(s.tds.total) > 0 && <span>TDS on salary <b className="num">{money(s.tds.total)}</b> <span className="text-xs text-muted-foreground">by {date(s.tds.due_date)}</span></span>}
+    </div>
+  );
+}

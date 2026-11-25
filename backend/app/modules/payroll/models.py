@@ -7,7 +7,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, ForeignKey, Index, String, Text, UniqueConstraint, Uuid
+from sqlalchemy import Boolean, Date, ForeignKey, Index, String, Text, UniqueConstraint, Uuid, false, true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
@@ -43,6 +43,15 @@ class Employee(UUIDPrimaryKey, Timestamps, Base):
     ifsc: Mapped[str | None] = mapped_column(String(11))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
+    # Statutory deductions.
+    pf_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
+    uan: Mapped[str | None] = mapped_column(String(12))
+    basic_percent: Mapped[Decimal] = mapped_column(Rate(), default=Decimal(100), server_default="100", nullable=False)  # PF wage share
+    pf_wage_cap: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true(), nullable=False)  # PF on max ₹15,000
+    esi_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
+    esi_number: Mapped[str | None] = mapped_column(String(17))
+    pt_state: Mapped[str | None] = mapped_column(String(2))  # state code for professional tax
+    tds_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
 
 
 class AttendanceStatus(enum.StrEnum):
@@ -103,5 +112,13 @@ class SalaryLine(UUIDPrimaryKey, Base):
     commission: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), nullable=False)
     bonus: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), nullable=False)
     deductions: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), nullable=False)  # advance recovery etc.
+    pf_wage: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), server_default="0", nullable=False)
+    pf_employee: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), server_default="0", nullable=False)
+    pf_employer: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), server_default="0", nullable=False)  # EPF + EPS
+    eps_employer: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), server_default="0", nullable=False)
+    esi_employee: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), server_default="0", nullable=False)
+    esi_employer: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), server_default="0", nullable=False)
+    pt: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), server_default="0", nullable=False)
+    tds: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), server_default="0", nullable=False)
     net: Mapped[Decimal] = mapped_column(Money(), nullable=False)
     note: Mapped[str | None] = mapped_column(String(300))

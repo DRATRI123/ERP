@@ -603,6 +603,13 @@ export const HELP: HelpTopic[] = [
     id: "staff", title: "Staff, attendance and salary", group: "Money", routes: ["/staff"],
     summary: "Employees, attendance by exception, and monthly salaries with commission, posted to the books.",
     sections: [
+      { heading: "PF, ESI, professional tax and TDS", steps: [
+        "Employees → Edit → Statutory deductions: switch on PF (with UAN and the basic + DA share), ESI (with IP number), choose the professional-tax state, and TDS if their salary is taxable.",
+        "Calculate salaries: PF 12% (employer also 12%, of which 8.33% to pension on up to ₹15,000), ESI 0.75% / 3.25% on wages up to ₹21,000, PT by state slab, and TDS under the new regime.",
+        "Change TDS on a line if the employee's actual tax differs (e.g. arrears).",
+        "Post to books: the employer's PF/ESI is an expense; PF, ESI, PT and TDS payables are created.",
+        "Below the table: amounts to deposit and due dates; ECR file downloads the PF return for the EPFO portal. Payslip prints each employee's slip.",
+      ], note: "Rates are those notified for 2025-26. Other states' professional tax: enter it under Other deductions." },
       { heading: "Add employees", steps: [
         "Staff & Salary → Employees → Add employee → monthly salary or daily wage, joining date, bank details.",
         "Commission: set % and link their ERP login — they earn it on invoices where they are the salesperson.",

@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from sqlalchemy import select
 
@@ -44,6 +45,14 @@ class EmployeeIn(BaseModel):
     ifsc: Annotated[str, StringConstraints(strip_whitespace=True, to_upper=True, pattern=r"^[A-Z]{4}0[A-Z0-9]{6}$")] | None = None
     is_active: bool = True
     notes: str | None = Field(None, max_length=2000)
+    pf_enabled: bool = False
+    uan: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{12}$")] | None = None
+    basic_percent: Decimal = Field(Decimal(100), gt=0, le=100, decimal_places=2, description="Share of salary that is basic + DA (PF wage)")
+    pf_wage_cap: bool = True
+    esi_enabled: bool = False
+    esi_number: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{10,17}$")] | None = None
+    pt_state: Annotated[str, StringConstraints(pattern=r"^[0-9]{2}$")] | None = None
+    tds_enabled: bool = False
 
 
 class EmployeeOut(EmployeeIn):
@@ -70,6 +79,12 @@ class LineOut(BaseModel):
     commission: Decimal
     bonus: Decimal
     deductions: Decimal
+    pf_employee: Decimal = Decimal(0)
+    pf_employer: Decimal = Decimal(0)
+    esi_employee: Decimal = Decimal(0)
+    esi_employer: Decimal = Decimal(0)
+    pt: Decimal = Decimal(0)
+    tds: Decimal = Decimal(0)
     net: Decimal
     note: str | None
 
@@ -90,6 +105,8 @@ class RunOut(BaseModel):
 class LineUpdateIn(BaseModel):
     bonus: Money | None = None
     deductions: Money | None = None
+    pt: Money | None = Field(None, description="Override the calculated professional tax")
+    tds: Money | None = Field(None, description="Override the calculated TDS (e.g. after investment proofs)")
     note: Annotated[str, StringConstraints(max_length=300)] | None = None
 
 
@@ -195,3 +212,21 @@ def pay_from(access: Manage, db: DB) -> list[dict[str, Any]]:
     rows = db.scalars(select(Account).where(Account.business_id == access.business.id, Account.is_active.is_(True),
                                             Account.subtype.in_([AccountSubtype.CASH, AccountSubtype.BANK])).order_by(Account.code))
     return [{"id": a.id, "code": a.code, "name": a.name} for a in rows]
+
+
+@router.get("/runs/{run_id}/statutory")
+def run_statutory(run_id: uuid.UUID, access: Manage, db: DB) -> dict[str, Any]:
+    """PF, ESI, professional tax and TDS for the month, with due dates."""
+    return service.statutory(db, access, service.get_run(db, access, run_id))
+
+
+@router.get("/runs/{run_id}/ecr.txt")
+def run_ecr(run_id: uuid.UUID, access: Manage, db: DB) -> Response:
+    run = service.get_run(db, access, run_id)
+    return Response(service.ecr_text(db, access, run), media_type="text/plain",
+                    headers={"Content-Disposition": f'attachment; filename="ECR-{run.month:%Y-%m}.txt"'})
+
+
+@router.get("/runs/{run_id}/payslips/{employee_id}", response_class=HTMLResponse)
+def payslip(run_id: uuid.UUID, employee_id: uuid.UUID, access: Manage, db: DB) -> HTMLResponse:
+    return HTMLResponse(service.payslip_html(db, access, service.get_run(db, access, run_id), employee_id))

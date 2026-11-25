@@ -37,7 +37,8 @@ PAID = {AttendanceStatus.PRESENT: Decimal(1), AttendanceStatus.LEAVE: Decimal(1)
         AttendanceStatus.HALF_DAY: Decimal("0.5"), AttendanceStatus.ABSENT: ZERO}
 EMPLOYEE_FIELDS = ("branch_id", "code", "name", "designation", "phone", "email", "joining_date", "leaving_date", "pay_type",
                    "monthly_salary", "daily_wage", "commission_percent", "user_id", "pan", "bank_account", "ifsc",
-                   "is_active", "notes")
+                   "is_active", "notes", "pf_enabled", "uan", "basic_percent", "pf_wage_cap", "esi_enabled", "esi_number", "pt_state", "tds_enabled",
+)
 
 
 def _q2(d: Decimal) -> Decimal:
@@ -156,15 +157,35 @@ def _sales(db: Session, business_id: uuid.UUID, user_id: uuid.UUID | None, first
     return total(DocType.SALES_INVOICE) - total(DocType.CREDIT_NOTE)
 
 
+def _statutory(line: SalaryLine, e: Employee | None, month: date) -> None:
+    """PF on the salary (not bonus or commission), ESI / PT / TDS on the month's gross."""
+    from app.modules.payroll import statutory as st
+
+    gross = line.base + line.commission + line.bonus
+    zero = {"pf_wage": ZERO, "pf_employee": ZERO, "pf_employer": ZERO, "eps_employer": ZERO,
+            "esi_employee": ZERO, "esi_employer": ZERO}
+    vals: dict[str, Decimal] = dict(zero)
+    if e is not None and e.pf_enabled:
+        vals.update(st.pf(line.base, e.basic_percent, e.pf_wage_cap))
+    if e is not None and e.esi_enabled:
+        rate = e.monthly_salary if e.pay_type == PayType.MONTHLY else e.daily_wage * 26
+        vals.update(st.esi(gross, rate))
+    for k, v in vals.items():
+        setattr(line, k, v)
+    line.pt = st.professional_tax(e.pt_state, gross, month) if e is not None else ZERO
+    line.tds = st.monthly_tds(gross) if e is not None and e.tds_enabled else ZERO
+
+
 def _fill(line: SalaryLine) -> None:
-    line.net = _q2(line.base + line.commission + line.bonus - line.deductions)
+    line.net = _q2(line.base + line.commission + line.bonus - line.deductions
+                   - line.pf_employee - line.esi_employee - line.pt - line.tds)
     if line.net < 0:
         raise ValidationFailed(f"{line.employee_name}: deductions are more than the pay")
 
 
 def _totals(run: SalaryRun) -> None:
     run.gross = sum((ln.base + ln.commission + ln.bonus for ln in run.lines), ZERO)
-    run.deductions = sum((ln.deductions for ln in run.lines), ZERO)
+    run.deductions = sum((ln.deductions + ln.pf_employee + ln.esi_employee + ln.pt + ln.tds for ln in run.lines), ZERO)
     run.net = sum((ln.net for ln in run.lines), ZERO)
 
 
@@ -186,6 +207,7 @@ def create_run(db: Session, access: BusinessAccess, month: date) -> SalaryRun:
         ln = SalaryLine(employee_id=e.id, employee_name=e.name, pay_type=e.pay_type, days_in_month=days_in_month,
                         payable_days=payable, paid_days=paid, base=_q2(base), sales=sales,
                         commission=_q2(sales * e.commission_percent / 100), bonus=ZERO, deductions=ZERO)
+        _statutory(ln, e, first)
         _fill(ln)
         run.lines.append(ln)
     if not run.lines:
@@ -215,6 +237,10 @@ def update_line(db: Session, access: BusinessAccess, run: SalaryRun, employee_id
     for k in ("bonus", "deductions", "note"):
         if k in data:
             setattr(ln, k, data[k] if k == "note" else Decimal(data[k] or 0))
+    _statutory(ln, db.get(Employee, ln.employee_id), run.month)
+    for k in ("pt", "tds"):  # a manual figure overrides the calculated one
+        if data.get(k) is not None:
+            setattr(ln, k, Decimal(data[k]))
     _fill(ln)
     _totals(run)
     db.flush()
@@ -237,9 +263,18 @@ def post_run(db: Session, access: BusinessAccess, run: SalaryRun) -> SalaryRun:
         raise Conflict("These salaries are already posted")
     _, last = month_bounds(run.month)
     acc = Accounts(db, access.business.id)
+    total = lambda k: sum((getattr(ln, k) for ln in run.lines), ZERO)  # noqa: E731
+    employer = total("pf_employer") + total("esi_employer")
     lines = [Line(acc["salaries"], debit=run.gross, description=f"Salaries {run.month:%B %Y}")]
-    if run.deductions:
-        lines.append(Line(acc["advances"], credit=run.deductions, description="Advances recovered"))
+    if employer:
+        lines.append(Line(acc["employer_contributions"], debit=employer, description="Employer PF and ESI"))
+    if total("deductions"):
+        lines.append(Line(acc["advances"], credit=total("deductions"), description="Advances recovered"))
+    for key, amount in (("pf_payable", total("pf_employee") + total("pf_employer")),
+                        ("esi_payable", total("esi_employee") + total("esi_employer")),
+                        ("pt_payable", total("pt")), ("tds_payable", total("tds"))):
+        if amount:
+            lines.append(Line(acc[key], credit=amount))
     lines.append(Line(acc["salaries_payable"], credit=run.net))
     post(db, access.business.id, entry_date=last, source_type=JournalSource.PAYROLL, source_id=run.id,
          source_ref=f"SAL/{run.month:%Y-%m}", lines=lines, created_by=access.user.id,
@@ -271,3 +306,85 @@ def pay_run(db: Session, access: BusinessAccess, run: SalaryRun, *, paid_from_ac
     audit.record(db, action="salary_run.paid", entity_type="salary_run", entity_id=run.id,
                  business_id=access.business.id, actor_id=access.user.id, changes={"net": run.net, "from": src.code})
     return run
+
+
+# ---------------------------------------------------------------------------- statutory returns and payslips
+
+
+def statutory(db: Session, access: BusinessAccess, run: SalaryRun) -> dict[str, Any]:
+    """What to deposit for the month: PF (with the ECR file), ESI, professional tax and TDS on salary.
+    PF and ESI are due by the 15th of the next month."""
+    emps = {e.id: e for e in db.scalars(select(Employee).where(Employee.id.in_([ln.employee_id for ln in run.lines])))}
+    pf_rows, esi_rows, pt_rows, tds_rows = [], [], [], []
+    for ln in run.lines:
+        e = emps.get(ln.employee_id)
+        gross = ln.base + ln.commission + ln.bonus
+        ncp = max(ZERO, ln.payable_days - ln.paid_days)
+        if ln.pf_employee:
+            eps_wage = min(ln.pf_wage, Decimal(15000))
+            pf_rows.append({"uan": e.uan if e else None, "name": ln.employee_name, "gross": _q2(gross), "epf_wage": ln.pf_wage,
+                            "eps_wage": eps_wage, "edli_wage": eps_wage, "employee": ln.pf_employee, "eps": ln.eps_employer,
+                            "epf_employer": ln.pf_employer - ln.eps_employer, "ncp_days": ncp})
+        if ln.esi_employee or ln.esi_employer:
+            esi_rows.append({"ip_number": e.esi_number if e else None, "name": ln.employee_name, "days": ln.paid_days,
+                             "wages": _q2(gross), "employee": ln.esi_employee, "employer": ln.esi_employer})
+        if ln.pt:
+            pt_rows.append({"name": ln.employee_name, "state": e.pt_state if e else None, "gross": _q2(gross), "pt": ln.pt})
+        if ln.tds:
+            tds_rows.append({"name": ln.employee_name, "pan": e.pan if e else None, "gross": _q2(gross), "tds": ln.tds})
+    _, last = month_bounds(run.month)
+    due = date(last.year + (last.month == 12), last.month % 12 + 1, 15)
+    s = lambda rows, k: sum((r[k] for r in rows), ZERO)  # noqa: E731
+    return {"month": run.month, "pf": {"rows": pf_rows, "employee": s(pf_rows, "employee"), "eps": s(pf_rows, "eps"),
+                                       "epf_employer": s(pf_rows, "epf_employer"), "due_date": due},
+            "esi": {"rows": esi_rows, "employee": s(esi_rows, "employee"), "employer": s(esi_rows, "employer"), "due_date": due},
+            "pt": {"rows": pt_rows, "total": s(pt_rows, "pt")},
+            "tds": {"rows": tds_rows, "total": s(tds_rows, "tds"), "due_date": date(due.year, due.month, 7) if run.month.month != 3 else date(last.year, 4, 30)}}
+
+
+def ecr_text(db: Session, access: BusinessAccess, run: SalaryRun) -> str:
+    """EPFO ECR 2.0 text file (fields separated by #~#) for the PF unified portal."""
+    rows = statutory(db, access, run)["pf"]["rows"]
+    out = []
+    for r in rows:
+        out.append("#~#".join(str(x) for x in (
+            r["uan"] or "", r["name"].upper(), int(r["gross"]), int(r["epf_wage"]), int(r["eps_wage"]), int(r["edli_wage"]),
+            int(r["employee"]), int(r["eps"]), int(r["epf_employer"]), int(r["ncp_days"]), 0)))
+    return "\n".join(out) + ("\n" if out else "")
+
+
+def payslip_html(db: Session, access: BusinessAccess, run: SalaryRun, employee_id: uuid.UUID) -> str:
+    import html
+
+    from app.modules.gst.words import rupees_in_words
+
+    ln = next((x for x in run.lines if x.employee_id == employee_id), None)
+    if ln is None:
+        raise NotFound("That employee is not in this run")
+    e = db.get(Employee, employee_id)
+    b = access.business
+    esc = html.escape
+    earn = [("Salary / wages", ln.base), ("Commission", ln.commission), ("Bonus", ln.bonus)]
+    ded = [("Provident fund", ln.pf_employee), ("ESI", ln.esi_employee), ("Professional tax", ln.pt), ("Income tax (TDS)", ln.tds),
+           ("Advance / other", ln.deductions)]
+    gross = ln.base + ln.commission + ln.bonus
+    rows = ""
+    for i in range(max(len(earn), len(ded))):
+        a = earn[i] if i < len(earn) else ("", None)
+        d = ded[i] if i < len(ded) else ("", None)
+        rows += (f"<tr><td>{esc(a[0])}</td><td class=n>{'' if a[1] is None else f'{a[1]:,.2f}'}</td>"
+                 f"<td>{esc(d[0])}</td><td class=n>{'' if d[1] is None else f'{d[1]:,.2f}'}</td></tr>")
+    tot_ded = gross - ln.net
+    info = [("Employee", ln.employee_name), ("Code", e.code if e else ""), ("Designation", (e.designation or "") if e else ""),
+            ("PAN", (e.pan or "") if e else ""), ("UAN", (e.uan or "") if e else ""), ("ESI no.", (e.esi_number or "") if e else ""),
+            ("Paid days", f"{ln.paid_days.normalize():f} of {ln.days_in_month}"), ("Bank a/c", (e.bank_account or "") if e else "")]
+    grid = "".join(f"<div><span>{esc(k)}</span><b>{esc(str(v))}</b></div>" for k, v in info)
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>Payslip {esc(ln.employee_name)} {run.month:%b %Y}</title>
+<style>body{{font:10pt Arial,"Noto Sans",sans-serif;margin:14mm;color:#111}}h2{{margin:0}}.grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 16px;margin:12px 0}}
+.grid span{{display:block;font-size:8pt;color:#666}}table{{width:100%;border-collapse:collapse}}td,th{{border:1px solid #bbb;padding:5px}}th{{background:#f2f2f2;text-align:left}}.n{{text-align:right}}</style></head><body>
+<h2>{esc(b.legal_name or b.name)}</h2><p>Payslip for {run.month:%B %Y}</p><div class=grid>{grid}</div>
+<table><tr><th>Earnings</th><th class=n>₹</th><th>Deductions</th><th class=n>₹</th></tr>{rows}
+<tr><th>Gross</th><th class=n>{gross:,.2f}</th><th>Total deductions</th><th class=n>{tot_ded:,.2f}</th></tr></table>
+<p><b>Net pay: ₹{ln.net:,.2f}</b> ({esc(rupees_in_words(ln.net))})</p>
+<p style="font-size:8pt;color:#666">Employer contributions (not deducted): PF ₹{ln.pf_employer:,.2f}, ESI ₹{ln.esi_employer:,.2f}. This is a computer-generated payslip.</p>
+</body></html>"""

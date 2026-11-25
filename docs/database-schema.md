@@ -249,6 +249,15 @@ Also:
 * `journal_entries.source_type` also accepts `cash_closing`.
 * New system accounts: 4230 Cash Excess and 6910 Cash Shortage.
 
+## Statutory payroll (migration 0024)
+
+* On `employees`: `pf_enabled`, `uan`, `basic_percent`, `pf_wage_cap`, `esi_enabled`,
+  `esi_number`, `pt_state`, `tds_enabled`.
+* On `salary_lines`: `pf_wage`, `pf_employee`, `pf_employer`, `eps_employer`,
+  `esi_employee`, `esi_employer`, `pt`, `tds`.
+* New system accounts: 2220 PF Payable, 2221 ESI Payable, 2222 Professional Tax Payable and
+  6015 Employer PF & ESI.
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |
