@@ -10,13 +10,13 @@ import { useBizMutation } from "@/hooks/use-business";
 import { useModules, type ModuleKey } from "@/hooks/use-modules";
 
 type Preset = { label: string; hint: string; on: ModuleKey[] };
-const ALL: ModuleKey[] = ["pharmacy", "cheques", "tds", "interest", "manufacturing", "pricing", "catalogue", "payroll", "claims", "licences", "automation", "developer"];
+const ALL: ModuleKey[] = ["pharmacy", "cheques", "tds", "interest", "damage", "loyalty", "manufacturing", "pricing", "catalogue", "payroll", "claims", "licences", "automation", "developer"];
 /** Starting points; every switch can still be changed afterwards. */
 const PRESETS: Preset[] = [
-  { label: "Medical store / pharmacy", hint: "Retail or wholesale chemist", on: ["pharmacy", "cheques", "tds", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
-  { label: "Manufacturer (Ayurveda, FMCG…)", hint: "Makes and sells its own products", on: ["manufacturing", "cheques", "tds", "interest", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
-  { label: "Distributor / wholesaler", hint: "Buys and sells to shops", on: ["cheques", "tds", "interest", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
-  { label: "Retail shop", hint: "Counter billing", on: ["cheques", "pricing", "catalogue", "payroll", "claims", "automation"] },
+  { label: "Medical store / pharmacy", hint: "Retail or wholesale chemist", on: ["pharmacy", "cheques", "tds", "damage", "loyalty", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
+  { label: "Manufacturer (Ayurveda, FMCG…)", hint: "Makes and sells its own products", on: ["manufacturing", "damage", "cheques", "tds", "interest", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
+  { label: "Distributor / wholesaler", hint: "Buys and sells to shops", on: ["damage", "cheques", "tds", "interest", "pricing", "catalogue", "payroll", "claims", "licences", "automation"] },
+  { label: "Retail shop", hint: "Counter billing", on: ["damage", "loyalty", "cheques", "pricing", "catalogue", "payroll", "claims", "automation"] },
   { label: "Services / clinic / office", hint: "No stock trading", on: ["tds", "payroll", "claims", "licences", "automation"] },
 ];
 

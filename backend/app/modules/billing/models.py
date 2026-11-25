@@ -266,6 +266,7 @@ class PaymentMode(enum.StrEnum):
     BANK_TRANSFER = "bank_transfer"
     CHEQUE = "cheque"
     OTHER = "other"
+    LOYALTY = "loyalty"  # customer's loyalty points
 
 
 class PaymentState(enum.StrEnum):

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangleIcon, ArrowLeftRightIcon, BanknoteIcon, ClockAlertIcon, StethoscopeIcon, CheckCircle2Icon, GiftIcon, TagIcon, CreditCardIcon, Loader2Icon, MinusIcon, PlusIcon, SaveIcon, SmartphoneIcon, Trash2Icon, WalletIcon,
+  AlertTriangleIcon, ArrowLeftRightIcon, StarIcon, BanknoteIcon, ClockAlertIcon, StethoscopeIcon, CheckCircle2Icon, GiftIcon, TagIcon, CreditCardIcon, Loader2Icon, MinusIcon, PlusIcon, SaveIcon, SmartphoneIcon, Trash2Icon, WalletIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -66,7 +66,8 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   const router = useRouter();
   const { base, id: bizId, can, isOwner } = useBusiness();
   const types = side === "sales" ? SALES_TYPES : PURCHASE_TYPES;
-  const pharmacy = useModules().on("pharmacy");
+  const modules = useModules();
+  const pharmacy = modules.on("pharmacy");
   const [docType, setDocType] = useState<DocType>(draft?.doc_type ?? (side === "sales" ? "sales_invoice" : "purchase_invoice"));
   const [party, setParty] = useState<Party | null>(draft?.party_id ? ({ id: draft.party_id, name: draft.party_name ?? "" } as Party) : null);
   const [partyName, setPartyName] = useState(draft && !draft.party_id ? (draft.party_name ?? "") : "");
@@ -116,6 +117,11 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   const totals = lines.length ? preview.data : undefined;
   const grand = totals?.grand_total ?? "0";
   const paid = payments.reduce((s, p) => s + dec(p.amount || "0"), 0n);
+  const points = useQuery({
+    queryKey: ["biz", bizId, "loyalty", party?.id], enabled: side === "sales" && !!party && modules.on("loyalty"),
+    queryFn: () => api<{ points: string; value: string; can_redeem: boolean }>(`${base}/customers/${party!.id}/loyalty`), staleTime: 15_000,
+  });
+  const pointsValue = points.data?.can_redeem ? dec(points.data.value) : 0n;
   const due = dec(grand) - paid;
 
   // ------------------------------------------------------------------ editing
@@ -363,10 +369,18 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                   </Button>
                 ))}
               </div>
+              {pointsValue > 0n && dec(grand) > 0n && !payments.some((p) => p.mode === "loyalty") && (
+                <Button type="button" variant="outline" size="sm" className="w-full border-dashed" onClick={() => {
+                  const use = pointsValue < dec(grand) ? pointsValue : dec(grand);
+                  const rest = dec(grand) - use;
+                  setPayments([{ key: uid(), mode: "loyalty", amount: decStr(use), reference: "" }, ...(rest > 0n ? [{ key: uid(), mode: "cash", amount: decStr(rest), reference: "" }] : [])]);
+                }}><StarIcon /> Use {Number(points.data!.points).toLocaleString("en-IN")} points ({money(decStr(pointsValue))})</Button>
+              )}
               {payments.map((p) => (
                 <div key={p.key} className="flex gap-2">
                   <NativeSelect value={p.mode} className="w-28" onChange={(e) => setPayments((ps) => ps.map((x) => (x.key === p.key ? { ...x, mode: e.target.value } : x)))}>
                     {MODES.map((m) => <option key={m.v} value={m.v}>{m.label}</option>)}
+                    {(p.mode === "loyalty" || pointsValue > 0n) && <option value="loyalty">Points</option>}
                   </NativeSelect>
                   <Input value={p.amount} inputMode="decimal" className="num text-right" aria-label="Amount"
                     onChange={(e) => setPayments((ps) => ps.map((x) => (x.key === p.key ? { ...x, amount: e.target.value.replace(/[^\d.]/g, "") } : x)))} />

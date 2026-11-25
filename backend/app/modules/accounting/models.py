@@ -137,6 +137,7 @@ class JournalSource(enum.StrEnum):
     CLOSING = "closing"
     PAYROLL = "payroll"
     TDS = "tds"  # TDS deposited to the government
+    CLAIM = "claim"  # damage claim settled by a supplier
 
 
 class JournalEntry(UUIDPrimaryKey, Base):

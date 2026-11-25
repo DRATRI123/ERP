@@ -120,6 +120,32 @@ PostgreSQL.
     overdue amounts, and stock value.
   * Shown per business and in total, for today, this month or this financial year.
   * A six-month sales chart. Clicking a business opens its dashboard.
+* **Supplier bill import** (`POST /purchases/import/preview` with the file, then `POST /purchases/import`):
+  * Reads the distributor's CSV or Excel bill. Columns are recognised by their usual names
+    (item name / product / description, code, barcode, HSN, qty, free / scheme qty, rate / PTR,
+    disc %, GST %, batch, expiry, MRP).
+  * Expiry dates like `03/27`, `12/2026`, `Feb-28` or full dates are understood. A month-only
+    date means the month's end.
+  * Total lines are skipped.
+  * Each line is matched to a product by: this supplier's remembered name or code, then
+    barcode, then our SKU / their code, then exact name. Otherwise up to three suggestions are
+    offered by shared words.
+  * The draft purchase bill keeps batch, expiry and MRP. Free quantity becomes a zero-rate line.
+  * The choices are remembered per supplier in `supplier_item_maps`, listed and forgettable
+    under `/suppliers/{id}/item-names`.
+* **Damage & breakage claims** (module `damage`, migration 0020):
+  * Recording damage posts a stock adjustment, so the cost goes to Stock adjustments.
+  * Naming a supplier opens a claim for the cost or a chosen amount. Settling it with their
+    credit note posts Dr Accounts payable / Cr Stock adjustments (journal source `claim`).
+  * Rejected claims keep the loss. A claim with no supplier is simply written off.
+  * The summary shows what is waiting, what was recovered and the net loss.
+* **Loyalty points** (module `loyalty`, off by default):
+  * Settings: points per ₹100 billed, value per point, and a minimum before points can be used.
+  * Finalized sales invoices with a customer earn points on what was not paid with points.
+  * Points are spent with payment mode `loyalty` (Dr Loyalty Rewards expense, Cr Receivable),
+    capped at the balance.
+  * Cancelling the invoice takes its points back; cancelling the points receipt returns them.
+  * Manual adjustments are possible, and the overview lists members and the value still owed.
 * **Cheques** (module `cheques`, migration 0019):
   * A register of post-dated cheques received and issued (`/cheques`). A cheque is not in the
     books while pending.

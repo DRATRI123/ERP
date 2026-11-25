@@ -1,6 +1,6 @@
 "use client";
 
-import { DownloadIcon, PlusIcon } from "lucide-react";
+import { DownloadIcon, PlusIcon, FileUpIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -42,6 +42,7 @@ export function DocumentList({ side }: { side: "sales" | "purchase" }) {
           {(isOwner || can("data.export", "gst.view")) && side === "sales" && (
             <Button variant="outline" onClick={() => openFile(`${base}/data/export/sales-register`, { format: "xlsx", date_from: monthStartISO(), date_to: todayISO() }, "sales-register.xlsx")}><DownloadIcon /> Export this month</Button>
           )}
+          {canCreate && side === "purchase" && <Button asChild variant="outline"><Link href="/purchases/import"><FileUpIcon /> Import supplier bill</Link></Button>}
           {canCreate && <Button asChild><Link href={side === "sales" ? "/sales/new" : "/purchases/new"}><PlusIcon /> {side === "sales" ? "New invoice" : "New purchase"}</Link></Button>}
         </>}
       />

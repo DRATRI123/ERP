@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeftIcon, FilePlus2Icon, MailIcon, PencilIcon, PhoneIcon } from "lucide-react";
+import { ArrowLeftIcon, FilePlus2Icon, MailIcon, PencilIcon, PhoneIcon, StarIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PartyDialog } from "@/features/parties/party-form";
 import { Attachments } from "@/features/files/attachments";
+import { useModules } from "@/hooks/use-modules";
 import { useBizQuery, useBusiness } from "@/hooks/use-business";
 import { date, money } from "@/lib/format";
 import { DOC_LABEL, type DocumentSummary, type Party } from "@/lib/types";
@@ -33,6 +34,8 @@ export function PartyDetail({ kind }: { kind: "customers" | "suppliers" }) {
   const balPerm = kind === "customers" ? "customer_balances.view" : "supplier_balances.view";
   const seeBal = isOwner || can(balPerm);
   const out = useBizQuery<Outstanding>(["outstanding", id], `/parties/${id}/outstanding`, undefined, { enabled: seeBal });
+  const loyaltyOn = useModules().on("loyalty");
+  const pts = useBizQuery<{ points: string; value: string }>(["loyalty", id], `/customers/${id}/loyalty`, undefined, { enabled: kind === "customers" && loyaltyOn });
   const ledger = useBizQuery<Ledger>(["party-ledger", id], "/accounting/reports/party-ledger",
     { party_id: id, date_from: period.from, date_to: period.to, side: kind === "customers" ? "receivable" : "payable" }, { enabled: seeBal });
   if (isLoading) return <Skeleton className="h-96" />;
@@ -59,6 +62,8 @@ export function PartyDetail({ kind }: { kind: "customers" | "suppliers" }) {
         <StatCard label={sales ? "To receive" : "To pay"} icon={HandCoinsIcon} loading={out.isLoading} value={money(out.data?.outstanding)} />
         <StatCard label="Overdue" icon={AlarmClockIcon} tone={Number(out.data?.overdue ?? 0) > 0 ? "red" : "green"} loading={out.isLoading} value={money(out.data?.overdue)} />
         <StatCard label="Credit terms" icon={HandCoinsIcon} tone="blue" value={p.credit_limit ? money(p.credit_limit) : "No limit"} sub={p.credit_days ? `${p.credit_days} days` : "Due on receipt"} />
+        {sales && loyaltyOn && <StatCard label="Loyalty points" icon={StarIcon} tone="violet" loading={pts.isLoading}
+          value={pts.data ? Number(pts.data.points).toLocaleString("en-IN") : "—"} sub={pts.data ? `worth ${money(pts.data.value)}` : undefined} />}
       </div>}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="overflow-hidden">

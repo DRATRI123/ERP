@@ -710,6 +710,11 @@ def finalize(db: Session, access: BusinessAccess, doc: Document, *,
 
         for p in payments:
             pay_document(db, access, doc, **p)
+    if doc.doc_type == DocType.SALES_INVOICE and party is not None:
+        from app.modules.stockx.loyalty import earn_for_invoice
+
+        paid_with_points = sum((Decimal(p["amount"]) for p in (payments or []) if str(p.get("mode")) == "loyalty"), ZERO)
+        earn_for_invoice(db, access.business, doc, redeemed_value=paid_with_points, user_id=access.user.id)
     if doc.doc_type == DocType.SALES_INVOICE and party is None and doc.balance_due != 0:
         raise ValidationFailed("A cash sale without a customer must be paid in full")
     if doc.doc_type in (DocType.SALES_INVOICE, DocType.DEBIT_NOTE) and party is not None \
@@ -778,6 +783,10 @@ def cancel(db: Session, access: BusinessAccess, doc: Document, *, reason: str, o
     from app.modules.accounting.posting import reverse as reverse_posting
 
     reverse_posting(db, access.business, JournalSource.DOCUMENT, doc.id, on=on, user_id=access.user.id)
+    if doc.doc_type == DocType.SALES_INVOICE:
+        from app.modules.stockx.loyalty import reverse_for_invoice
+
+        reverse_for_invoice(db, access.business, doc, on, user_id=access.user.id)
     doc.status = DocStatus.CANCELLED
     doc.cancelled_at = datetime.now(UTC)
     doc.cancelled_by_id = access.user.id

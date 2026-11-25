@@ -153,6 +153,13 @@ def create_payment(db: Session, access: BusinessAccess, *, direction: PaymentDir
                           **({"tds_amount": tds_amount, "tds_section": tds_section} if tds_amount else {}),
                           "allocations": [{"document_id": d.id, "amount": a.amount}
                                           for d, a in zip(touched, pay.allocations, strict=True)]})
+    if mode == PaymentMode.LOYALTY:
+        if direction != PaymentDirection.IN:
+            raise ValidationFailed("Loyalty points can only pay a customer's bill")
+        from app.modules.stockx.loyalty import redeem
+
+        redeem(db, access.business, party_id=party_id, amount=amount, payment_id=pay.id, on=payment_date,
+               number=number, user_id=access.user.id)
     post_payment(db, access.business, pay, user_id=access.user.id)
     payload = {"id": pay.id, "number": number, "branch_id": pay.branch_id, "direction": direction.value,
                "amount": amount,
@@ -200,6 +207,10 @@ def cancel_payment(db: Session, access: BusinessAccess, pay: Payment, *, reason:
             _apply(doc, -a.amount)
     reverse_posting(db, access.business, JournalSource.PAYMENT, pay.id, on=local_today(),
                     user_id=access.user.id)
+    if pay.mode == PaymentMode.LOYALTY:
+        from app.modules.stockx.loyalty import unredeem
+
+        unredeem(db, access.business, pay, local_today(), user_id=access.user.id)
     pay.status = PaymentState.CANCELLED
     pay.cancelled_at = datetime.now(UTC)
     pay.cancel_reason = reason

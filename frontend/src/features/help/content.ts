@@ -264,6 +264,62 @@ export const HELP: HelpTopic[] = [
 
   // ------------------------------------------------------------------ stock
   {
+    id: "purchase-import", title: "Import a supplier's bill (Excel / CSV)", group: "Buying", routes: ["/purchases/import"],
+    summary: "Your distributor sends the bill as a file: upload it instead of typing every line. Items you match once are remembered for that supplier.",
+    sections: [
+      { heading: "Import", steps: [
+        "Purchases → Import supplier bill → choose the supplier, enter their bill number and date.",
+        "Choose the file. Columns are found by their usual names: Item name, Item code, Barcode, Qty, Free, Rate / PTR, Disc %, GST %, Batch, Expiry, MRP.",
+        "Each line shows how it was matched: Remembered, Barcode, Item code or Same name.",
+        "For an unmatched line pick from the suggestions or “Search all products”. Tick Skip for lines you don't want.",
+        "Create draft bill → check it in the normal purchase screen → Save & finalize.",
+      ] },
+      { heading: "Good to know", steps: [
+        "Free / scheme quantity becomes its own zero-rate line, so stock is right and the cost per unit drops.",
+        "Expiry like 03/27 means the end of March 2027.",
+        "The bill's Total line is skipped automatically.",
+      ] },
+    ],
+    related: ["purchases"],
+  },
+  {
+    id: "damage", title: "Damage, breakage and claims", group: "Stock", routes: ["/damage"],
+    summary: "Broken bottles, leaking packs, transit damage: write the stock off and claim it from the supplier until they credit it.",
+    sections: [
+      { heading: "Record damage", steps: [
+        "Damage & claims → Record damage → scan the product, choose godown and batch, quantity and reason.",
+        "Name the supplier to claim it from them (amount defaults to its cost), or leave it empty to only write it off.",
+        "Stock goes down at once and the cost goes to Stock adjustments (a loss).",
+      ] },
+      { heading: "When the supplier responds", steps: [
+        "They send a credit note: Credit received → amount and their credit note number. You owe them that much less and the loss shrinks.",
+        "They refuse: Rejected with the reason. The loss stays.",
+      ] },
+    ],
+    tips: ["Attach the photo of the damage (Documents) and mention the claim number when you call the supplier."],
+    related: ["inventory"],
+  },
+  {
+    id: "loyalty", title: "Loyalty points", group: "Selling", routes: ["/loyalty"],
+    summary: "Customers earn points on every bill and spend them at the counter — a simple way to bring them back.",
+    sections: [
+      { heading: "Set up", steps: [
+        "Settings → Modules → switch on Loyalty points.",
+        "Loyalty points → points per ₹100 billed (e.g. 1) and value of one point (e.g. ₹1) = 1% back. Optionally “use from” a minimum.",
+      ] },
+      { heading: "At the counter", steps: [
+        "Choose the customer on the bill (walk-in sales don't earn points).",
+        "If they have points, the Payment section shows “Use N points (₹x)”: it pays that part and puts the rest in cash — change the mode if they pay by UPI.",
+        "Points are earned on what they paid other than with points.",
+      ] },
+      { heading: "Corrections", steps: [
+        "Cancelling a bill takes its points back; cancelling a points receipt returns them.",
+        "Adjust (Loyalty points page) adds a welcome or birthday bonus, or removes points with a minus sign.",
+      ] },
+    ],
+    related: ["sales", "customers"],
+  },
+  {
     id: "inventory", title: "Products and stock", group: "Stock", routes: ["/inventory"],
     summary: "Your catalogue and live stock by warehouse and batch. Stock changes only through documents, so it always adds up.",
     sections: [

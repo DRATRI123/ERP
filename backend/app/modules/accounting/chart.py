@@ -70,6 +70,7 @@ DEFAULT_CHART: list[tuple[str, str, S, str | None]] = [
     ("6070", "Professional Fees", S.OPERATING_EXPENSE, None),
     ("6080", "Advertising & Marketing", S.OPERATING_EXPENSE, None),
     ("6090", "Miscellaneous Expenses", S.OPERATING_EXPENSE, None),
+    ("6095", "Loyalty Rewards", S.OPERATING_EXPENSE, "loyalty_expense"),
     ("6100", "Depreciation", S.DEPRECIATION, "depreciation"),
     ("6200", "Bank Charges", S.FINANCE_COST, None),
     ("6210", "Interest Paid", S.FINANCE_COST, None),

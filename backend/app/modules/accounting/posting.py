@@ -190,6 +190,8 @@ def _purchase_lines(db: Session, acc: Accounts, doc: Document,
 
 def cash_or_bank(db: Session, business_id: uuid.UUID, mode: PaymentMode,
                  account_id: uuid.UUID | None) -> Account:
+    if mode == PaymentMode.LOYALTY:  # paid with points: the business bears it as a reward
+        return Accounts(db, business_id)["loyalty_expense"]
     if account_id is not None:
         a = db.get(Account, account_id)
         if a is None or a.business_id != business_id or a.subtype not in (

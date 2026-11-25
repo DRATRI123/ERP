@@ -102,6 +102,21 @@ CI runs these plus `npm audit`, and an end-to-end job that installs with `setup.
   near-expiry discount sits under it while Pharmacy is on.
 * `/settings?tab=modules` opens the tab directly; the old `?tab=pharmacy` also lands there.
 
+## Supplier bill import, damage and loyalty
+
+* **Purchases → Import supplier bill** (`/purchases/import`): supplier, bill number and date,
+  then the file.
+  * Every line shows how it was matched (Remembered / Barcode / Item code / Same name), or offers
+    suggestions and a product search. Any line can be skipped.
+  * *Create draft bill* opens the normal purchase editor with the draft.
+* **Damage & claims** (`/damage`): totals for waiting, recovered and net loss; tabs by status.
+  *Record damage* takes product, godown, batch, quantity, reason and an optional supplier and
+  amount. *Credit received* and *Rejected* close a claim.
+* **Loyalty points** (`/loyalty`): earning rate, point value and minimum; members with points
+  and value; manual *Adjust*.
+  * In the bill editor, a customer with points gets a *Use N points (₹x)* payment button.
+  * Customer pages show their points.
+
 ## Cheques, TDS and interest
 
 * **Cheques** (`/cheques`):

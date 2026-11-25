@@ -206,6 +206,20 @@ Also:
 * `journal_entries.source_type` also accepts `tds`.
 * New system accounts: 1310 TDS Receivable and 2120 TDS Payable.
 
+## Stock extras (migration 0020)
+
+| Table | Purpose |
+|---|---|
+| `supplier_item_maps` | Per supplier: their item name or code (normalised) → our product, learnt on bill import |
+| `damage_claims` | Damaged stock written off: product, godown, batch, quantity, reason, cost, the stock adjustment, supplier, claim and settled amounts, status open/settled/rejected/written_off, credit note no. |
+| `loyalty_entries` | Points ledger per customer: earn / redeem / reverse / adjust, signed points, the invoice or receipt it came from |
+
+Also:
+
+* `payments.mode` also accepts `loyalty`.
+* `journal_entries.source_type` also accepts `claim`.
+* New system account: 6095 Loyalty Rewards.
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |
