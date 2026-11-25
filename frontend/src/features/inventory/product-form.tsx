@@ -128,9 +128,10 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
           </fieldset>
           {service && <Field label="Warranty (months)" error={err.warranty_months?.message} hint="Registered on each sale" className="sm:col-span-2"><Input inputMode="numeric" placeholder="12" {...form.register("warranty_months")} /></Field>}
           <div className="grid gap-3 rounded-lg border p-3 sm:col-span-4 sm:grid-cols-2">
+            {!!product?.stock_locked && <p className="text-xs text-muted-foreground sm:col-span-2">Stock has already moved for this product, so stock tracking, batches and serial numbers are fixed. Make a new product to change them.</p>}
             {([["prices_include_tax", "Prices include GST"], ["track_inventory", "Track stock"], ["batch_tracking", "Batches & expiry"], ["serial_tracking", "Serial numbers"]] as const).map(([k, label]) => (
               <label key={k} className="flex items-center justify-between gap-2 text-sm">{label}
-                <Switch checked={!!flags[FLAGS.indexOf(k)]} onCheckedChange={(v) => form.setValue(k, v, { shouldDirty: true })} disabled={!!product && (k === "batch_tracking" || k === "serial_tracking")} />
+                <Switch checked={!!flags[FLAGS.indexOf(k)]} onCheckedChange={(v) => form.setValue(k, v, { shouldDirty: true })} disabled={!!product?.stock_locked && k !== "prices_include_tax"} />
               </label>
             ))}
           </div>

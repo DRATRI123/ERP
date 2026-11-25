@@ -51,9 +51,14 @@ def product_out(db: Session, access: BusinessAccess, products: list[Product]) ->
                    StockBalance.warehouse_id.in_(wids))
             .group_by(StockBalance.product_id)
         ).all())
+    from app.modules.inventory.models import StockLedgerEntry
+
+    moved = set(db.scalars(select(StockLedgerEntry.product_id).where(
+        StockLedgerEntry.product_id.in_([p.id for p in products])).distinct())) if products else set()
     out = []
     for p in products:
         item = ProductOut.model_validate(p)
+        item.stock_locked = p.id in moved
         if not show_cost:
             item.purchase_price = None
         if show_stock and p.track_inventory:

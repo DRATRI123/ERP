@@ -143,3 +143,24 @@ def test_sale_or_return_challan(s, db):
     assert D(s.get("/sale-or-return", open_only=False)["lines"][0]["returned"]) == 4
     books_ok(s)
     s.assert_consistent(db)
+
+
+def test_serial_switch_until_stock_moves_and_purchase_with_serials(s):
+    p = s.product("svp", serial_tracking=True, batch_tracking=True)
+    assert p["stock_locked"] is False
+    r = s.api.c.patch(f"{s.base}/products/{p['id']}", headers=s.h, json={"serial_tracking": False})
+    assert r.status_code == 200 and r.json()["serial_tracking"] is False  # no stock yet: can switch off
+    s.api.c.patch(f"{s.base}/products/{p['id']}", headers=s.h, json={"serial_tracking": True}).raise_for_status()
+    sup = s.post("/suppliers", {"name": "Vaidya Pharma"})
+    bill = doc(s, "purchase_invoice", [{"product_id": p["id"], "quantity": "3", "unit_price": "150", "batch_no": "B1",
+                                        "expiry_date": "2030-01-01"}], party_id=sup["id"], supplier_invoice_no="A1")
+    err = finalize(s, bill["id"], expect=422)["error"]["message"]
+    assert "one serial number per piece: 0 given for 3" in err
+    bill2 = doc(s, "purchase_invoice", [{"product_id": p["id"], "quantity": "3", "unit_price": "150", "batch_no": "B1",
+                                         "expiry_date": "2030-01-01", "serials": ["S-1", "S-2", "S-3"]}],
+                party_id=sup["id"], supplier_invoice_no="A2")
+    finalize(s, bill2["id"])
+    got = s.get(f"/products/{p['id']}")
+    assert got["stock_locked"] is True
+    r = s.api.c.patch(f"{s.base}/products/{p['id']}", headers=s.h, json={"serial_tracking": False})
+    assert r.status_code == 422  # stock has moved: fixed

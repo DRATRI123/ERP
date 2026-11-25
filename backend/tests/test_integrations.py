@@ -436,9 +436,7 @@ def test_google_setup_values_origin_cancel_disconnect_and_remove(ishop, fake, db
 
 
 def test_removed_integration_with_history_is_hidden(ishop, fake, db):
-    from app.modules.integrations.models import Integration, OutboundMessage
-
-    from app.modules.integrations.models import MessageChannel, MessageStatus
+    from app.modules.integrations.models import Integration, MessageChannel, MessageStatus, OutboundMessage
 
     r = connect(ishop, "msg91", {"invoice_flow_id": "f"}, {"auth_key": "k"}, name="SMS")
     db.add(OutboundMessage(business_id=uuid.UUID(ishop.bid), integration_id=uuid.UUID(r["id"]), channel=MessageChannel.SMS,

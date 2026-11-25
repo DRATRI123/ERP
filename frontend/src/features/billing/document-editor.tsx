@@ -34,6 +34,7 @@ interface Line {
   key: string; product_id: string | null; name: string; sku?: string; hsn?: string | null; unit?: string;
   quantity: string; unit_price: string; discount_percent: string; gst_rate?: string; stock?: string | null;
   batched?: boolean; batch_no?: string; expiry_date?: string; mrp?: string;
+  serialed?: boolean; serials?: string; // one serial number per unit, typed / scanned one per line
   priceTyped?: boolean; // only typed rates are sent; otherwise the server prices (price lists, tiers)
   incl?: boolean; // price includes GST (for the offline estimate)
   schedule?: string; rack?: string | null; composition?: string | null; packSize?: number; packLabel?: string | null;
@@ -44,6 +45,8 @@ const packs = (q: number, size: number, label?: string | null) => {
   const full = Math.floor(q / size), loose = Math.round((q - full * size) * 1000) / 1000;
   return [full ? `${full} ${label || "pack"}` : "", loose ? `${loose} loose` : ""].filter(Boolean).join(" + ");
 };
+/** Serial numbers typed or scanned: one per line, or separated by commas. */
+const serialList = (s?: string) => (s ?? "").split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
 const isFree = (l: DocumentLine) => !!(l.custom_fields as Record<string, unknown> | undefined)?.scheme_free;
 interface AvailableBatch { batch_id: string; batch_no: string; expiry_date: string | null; mrp: string | null; quantity: string; days_left: number | null }
 interface PayRow { key: string; mode: string; amount: string; reference: string }
@@ -93,7 +96,8 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
     key: uid(), product_id: l.product_id, name: l.description, hsn: l.hsn_sac, unit: l.unit_code ?? undefined,
     quantity: String(Number(l.quantity)), unit_price: String(Number(l.unit_price)), discount_percent: String(Number(l.discount_percent)), gst_rate: l.gst_rate,
     batched: !!l.batch_no, batch_no: (l.batch_no as string | null) ?? undefined, expiry_date: (l.expiry_date as string | null) ?? undefined,
-    mrp: l.mrp ? String(Number(l.mrp)) : undefined })));
+    mrp: l.mrp ? String(Number(l.mrp)) : undefined,
+    serialed: Array.isArray(l.serials) && l.serials.length > 0, serials: Array.isArray(l.serials) ? (l.serials as string[]).join("\n") : undefined })));
   const [payments, setPayments] = useState<PayRow[]>([]);
   const [newParty, setNewParty] = useState<string | null>(null);
   const search = useRef<ProductSearchHandle>(null);
@@ -114,6 +118,7 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
       ...(l.product_id ? {} : { gst_rate: l.gst_rate ?? "0" }),
       ...(l.batch_no ? { batch_no: l.batch_no } : {}),
       ...(side === "purchase" && l.batched ? { expiry_date: l.expiry_date || undefined, mrp: l.mrp || undefined } : {}),
+      ...(l.serialed ? { serials: serialList(l.serials) } : {}),
     })),
   }), [docType, docDate, dueDate, party, partyName, supplierNo, notes, lines, side, tier, rx]);
   const previewBody = useDebounced(body, 250);
@@ -151,6 +156,7 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
       return [...ls, { key: uid(), product_id: p.id, name: p.name, sku: p.sku, hsn: p.hsn_sac, quantity: "1",
         unit_price: price ? String(Number(price)) : "", discount_percent: "", gst_rate: p.gst_rate, stock: (p.on_hand as string) ?? null,
         batched: p.batch_tracking && p.track_inventory, mrp: side === "purchase" && p.mrp ? String(Number(p.mrp)) : undefined,
+        serialed: p.serial_tracking && p.track_inventory,
         schedule: (p.drug_schedule as string | undefined) ?? undefined, rack: (p.rack as string | null) ?? null,
         composition: (p.composition as string | null) ?? null, packSize: p.pack_size ? Number(p.pack_size) : undefined,
         packLabel: (p.pack_label as string | null) ?? null, incl: p.prices_include_tax }];
@@ -160,7 +166,7 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
   const swap = (key: string, p: Product) => setLines((ls) => ls.map((l) => (l.key !== key ? l : {
     ...l, product_id: p.id, name: p.name, sku: p.sku, hsn: p.hsn_sac, unit_price: p.selling_price ? String(Number(p.selling_price)) : "",
     priceTyped: false, gst_rate: p.gst_rate, stock: (p.on_hand as string) ?? null, batched: p.batch_tracking && p.track_inventory,
-    batch_no: undefined, schedule: (p.drug_schedule as string | undefined) ?? undefined, rack: (p.rack as string | null) ?? null,
+    batch_no: undefined, serialed: p.serial_tracking && p.track_inventory, serials: undefined, schedule: (p.drug_schedule as string | undefined) ?? undefined, rack: (p.rack as string | null) ?? null,
     composition: (p.composition as string | null) ?? null, packSize: p.pack_size ? Number(p.pack_size) : undefined, packLabel: (p.pack_label as string | null) ?? null,
   })));
   const update = (key: string, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
@@ -223,8 +229,9 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
   const needsRxNo = pharmacy && side === "sales" && lines.some((l) => l.schedule && REGISTER_SCHEDULES.has(l.schedule));
   const rxMissing = docType === "sales_invoice" && needsRx && (!rx.doctor_id || !rx.patient_name.trim() || (needsRxNo && !rx.rx_number.trim()));
   const missingBatch = side === "purchase" && docType === "purchase_invoice" && lines.some((l) => l.batched && !l.batch_no?.trim());
+  const serialsShort = lines.some((l) => l.serialed && serialList(l.serials).length !== Number(l.quantity || 0));
   const canSave = lines.length > 0 && lines.every((l) => Number(l.quantity) > 0) && !save.isPending && !missingBatch;
-  const canFinalize = canSave && !rxMissing;
+  const canFinalize = canSave && !rxMissing && !serialsShort;
   const finalizeLabel = tr(docType === "sales_invoice" || docType === "purchase_invoice" ? "Save & finalize" : "Save & issue");
 
   // ------------------------------------------------------------------ shortcuts
@@ -337,6 +344,7 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
                               <Input value={l.mrp ?? ""} inputMode="decimal" onChange={(e) => update(l.key, { mrp: e.target.value.replace(/[^\d.]/g, "") })} placeholder="MRP" aria-label="MRP of this batch" className="num h-7 w-20 text-xs" />
                             </div>
                           ) : <BatchSelect productId={l.product_id} value={l.batch_no ?? ""} onChange={(b) => update(l.key, { batch_no: b || undefined })} />)}
+                          {l.serialed && l.product_id && <SerialBox line={l} side={side} onChange={(serials) => update(l.key, { serials })} />}
                         </td>
                         <td className="px-2 py-2 max-md:p-0">
                           <span className="text-[10px] text-muted-foreground uppercase md:hidden">{tr("Qty")}</span>
@@ -381,6 +389,7 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
           </div>
         </Card>
         {missingBatch && <p className="text-sm text-amber-700 dark:text-warning">Enter the batch number for each batch-tracked item (printed on the pack).</p>}
+        {serialsShort && <p className="text-sm text-amber-700 dark:text-warning">Serial-tracked items need one serial number per piece (see the box under the item). If this item does not need serial numbers, switch “Serial numbers” off in the product.</p>}
         <Card><CardContent><Field label={tr("Notes (printed)")}><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-14" /></Field></CardContent></Card>
       </div>
 
@@ -532,6 +541,38 @@ function CreditPanel({ partyId }: { partyId: string }) {
       {Number(c.overdue) > 0 && <span className="text-destructive">Overdue <b className="num">{money(c.overdue)}</b>{c.oldest_overdue_days ? ` (oldest ${c.oldest_overdue_days} days)` : ""}</span>}
       {c.credit_limit !== null && <span>Limit {money(c.credit_limit)} · <span className={over ? "font-medium text-destructive" : ""}>available {money(c.available)}</span></span>}
       {c.price_list && <span className="flex items-center gap-1 text-primary"><TagIcon className="size-3.5" /> {c.price_list.name} prices</span>}
+    </div>
+  );
+}
+
+/** Serial numbers for a serial-tracked line: one per unit. Purchases can number them automatically. */
+function SerialBox({ line, side, onChange }: { line: Line; side: "sales" | "purchase"; onChange: (s: string) => void }) {
+  const list = serialList(line.serials);
+  const need = Math.round(Number(line.quantity || 0));
+  const dupes = list.length !== new Set(list).size;
+  const [prefix, setPrefix] = useState(() => `${(line.batch_no || line.sku || "SN").toUpperCase().replace(/\s+/g, "")}-`);
+  const auto = () => {
+    const start = list.length + 1;
+    const width = String(need).length < 4 ? 4 : String(need).length;
+    const extra = Array.from({ length: Math.max(0, need - list.length) }, (_, i) => `${prefix}${String(start + i).padStart(width, "0")}`);
+    onChange([...list, ...extra].join("\n"));
+  };
+  const ok = list.length === need && !dupes;
+  return (
+    <div className="mt-1.5 space-y-1 rounded-md border border-dashed p-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-1 text-xs">
+        <span className={ok ? "text-muted-foreground" : "font-medium text-amber-700 dark:text-warning"}>
+          Serial numbers: {list.length} / {need}{dupes ? " · duplicates" : ""}</span>
+        {side === "purchase" && list.length < need && (
+          <span className="flex items-center gap-1">
+            <Input value={prefix} onChange={(e) => setPrefix(e.target.value.slice(0, 30))} aria-label="Serial prefix" className="h-6 w-24 text-xs" />
+            <Button type="button" size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={auto}>Auto-number {need - list.length}</Button>
+          </span>)}
+        {list.length > 0 && <button type="button" className="text-muted-foreground hover:underline" onClick={() => onChange("")}>clear</button>}
+      </div>
+      <Textarea value={line.serials ?? ""} onChange={(e) => onChange(e.target.value)} rows={Math.min(4, Math.max(2, list.length + 1))}
+        placeholder={side === "purchase" ? "Scan or type each serial number, one per line" : "Scan the serial number of each piece sold"}
+        aria-label="Serial numbers" className="font-mono text-xs" />
     </div>
   );
 }

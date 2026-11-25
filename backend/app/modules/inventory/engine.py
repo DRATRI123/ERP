@@ -215,8 +215,10 @@ class StockEngine:
             if len(set(serials)) != len(serials):
                 raise ValidationFailed(f"{name}: duplicate serial numbers")
             if Decimal(len(serials)) != abs(mv.quantity):
+                need = abs(mv.quantity).normalize()
                 raise ValidationFailed(
-                    f"{name} is serial-tracked: give exactly {abs(mv.quantity)} serial numbers")
+                    f"{name} needs one serial number per piece: {len(serials)} given for {need:f}. Enter them under "
+                    "the item, or switch off Serial numbers in the product if it does not need them")
             mv.serials = serials
         elif mv.serials:
             raise ValidationFailed(f"{name} is not serial-tracked")
