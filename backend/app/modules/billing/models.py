@@ -34,6 +34,7 @@ from app.db.types import Money, Quantity, UTCDateTime, str_enum
 from app.modules.billing.doctypes import DocType
 from app.modules.catalog.models import Rate
 from app.modules.gst.tax import TaxCategory
+from app.modules.pharmacy.models import Doctor
 
 
 class DocStatus(enum.StrEnum):
@@ -51,6 +52,8 @@ class PriceTier(enum.StrEnum):
     RETAIL = "retail"
     WHOLESALE = "wholesale"
     MRP = "mrp"
+    PTR = "ptr"  # pharma: price to retailer
+    PTS = "pts"  # pharma: price to stockist
 
 
 class PaymentStatus(enum.StrEnum):
@@ -142,6 +145,13 @@ class Document(UUIDPrimaryKey, Timestamps, Base):
     landed_cost: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), nullable=False)
     salesperson_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="RESTRICT"))
+    # Pharmacy: prescription details, required when a line is a Schedule H/H1/X/narcotic drug.
+    doctor_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("doctors.id", ondelete="RESTRICT"), index=True)
+    patient_name: Mapped[str | None] = mapped_column(String(120))
+    patient_address: Mapped[str | None] = mapped_column(String(300))
+    rx_number: Mapped[str | None] = mapped_column(String(40))
+    doctor: Mapped[Doctor | None] = relationship(lazy="select")
 
     subtotal: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), nullable=False)
     discount_total: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), nullable=False)
@@ -191,6 +201,10 @@ class Document(UUIDPrimaryKey, Timestamps, Base):
 
     lines: Mapped[list[DocumentLine]] = relationship(
         cascade="all, delete-orphan", lazy="selectin", order_by="DocumentLine.line_no")
+
+    @property
+    def doctor_name(self) -> str | None:
+        return self.doctor.name if self.doctor_id and self.doctor else None
 
 
 class DocumentLine(UUIDPrimaryKey, Base):

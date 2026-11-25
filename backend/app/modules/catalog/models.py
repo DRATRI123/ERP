@@ -24,6 +24,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
 from app.db.types import Money, Quantity, ScaledDecimal, UTCDateTime, str_enum
+from app.modules.pharmacy.models import DrugSchedule
 
 
 def Rate() -> ScaledDecimal:
@@ -88,6 +89,8 @@ class Product(UUIDPrimaryKey, Timestamps, Base):
         Index("ix_products_business_name", "business_id", "name"),
         CheckConstraint("gst_rate >= 0", name="gst_rate_non_negative"),
         CheckConstraint("cess_rate >= 0", name="cess_rate_non_negative"),
+        CheckConstraint("pack_size IS NULL OR pack_size > 0", name="pack_size_positive"),
+        Index("ix_products_business_composition", "business_id", "composition"),
     )
 
     business_id: Mapped[uuid.UUID] = mapped_column(
@@ -115,6 +118,9 @@ class Product(UUIDPrimaryKey, Timestamps, Base):
     selling_price: Mapped[Decimal | None] = mapped_column(Money())  # retail price
     wholesale_price: Mapped[Decimal | None] = mapped_column(Money())
     mrp: Mapped[Decimal | None] = mapped_column(Money())
+    # Pharma trade rates: price to retailer and price to stockist (both per stock unit).
+    ptr: Mapped[Decimal | None] = mapped_column(Money())
+    pts: Mapped[Decimal | None] = mapped_column(Money())
     prices_include_tax: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     gst_rate: Mapped[Decimal] = mapped_column(Rate(), default=Decimal(0), nullable=False)
     cess_rate: Mapped[Decimal] = mapped_column(Rate(), default=Decimal(0), nullable=False)
@@ -124,6 +130,15 @@ class Product(UUIDPrimaryKey, Timestamps, Base):
     serial_tracking: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     reorder_level: Mapped[Decimal | None] = mapped_column(Quantity())
     reorder_quantity: Mapped[Decimal | None] = mapped_column(Quantity())
+
+    # Pharmacy. Salt / composition ("Paracetamol 500 mg") finds substitutes with the same salt.
+    composition: Mapped[str | None] = mapped_column(String(300))
+    rack: Mapped[str | None] = mapped_column(String(30))  # shelf location, e.g. "A-3"
+    drug_schedule: Mapped[DrugSchedule] = mapped_column(
+        str_enum(DrugSchedule, 10), default=DrugSchedule.NONE, server_default="none", nullable=False)
+    # Loose selling: stock and prices are per base unit (tablet); a pack (strip) holds pack_size.
+    pack_size: Mapped[Decimal | None] = mapped_column(Quantity())
+    pack_label: Mapped[str | None] = mapped_column(String(16))
 
     attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

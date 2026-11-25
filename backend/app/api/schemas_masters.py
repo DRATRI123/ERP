@@ -23,6 +23,7 @@ from pydantic import (
 from app.api.schemas import GSTIN, PAN, Name, Phone, StateCode
 from app.modules.catalog.models import ProductKind
 from app.modules.parties.models import AddressKind, PartyGstType
+from app.modules.pharmacy.models import DrugSchedule
 
 
 def scaled(places: int) -> AfterValidator:
@@ -127,6 +128,13 @@ class ProductBase(BaseModel):
     mrp: MoneyIn | None = None
     reorder_level: QtyIn | None = None
     reorder_quantity: QtyIn | None = None
+    ptr: MoneyIn | None = Field(None, description="Pharma: price to retailer, per stock unit")
+    pts: MoneyIn | None = Field(None, description="Pharma: price to stockist, per stock unit")
+    composition: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = Field(
+        None, description="Salt / composition, e.g. 'Paracetamol 500 mg'; finds substitutes")
+    rack: Annotated[str, StringConstraints(strip_whitespace=True, max_length=30)] | None = None
+    pack_size: QtyIn | None = Field(None, gt=0, description="Stock units in one pack (e.g. 10 tablets per strip)")
+    pack_label: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=16)] | None = None
 
 
 class ProductIn(ProductBase):
@@ -140,6 +148,7 @@ class ProductIn(ProductBase):
     track_inventory: bool = True
     batch_tracking: bool = False
     serial_tracking: bool = False
+    drug_schedule: DrugSchedule = DrugSchedule.NONE
     attributes: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -154,6 +163,7 @@ class ProductUpdateIn(ProductBase):
     track_inventory: bool | None = None
     batch_tracking: bool | None = None
     serial_tracking: bool | None = None
+    drug_schedule: DrugSchedule | None = None
     attributes: dict[str, Any] | None = None
 
 
@@ -181,6 +191,13 @@ class ProductOut(ORM):
     serial_tracking: bool
     reorder_level: Decimal | None
     reorder_quantity: Decimal | None
+    ptr: Decimal | None = None
+    pts: Decimal | None = None
+    composition: str | None = None
+    rack: str | None = None
+    drug_schedule: DrugSchedule = DrugSchedule.NONE
+    pack_size: Decimal | None = None
+    pack_label: str | None = None
     attributes: dict[str, Any]
     is_active: bool
     archived_at: datetime | None

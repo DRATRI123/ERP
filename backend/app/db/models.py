@@ -21,6 +21,7 @@ from app.modules.manufacturing import models as manufacturing_models  # noqa: F4
 from app.modules.numbering import models as numbering_models  # noqa: F401
 from app.modules.parties import models as party_models  # noqa: F401
 from app.modules.payroll import models as payroll_models  # noqa: F401
+from app.modules.pharmacy import models as pharmacy_models  # noqa: F401
 from app.modules.pricing import models as pricing_models  # noqa: F401
 from app.modules.shop import models as shop_models  # noqa: F401
 from app.modules.system import models as system_models  # noqa: F401

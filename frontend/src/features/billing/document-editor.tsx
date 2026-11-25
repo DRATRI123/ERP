@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangleIcon, BanknoteIcon, CheckCircle2Icon, GiftIcon, TagIcon, CreditCardIcon, Loader2Icon, MinusIcon, PlusIcon, SaveIcon, SmartphoneIcon, Trash2Icon, WalletIcon,
+  AlertTriangleIcon, ArrowLeftRightIcon, BanknoteIcon, ClockAlertIcon, StethoscopeIcon, CheckCircle2Icon, GiftIcon, TagIcon, CreditCardIcon, Loader2Icon, MinusIcon, PlusIcon, SaveIcon, SmartphoneIcon, Trash2Icon, WalletIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 import { PartyPicker } from "@/components/pickers/party-picker";
 import { PartyDialog } from "@/features/parties/party-form";
+import { DoctorSelect, REGISTER_SCHEDULES, RX_SCHEDULES, ScheduleBadge, SubstitutesDialog } from "@/features/pharmacy/pharmacy";
 import { ProductSearch, type ProductSearchHandle } from "@/components/pickers/product-search";
 import { EmptyState } from "@/components/data/states";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +31,14 @@ interface Line {
   quantity: string; unit_price: string; discount_percent: string; gst_rate?: string; stock?: string | null;
   batched?: boolean; batch_no?: string; expiry_date?: string; mrp?: string;
   priceTyped?: boolean; // only typed rates are sent; otherwise the server prices (price lists, tiers)
+  schedule?: string; rack?: string | null; composition?: string | null; packSize?: number; packLabel?: string | null;
 }
+const TIERS = [["retail", "Retail"], ["wholesale", "Wholesale"], ["mrp", "MRP"], ["ptr", "PTR (to retailer)"], ["pts", "PTS (to stockist)"]] as const;
+/** 23 tablets in strips of 10 -> "2 strip + 3". */
+const packs = (q: number, size: number, label?: string | null) => {
+  const full = Math.floor(q / size), loose = Math.round((q - full * size) * 1000) / 1000;
+  return [full ? `${full} ${label || "pack"}` : "", loose ? `${loose} loose` : ""].filter(Boolean).join(" + ");
+};
 const isFree = (l: DocumentLine) => !!(l.custom_fields as Record<string, unknown> | undefined)?.scheme_free;
 interface AvailableBatch { batch_id: string; batch_no: string; expiry_date: string | null; mrp: string | null; quantity: string; days_left: number | null }
 interface PayRow { key: string; mode: string; amount: string; reference: string }
@@ -64,6 +72,11 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   const [dueDate, setDueDate] = useState(draft?.due_date ?? "");
   const [supplierNo, setSupplierNo] = useState((draft?.supplier_invoice_no as string | undefined) ?? "");
   const [notes, setNotes] = useState((draft?.notes as string | undefined) ?? "");
+  const [tier, setTier] = useState((draft?.price_tier as string | undefined) ?? "retail");
+  const [rx, setRx] = useState({ doctor_id: (draft?.doctor_id as string | null) ?? "", patient_name: (draft?.patient_name as string | null) ?? "",
+    patient_address: (draft?.patient_address as string | null) ?? "", rx_number: (draft?.rx_number as string | null) ?? "" });
+  const [showRx, setShowRx] = useState(!!draft?.doctor_id || !!draft?.patient_name);
+  const [subsFor, setSubsFor] = useState<Line | null>(null);
   const [lines, setLines] = useState<Line[]>(() => (draft?.lines ?? []).filter((l) => !isFree(l)).map((l) => ({ priceTyped: true,
     key: uid(), product_id: l.product_id, name: l.description, hsn: l.hsn_sac, unit: l.unit_code ?? undefined,
     quantity: String(Number(l.quantity)), unit_price: String(Number(l.unit_price)), discount_percent: String(Number(l.discount_percent)), gst_rate: l.gst_rate,
@@ -80,6 +93,8 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
     party_id: party?.id, party_name: party ? undefined : partyName || undefined,
     supplier_invoice_no: side === "purchase" ? supplierNo || undefined : undefined,
     notes: notes || undefined,
+    ...(side === "sales" ? { price_tier: tier, doctor_id: rx.doctor_id || null, patient_name: rx.patient_name || null,
+      patient_address: rx.patient_address || null, rx_number: rx.rx_number || null } : {}),
     lines: lines.map((l) => ({
       product_id: l.product_id ?? undefined, description: l.product_id ? undefined : l.name,
       quantity: l.quantity || "0", unit_price: (l.priceTyped || !l.product_id) && l.unit_price ? l.unit_price : undefined,
@@ -88,7 +103,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
       ...(l.batch_no ? { batch_no: l.batch_no } : {}),
       ...(side === "purchase" && l.batched ? { expiry_date: l.expiry_date || undefined, mrp: l.mrp || undefined } : {}),
     })),
-  }), [docType, docDate, dueDate, party, partyName, supplierNo, notes, lines, side]);
+  }), [docType, docDate, dueDate, party, partyName, supplierNo, notes, lines, side, tier, rx]);
   const previewBody = useDebounced(body, 250);
   const validLines = previewBody.lines.length > 0 && previewBody.lines.every((l) => Number(l.quantity) > 0);
   const preview = useQuery({
@@ -115,9 +130,19 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
       const price = side === "sales" ? p.selling_price : (p.purchase_price ?? p.selling_price);
       return [...ls, { key: uid(), product_id: p.id, name: p.name, sku: p.sku, hsn: p.hsn_sac, quantity: "1",
         unit_price: price ? String(Number(price)) : "", discount_percent: "", gst_rate: p.gst_rate, stock: (p.on_hand as string) ?? null,
-        batched: p.batch_tracking && p.track_inventory, mrp: side === "purchase" && p.mrp ? String(Number(p.mrp)) : undefined }];
+        batched: p.batch_tracking && p.track_inventory, mrp: side === "purchase" && p.mrp ? String(Number(p.mrp)) : undefined,
+        schedule: (p.drug_schedule as string | undefined) ?? undefined, rack: (p.rack as string | null) ?? null,
+        composition: (p.composition as string | null) ?? null, packSize: p.pack_size ? Number(p.pack_size) : undefined,
+        packLabel: (p.pack_label as string | null) ?? null }];
     });
   }, [side]);
+  /** Swap a line to a substitute (same salt), keeping its quantity. */
+  const swap = (key: string, p: Product) => setLines((ls) => ls.map((l) => (l.key !== key ? l : {
+    ...l, product_id: p.id, name: p.name, sku: p.sku, hsn: p.hsn_sac, unit_price: p.selling_price ? String(Number(p.selling_price)) : "",
+    priceTyped: false, gst_rate: p.gst_rate, stock: (p.on_hand as string) ?? null, batched: p.batch_tracking && p.track_inventory,
+    batch_no: undefined, schedule: (p.drug_schedule as string | undefined) ?? undefined, rack: (p.rack as string | null) ?? null,
+    composition: (p.composition as string | null) ?? null, packSize: p.pack_size ? Number(p.pack_size) : undefined, packLabel: (p.pack_label as string | null) ?? null,
+  })));
   const update = (key: string, patch: Partial<Line>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
   const remove = (key: string) => setLines((ls) => ls.filter((l) => l.key !== key));
 
@@ -138,8 +163,12 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
     },
     onError: (e: ApiError) => toast.error(e.message, { description: Object.values(e.fieldErrors)[0] }),
   });
+  const needsRx = side === "sales" && lines.some((l) => l.schedule && RX_SCHEDULES.has(l.schedule));
+  const needsRxNo = side === "sales" && lines.some((l) => l.schedule && REGISTER_SCHEDULES.has(l.schedule));
+  const rxMissing = docType === "sales_invoice" && needsRx && (!rx.doctor_id || !rx.patient_name.trim() || (needsRxNo && !rx.rx_number.trim()));
   const missingBatch = side === "purchase" && docType === "purchase_invoice" && lines.some((l) => l.batched && !l.batch_no?.trim());
   const canSave = lines.length > 0 && lines.every((l) => Number(l.quantity) > 0) && !save.isPending && !missingBatch;
+  const canFinalize = canSave && !rxMissing;
   const finalizeLabel = docType === "sales_invoice" || docType === "purchase_invoice" ? "Save & finalize" : "Save & issue";
 
   // ------------------------------------------------------------------ shortcuts
@@ -147,12 +176,12 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
     function onKey(e: KeyboardEvent) {
       if (e.key === "F2") { e.preventDefault(); search.current?.focus(); }
       else if (e.key === "F4") { e.preventDefault(); partyBtn.current?.click(); }
-      else if (e.key === "F9") { e.preventDefault(); if (canSave) save.mutate(true); }
+      else if (e.key === "F9") { e.preventDefault(); if (canFinalize) save.mutate(true); }
       else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); if (canSave) save.mutate(false); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [canSave, save]);
+  }, [canSave, canFinalize, save]);
   useEffect(() => { search.current?.focus(); }, []);
 
   if (!isOwner && !can(side === "sales" ? "invoices.create" : "purchases.create")) {
@@ -185,10 +214,31 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
             {side === "purchase" && (
               <Field label="Supplier bill no." htmlFor="doc-supplier-no"><Input id="doc-supplier-no" value={supplierNo} onChange={(e) => setSupplierNo(e.target.value)} /></Field>
             )}
+            {side === "sales" && (
+              <Field label="Rate" htmlFor="doc-tier" hint={tier === "ptr" || tier === "pts" ? "Pharma trade rate" : undefined}>
+                <NativeSelect id="doc-tier" value={tier} onChange={(e) => setTier(e.target.value)}>{TIERS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</NativeSelect>
+              </Field>
+            )}
             {side === "sales" && party && <CreditPanel partyId={party.id} />}
             {party && <Field label="Due date" htmlFor="doc-due"><Input id="doc-due" type="date" value={dueDate} min={docDate} onChange={(e) => setDueDate(e.target.value)} /></Field>}
           </CardContent>
         </Card>
+
+        {side === "sales" && (needsRx || showRx) && (
+          <Card className={cn(rxMissing && "border-warning/60")}>
+            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
+                <StethoscopeIcon className="size-4 text-primary" />
+                <p className="text-sm font-medium">Prescription</p>
+                {needsRx && <p className="text-xs text-muted-foreground">Required: this bill has {needsRxNo ? "a Schedule H1 / X / narcotic drug — doctor, patient and Rx number go in the register" : "a Schedule H drug — enter the doctor and patient"}.</p>}
+              </div>
+              <Field label="Doctor" required={needsRx} htmlFor="rx-doctor" className="sm:col-span-2"><DoctorSelect id="rx-doctor" value={rx.doctor_id} onChange={(v) => setRx((x) => ({ ...x, doctor_id: v }))} /></Field>
+              <Field label="Patient name" required={needsRx} htmlFor="rx-patient"><Input id="rx-patient" value={rx.patient_name} onChange={(e) => setRx((x) => ({ ...x, patient_name: e.target.value }))} /></Field>
+              <Field label="Rx no." required={needsRxNo} htmlFor="rx-no"><Input id="rx-no" value={rx.rx_number} onChange={(e) => setRx((x) => ({ ...x, rx_number: e.target.value }))} /></Field>
+              <Field label="Patient address" htmlFor="rx-addr" className="sm:col-span-2 lg:col-span-4"><Input id="rx-addr" value={rx.patient_address} onChange={(e) => setRx((x) => ({ ...x, patient_address: e.target.value }))} placeholder="For the H1 / X register" /></Field>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="overflow-visible">
           <div className="border-b p-3"><ProductSearch ref={search} onPick={addProduct} /></div>
@@ -200,7 +250,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                 <thead className="bg-muted/40 text-xs text-muted-foreground uppercase max-md:hidden">
                   <tr>
                     <th className="w-8 px-3 py-2 text-left">#</th><th className="px-3 py-2 text-left">Item</th>
-                    <th className="w-28 px-2 py-2 text-center">Qty</th><th className="w-32 px-2 py-2 text-right">Rate</th>
+                    <th className="w-36 px-2 py-2 text-center">Qty</th><th className="w-32 px-2 py-2 text-right">Rate</th>
                     <th className="w-20 px-2 py-2 text-right">Disc %</th><th className="hidden w-16 px-2 py-2 text-right md:table-cell">GST</th>
                     <th className="w-32 px-3 py-2 text-right">Amount</th><th className="w-10" />
                   </tr>
@@ -213,11 +263,16 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                       <tr key={l.key} className="align-middle max-md:grid max-md:grid-cols-3 max-md:gap-x-2 max-md:gap-y-2 max-md:px-3 max-md:py-3">
                         <td className="px-3 py-2 text-muted-foreground max-md:hidden">{i + 1}</td>
                         <td className="px-3 py-2 max-md:col-span-3 max-md:p-0">
-                          {l.product_id ? <p className="font-medium">{l.name}</p> : (
+                          {l.product_id ? <p className="flex flex-wrap items-center gap-1.5 font-medium">{l.name} <ScheduleBadge schedule={l.schedule} />
+                            {side === "sales" && (t?.custom_fields as Record<string, unknown> | undefined)?.near_expiry === true && (
+                              <Badge variant="warning" className="h-5 gap-1 px-1.5 text-[10px]"><ClockAlertIcon className="size-3" /> Near expiry −{Number(t?.discount_percent)}%</Badge>)}</p> : (
                             <Input value={l.name} onChange={(e) => update(l.key, { name: e.target.value })} placeholder="Description" className="h-8" />
                           )}
-                          <p className="text-xs text-muted-foreground">{[l.sku, l.hsn && `HSN ${l.hsn}`].filter(Boolean).join(" · ")}
-                            {low && <span className="ml-1 text-destructive">· only {qty(l.stock)} in stock</span>}</p>
+                          <p className="text-xs text-muted-foreground">{[l.sku, l.rack && `Rack ${l.rack}`, l.hsn && `HSN ${l.hsn}`].filter(Boolean).join(" · ")}
+                            {low && <span className="ml-1 text-destructive">· only {qty(l.stock)} in stock</span>}
+                            {side === "sales" && l.product_id && l.composition && (
+                              <button type="button" onClick={() => setSubsFor(l)} className="ml-1.5 inline-flex items-center gap-0.5 text-primary hover:underline">
+                                <ArrowLeftRightIcon className="size-3" /> Substitutes</button>)}</p>
                           {l.batched && l.product_id && (side === "purchase" ? (
                             <div className="mt-1.5 flex flex-wrap gap-1.5">
                               <Input value={l.batch_no ?? ""} onChange={(e) => update(l.key, { batch_no: e.target.value })} placeholder="Batch no." aria-label="Batch number"
@@ -234,6 +289,12 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                             <Input value={l.quantity} inputMode="decimal" onChange={(e) => update(l.key, { quantity: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 w-14 px-1 text-center" aria-label="Quantity" />
                             <Button type="button" variant="ghost" size="icon-sm" className="size-7" onClick={() => update(l.key, { quantity: String(Number(l.quantity || 0) + 1) })} aria-label="Increase"><PlusIcon /></Button>
                           </div>
+                          {l.packSize && l.packSize > 1 && (
+                            <div className="mt-1 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground max-md:justify-start">
+                              <span className="whitespace-nowrap">{packs(Number(l.quantity || 0), l.packSize, l.packLabel) || "—"}</span>
+                              <button type="button" className="rounded border px-1 whitespace-nowrap text-primary hover:bg-accent" onClick={() => update(l.key, { quantity: String(Number(l.quantity || 0) + l.packSize!) })}>+1 {l.packLabel || "pack"}</button>
+                            </div>
+                          )}
                         </td>
                         <td className="px-2 py-2 max-md:p-0"><span className="text-[10px] text-muted-foreground uppercase md:hidden">Rate</span><Input value={l.priceTyped || !t ? l.unit_price : String(Number(t.unit_price))} inputMode="decimal" onChange={(e) => update(l.key, { unit_price: e.target.value.replace(/[^\d.]/g, ""), priceTyped: true })} className="num h-8 text-right" aria-label="Rate" />
                           {typeof t?.custom_fields === "object" && (t.custom_fields as Record<string, string>)?.scheme && <p className="mt-0.5 text-right text-[11px] text-primary">{(t.custom_fields as Record<string, string>).scheme}</p>}</td>
@@ -325,7 +386,9 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
             </CardContent>
           )}
           <CardContent className="grid gap-2 border-t">
-            <Button size="lg" disabled={!canSave} onClick={() => save.mutate(true)}>
+            {rxMissing && <p className="text-xs text-amber-700 dark:text-warning">Enter the prescription details above to finalize.</p>}
+            {side === "sales" && !needsRx && !showRx && <Button variant="link" size="sm" className="h-auto justify-start p-0" onClick={() => setShowRx(true)}><StethoscopeIcon /> Add doctor / prescription</Button>}
+            <Button size="lg" disabled={!canFinalize} onClick={() => save.mutate(true)}>
               {save.isPending ? <Loader2Icon className="animate-spin" /> : <CheckCircle2Icon />} {finalizeLabel} <kbd className="ml-auto rounded bg-white/15 px-1.5 text-[11px]">F9</kbd>
             </Button>
             <Button variant="outline" disabled={!canSave} onClick={() => save.mutate(false)}>
@@ -339,9 +402,13 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
           <div className="min-w-0 flex-1"><p className="text-[11px] text-muted-foreground">{lines.length} item{lines.length === 1 ? "" : "s"} · total</p>
             <p className="num truncate text-lg font-semibold">{money(grand)}</p></div>
           <Button variant="outline" size="sm" disabled={!canSave} onClick={() => save.mutate(false)} aria-label="Save draft"><SaveIcon /></Button>
-          <Button disabled={!canSave} onClick={() => save.mutate(true)}>
+          <Button disabled={!canFinalize} onClick={() => save.mutate(true)}>
             {save.isPending ? <Loader2Icon className="animate-spin" /> : <CheckCircle2Icon />} {finalizeLabel}</Button>
         </div>
+      )}
+      {subsFor?.product_id && (
+        <SubstitutesDialog open product={{ id: subsFor.product_id, name: subsFor.name, composition: subsFor.composition }}
+          onOpenChange={(v) => !v && setSubsFor(null)} onPick={(p) => swap(subsFor.key, p)} />
       )}
       <PartyDialog kind={side === "sales" ? "customers" : "suppliers"} open={newParty !== null} initialName={newParty ?? undefined}
         onOpenChange={(v) => !v && setNewParty(null)} onSaved={(p) => { setParty(p); setNewParty(null); }} />

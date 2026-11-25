@@ -1,7 +1,7 @@
 import {
   BarChart3Icon, BookOpenIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
   LayoutDashboardIcon, PlugIcon, ReceiptIndianRupeeIcon, SettingsIcon, ShoppingCartIcon, TruckIcon, UsersIcon,
-  IdCardIcon, LifeBuoyIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
+  IdCardIcon, LifeBuoyIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, StethoscopeIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -26,6 +26,7 @@ export const NAV: NavItem[] = [
   { href: "/catalogue", label: "WhatsApp catalogue", icon: MessageCircleIcon, any: ["business.settings", "invoices.view"], group: "main" },
   { href: "/customers", label: "Customers", icon: UsersIcon, any: ["customers.view"], group: "main", shortcut: "c" },
   { href: "/suppliers", label: "Suppliers", icon: TruckIcon, any: ["suppliers.view"], group: "main" },
+  { href: "/doctors", label: "Doctors", icon: StethoscopeIcon, any: ["invoices.view"], group: "main" },
   { href: "/accounting", label: "Accounting", icon: BookOpenIcon, any: ["accounting.view", "expenses.view"], group: "money", shortcut: "a" },
   { href: "/payments", label: "Banking & Payments", icon: WalletIcon, any: ["payments.view"], group: "money" },
   { href: "/claims", label: "Expense claims", icon: ReceiptIcon, any: ["expenses.claim", "expenses.manage"], group: "money" },

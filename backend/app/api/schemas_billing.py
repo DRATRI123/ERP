@@ -95,6 +95,10 @@ class _Header(BaseModel):
     supplier_invoice_date: date | None = None
     landed_cost: MoneyIn | None = None
     salesperson_id: uuid.UUID | None = None
+    doctor_id: uuid.UUID | None = None
+    patient_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=120)] | None = None
+    patient_address: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] | None = None
+    rx_number: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40)] | None = None
     notes: Text | None = None
     terms: Text | None = None
     custom_fields: dict[str, Any] | None = None
@@ -209,6 +213,11 @@ class DocumentOut(DocumentSummaryOut):
     supplier_invoice_date: date | None
     landed_cost: MoneyOut
     salesperson_id: uuid.UUID | None
+    doctor_id: uuid.UUID | None = None
+    doctor_name: str | None = None
+    patient_name: str | None = None
+    patient_address: str | None = None
+    rx_number: str | None = None
     billing_address_id: uuid.UUID | None
     shipping_address_id: uuid.UUID | None
     party_snapshot: dict[str, Any] | None

@@ -188,6 +188,47 @@ export const HELP: HelpTopic[] = [
 
   // ------------------------------------------------------------------ buying
   {
+    id: "pharmacy", title: "Pharmacy: doctors, prescriptions, salts, loose tablets", group: "Selling",
+    routes: ["/doctors", "/sales/new", "/settings?tab=pharmacy"],
+    summary: "Sell medicines the way a chemist does: by strip or loose, with substitutes by salt, the prescription on Schedule H bills and the H1 register kept for you.",
+    sections: [
+      { heading: "Set up each medicine (Products & Inventory → New product / Edit)", steps: [
+        "Salt / composition: e.g. “Paracetamol 500 mg”. Searching the salt finds every brand, and the bill offers substitutes.",
+        "Rack / shelf: e.g. “A-3”. Shown in search results and on the bill line, so staff find it fast.",
+        "Drug schedule: H (prescription), H1 / X / Narcotic (prescription + register), G or None.",
+        "PTR and PTS: price to retailer and to stockist, used when the bill’s Rate is PTR or PTS.",
+        "Selling loose: keep the unit as one tablet and set Pack size 10, Pack name “strip”. Prices and stock are per tablet.",
+      ], note: "Switch on “Batches & expiry” for medicines, so expiry is checked and the earliest batch is sold first." },
+      { heading: "Billing a prescription", steps: [
+        "Add the items. A Schedule H / H1 / X item shows a red badge and the Prescription box opens.",
+        "Doctor: choose from the list, or press + to add a new doctor on the spot.",
+        "Enter the patient’s name. For H1, X and narcotics also the Rx number (and the address for the register).",
+        "Save & finalize stays disabled until these are filled. The doctor, patient and Rx print on the bill.",
+        "For any other bill, “Add doctor / prescription” under the total records the doctor for doctor-wise sales.",
+      ] },
+      { heading: "Strips and loose tablets", steps: [
+        "Quantity is in tablets. Under it you see e.g. “2 strip + 3 loose”.",
+        "Press “+1 strip” to add a full strip, or type the number of tablets for loose sale.",
+      ] },
+      { heading: "Substitutes", steps: [
+        "On a bill line, press “Substitutes” to see other brands with the same salt, with price, stock and rack.",
+        "Press Use to swap the line to that brand; the quantity stays.",
+      ] },
+      { heading: "Near-expiry discount", steps: [
+        "Settings → Pharmacy: set e.g. 60 days and 10%.",
+        "When the batch being sold expires within 60 days, the line gets 10% off automatically, marked “Near expiry”.",
+        "A line where you typed your own discount is left alone.",
+      ] },
+      { heading: "Registers and reports", steps: [
+        "Reports → Pharmacy → Schedule H1 / X register: date, bill, patient, doctor with registration number, drug, batch and quantity. Export it as CSV or print it.",
+        "Reports → Pharmacy → Doctor-wise sales: bills and value per doctor for any period. The Doctors page shows this month’s.",
+      ] },
+    ],
+    tips: ["Keep the H1 register for 3 years: export it every month and save it in Documents.",
+      "PTR / PTS only apply when the bill’s Rate is set to them; a customer’s price list still comes first."],
+    related: ["sales", "expiry", "inventory", "reports"],
+  },
+  {
     id: "purchases", title: "Purchases: purchase orders, purchase bills, returns", group: "Buying",
     routes: ["/purchases", "/purchases/new"],
     summary: "Purchase order = what you ask the supplier for (no stock change). Purchase bill = goods and supplier’s bill received (stock and dues increase). Purchase return = goods sent back.",

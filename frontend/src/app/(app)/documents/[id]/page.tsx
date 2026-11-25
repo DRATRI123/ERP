@@ -157,6 +157,9 @@ function DocumentPage() {
               <Meta k="Place of supply" v={d.place_of_supply ?? "—"} />
               <Meta k="Supply" v={d.is_interstate ? "Inter-state (IGST)" : "Intra-state"} />
               {d.seller_gstin && <Meta k="Our GSTIN" v={d.seller_gstin} />}
+              {(d.doctor_name as string) && <Meta k="Doctor" v={d.doctor_name as string} />}
+              {(d.patient_name as string) && <Meta k="Patient" v={d.patient_name as string} />}
+              {(d.rx_number as string) && <Meta k="Rx no." v={d.rx_number as string} />}
               {(d.irn as string) && <Meta k="IRN" v={<Badge variant="blue">e-invoice registered</Badge>} />}
               {(d.cancel_reason as string) && <Meta k="Cancelled" v={d.cancel_reason as string} />}
             </CardContent>

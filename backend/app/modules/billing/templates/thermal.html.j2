@@ -38,6 +38,8 @@
   </div>
   <table>
     <tr><td>No: {{ doc.number or "DRAFT" }}</td><td class="r">{{ doc.doc_date.strftime("%d-%m-%Y") }}</td></tr>
+    {% if doc.doctor_id and doc.doctor %}<tr><td colspan="2">Dr. {{ doc.doctor.name }}{% if doc.doctor.registration_no %} (Reg. {{ doc.doctor.registration_no }}){% endif %}</td></tr>{% endif %}
+    {% if doc.patient_name %}<tr><td colspan="2">Patient: {{ doc.patient_name }}{% if doc.rx_number %} · Rx {{ doc.rx_number }}{% endif %}</td></tr>{% endif %}
     <tr><td colspan="2">{{ buyer.name or doc.party_name or "Cash Sale" }}{% if buyer.gstin %} · {{ buyer.gstin }}{% endif %}</td></tr>
   </table>
   <hr>

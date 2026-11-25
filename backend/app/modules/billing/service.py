@@ -55,7 +55,8 @@ HEADER_FIELDS = [
     "place_of_supply", "billing_address_id", "shipping_address_id", "tax_mode",
     "reverse_charge", "price_tier", "prices_include_tax", "warehouse_id", "restock",
     "reference_document_id", "supplier_invoice_no", "supplier_invoice_date", "landed_cost",
-    "salesperson_id", "notes", "terms", "custom_fields",
+    "salesperson_id", "doctor_id", "patient_name", "patient_address", "rx_number",
+    "notes", "terms", "custom_fields",
 ]
 
 
@@ -199,6 +200,10 @@ def _price_line(db: Session, access: BusinessAccess, doc: Document, spec: DocTyp
             price = product.wholesale_price or product.selling_price
         elif doc.price_tier == PriceTier.MRP:
             price, inclusive = product.mrp, True if inclusive is None else inclusive
+        elif doc.price_tier == PriceTier.PTR:
+            price = product.ptr or product.wholesale_price or product.selling_price
+        elif doc.price_tier == PriceTier.PTS:
+            price = product.pts or product.ptr or product.wholesale_price or product.selling_price
         else:
             price = product.selling_price
         if inclusive is None and spec.side == Side.SALES:
@@ -347,6 +352,12 @@ def _apply(db: Session, access: BusinessAccess, doc: Document, spec: DocTypeSpec
             raise ValidationFailed("Warehouse not found or not accessible")
     if doc.landed_cost and spec.code != DocType.PURCHASE_INVOICE:
         raise ValidationFailed("Landed cost applies to purchase invoices only")
+    if doc.doctor_id is not None:
+        from app.modules.pharmacy.models import Doctor
+
+        d = db.get(Doctor, doc.doctor_id)
+        if d is None or d.business_id != access.business.id:
+            raise ValidationFailed("Doctor not found")
     if lines is not None:
         if not lines:
             raise ValidationFailed("A document needs at least one line")
@@ -358,6 +369,10 @@ def _apply(db: Session, access: BusinessAccess, doc: Document, spec: DocTypeSpec
             from app.modules.pricing.service import apply_schemes
 
             apply_schemes(db, access, doc)
+        if doc.doc_type == DocType.SALES_INVOICE:
+            from app.modules.pharmacy.service import apply_near_expiry_discount
+
+            apply_near_expiry_discount(db, access, doc)
     _validate_reference(db, access, doc, spec)
     recompute(db, access, doc)
 
@@ -637,6 +652,10 @@ def finalize(db: Session, access: BusinessAccess, doc: Document, *,
     party = _party(db, access, spec, doc.party_id)
     if spec.requires_party and party is None:
         raise ValidationFailed(f"A {spec.label} needs a party")
+    if doc.doc_type == DocType.SALES_INVOICE:
+        from app.modules.pharmacy.service import check_prescription
+
+        check_prescription(db, doc)
     if doc.doc_type == DocType.PURCHASE_INVOICE:
         if not doc.supplier_invoice_no:
             raise ValidationFailed("Enter the supplier's invoice number")

@@ -29,11 +29,21 @@ const schema = z.object({
   gst_rate: z.string(),
   selling_price: money, purchase_price: money, mrp: money,
   reorder_level: z.string().regex(/^\d*(\.\d{0,3})?$/).optional(),
+  ptr: money, pts: money,
+  composition: z.string().max(300).optional(),
+  rack: z.string().max(30).optional(),
+  drug_schedule: z.enum(["none", "g", "h", "h1", "x", "narcotic"]),
+  pack_size: z.string().regex(/^\d*(\.\d{0,3})?$/, "Enter a number").optional(),
+  pack_label: z.string().max(16).optional(),
   prices_include_tax: z.boolean(),
   track_inventory: z.boolean(), batch_tracking: z.boolean(), serial_tracking: z.boolean(),
 });
 type Values = z.infer<typeof schema>;
 const GST = ["0", "0.25", "3", "5", "12", "18", "28"];
+export const SCHEDULES = [
+  ["none", "None (OTC)"], ["g", "Schedule G"], ["h", "Schedule H — prescription"], ["h1", "Schedule H1 — Rx + register"],
+  ["x", "Schedule X — Rx + register"], ["narcotic", "Narcotic (NDPS) — Rx + register"],
+] as const;
 
 export function ProductDialog({ open, onOpenChange, product }: { open: boolean; onOpenChange: (v: boolean) => void; product?: Product }) {
   const { base, id } = useBusiness();
@@ -49,8 +59,10 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
       selling_price: n(product.selling_price), purchase_price: n(product.purchase_price), mrp: n(product.mrp),
       reorder_level: n(product.reorder_level), prices_include_tax: product.prices_include_tax,
       track_inventory: product.track_inventory, batch_tracking: product.batch_tracking, serial_tracking: product.serial_tracking,
+      ptr: n(product.ptr), pts: n(product.pts), composition: (product.composition as string | null) ?? "", rack: (product.rack as string | null) ?? "",
+      drug_schedule: ((product.drug_schedule as string) ?? "none") as Values["drug_schedule"], pack_size: n(product.pack_size), pack_label: (product.pack_label as string | null) ?? "",
     } : undefined,
-    defaultValues: { name: "", sku: "", unit_id: "", kind: "goods", gst_rate: "18", prices_include_tax: false, track_inventory: true, batch_tracking: false, serial_tracking: false },
+    defaultValues: { name: "", sku: "", unit_id: "", kind: "goods", gst_rate: "18", prices_include_tax: false, track_inventory: true, batch_tracking: false, serial_tracking: false, drug_schedule: "none" },
   });
   const save = useMutation({
     mutationFn: (v: Values) => {
@@ -66,6 +78,8 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
   const err = form.formState.errors;
   const FLAGS = ["prices_include_tax", "track_inventory", "batch_tracking", "serial_tracking"] as const;
   const flags = useWatch({ control: form.control, name: [...FLAGS] });
+  const [packSize, packLabel, sp] = useWatch({ control: form.control, name: ["pack_size", "pack_label", "selling_price"] });
+  const perPack = Number(packSize) > 1 && Number(sp) > 0 ? (Number(sp) * Number(packSize)).toFixed(2) : null;
   useEffect(() => {
     if (!product && !form.getValues("unit_id") && units.data?.[0]) form.setValue("unit_id", units.data.find((u) => u.code === "NOS")?.id ?? units.data[0].id);
   }, [units.data, product, form]);
@@ -91,6 +105,19 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
           <Field label="Purchase price" error={err.purchase_price?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("purchase_price")} /></Field>
           <Field label="MRP" error={err.mrp?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("mrp")} /></Field>
           <Field label="Reorder level" hint="Alert when stock falls to this" className="sm:col-span-2"><Input inputMode="decimal" {...form.register("reorder_level")} /></Field>
+          <fieldset className="grid gap-4 rounded-lg border p-3 sm:col-span-6 sm:grid-cols-6">
+            <legend className="px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Pharmacy (optional)</legend>
+            <Field label="Salt / composition" hint="Finds substitutes with the same salt" className="sm:col-span-4"><Input placeholder="Paracetamol 500 mg" {...form.register("composition")} /></Field>
+            <Field label="Rack / shelf" className="sm:col-span-2"><Input placeholder="A-3" {...form.register("rack")} /></Field>
+            <Field label="Drug schedule" className="sm:col-span-2"><NativeSelect {...form.register("drug_schedule")}>{SCHEDULES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</NativeSelect></Field>
+            <Field label="PTR" hint="Price to retailer" error={err.ptr?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("ptr")} /></Field>
+            <Field label="PTS" hint="Price to stockist" error={err.pts?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("pts")} /></Field>
+            <Field label="Pack size" error={err.pack_size?.message} hint="Units in one pack, to sell loose" className="sm:col-span-2"><Input inputMode="decimal" placeholder="10" {...form.register("pack_size")} /></Field>
+            <Field label="Pack name" className="sm:col-span-2"><Input placeholder="strip" {...form.register("pack_label")} /></Field>
+            <p className="self-end pb-2 text-xs text-muted-foreground sm:col-span-2">
+              {perPack ? `One ${packLabel || "pack"} = ${Number(packSize)} units = ₹${perPack}. Stock and prices stay per unit.` : "Stock and prices are per unit (e.g. per tablet)."}
+            </p>
+          </fieldset>
           <div className="grid gap-3 rounded-lg border p-3 sm:col-span-4 sm:grid-cols-2">
             {([["prices_include_tax", "Prices include GST"], ["track_inventory", "Track stock"], ["batch_tracking", "Batches & expiry"], ["serial_tracking", "Serial numbers"]] as const).map(([k, label]) => (
               <label key={k} className="flex items-center justify-between gap-2 text-sm">{label}

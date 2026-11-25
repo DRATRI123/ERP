@@ -5,7 +5,7 @@ import {
   AlertTriangleIcon, CheckCircle2Icon, DatabaseBackupIcon, DownloadIcon, GlobeIcon, Loader2Icon, PaletteIcon, PlusIcon, ShieldCheckIcon, WrenchIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/data/page-header";
@@ -18,7 +18,9 @@ import { Field } from "@/components/ui/form-field";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { NearExpirySettings } from "@/features/pharmacy/pharmacy";
 import { useApiQuery, useBizQuery, useBusiness } from "@/hooks/use-business";
 import { api, ApiError, openFile, type Page } from "@/lib/api";
 import { dateTime, titleCase } from "@/lib/format";
@@ -31,14 +33,20 @@ interface Branch { id: string; code: string; name: string; kind: string; gstin: 
 interface Series { id: string; doc_type: DocType; name: string; prefix: string; suffix: string; padding: number; is_default: boolean; is_active: boolean }
 
 export default function SettingsPage() {
+  return <Suspense><SettingsTabs /></Suspense>;
+}
+
+function SettingsTabs() {
   const { isOwner, can } = useBusiness();
+  const tab = useSearchParams().get("tab") ?? "business";
   return (
     <>
       <PageHeader title="Settings" description="Business profile, branches, numbering, print templates and system." />
-      <Tabs defaultValue="business">
+      <Tabs defaultValue={tab}>
         <TabsList>
           <TabsTrigger value="business">Business</TabsTrigger><TabsTrigger value="branches">Branches</TabsTrigger>
           <TabsTrigger value="numbering">Numbering</TabsTrigger><TabsTrigger value="templates">Print templates</TabsTrigger>
+          <TabsTrigger value="pharmacy">Pharmacy</TabsTrigger>
           {isOwner && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
         <TabsContent value="business"><BusinessProfile editable={isOwner || can("business.settings")} /></TabsContent>
@@ -51,6 +59,7 @@ export default function SettingsPage() {
             <Button asChild><Link href="/settings/templates">Open designer</Link></Button>
           </CardContent></Card>
         </TabsContent>
+        <TabsContent value="pharmacy"><NearExpirySettings editable={isOwner || can("business.settings")} /></TabsContent>
         {isOwner && <TabsContent value="system"><System /></TabsContent>}
       </Tabs>
       <Card className="mt-6"><CardContent className="flex items-center gap-3 text-sm">

@@ -68,6 +68,9 @@
       {% if doc.place_of_supply %}<div><b>Place of supply:</b> {{ doc.place_of_supply }}{% if pos_name %}-{{ pos_name }}{% endif %}</div>{% endif %}
       {% if doc.reverse_charge %}<div><b>Tax payable on reverse charge:</b> Yes</div>{% endif %}
       {% if doc.supplier_invoice_no %}<div><b>Supplier inv.:</b> {{ doc.supplier_invoice_no }}</div>{% endif %}
+      {% if doc.doctor_id and doc.doctor %}<div><b>Doctor:</b> {{ doc.doctor.name }}{% if doc.doctor.registration_no %} (Reg. {{ doc.doctor.registration_no }}){% endif %}</div>{% endif %}
+      {% if doc.patient_name %}<div><b>Patient:</b> {{ doc.patient_name }}</div>{% endif %}
+      {% if doc.rx_number %}<div><b>Rx No:</b> {{ doc.rx_number }}</div>{% endif %}
       {% if cancelled %}<div class="status">CANCELLED</div>{% endif %}
     </div>
   </div>

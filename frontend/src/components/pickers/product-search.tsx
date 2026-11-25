@@ -87,7 +87,7 @@ export const ProductSearch = forwardRef<ProductSearchHandle, { onPick: (p: Produ
                   className={cn("flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm", i === active && "bg-accent")}>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{p.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{p.sku}{p.barcode ? ` · ${p.barcode}` : ""}{p.hsn_sac ? ` · HSN ${p.hsn_sac}` : ""}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{p.sku}{p.composition ? ` · ${p.composition as string}` : ""}{p.rack ? ` · Rack ${p.rack as string}` : ""}{p.barcode ? ` · ${p.barcode}` : ""}{p.hsn_sac ? ` · HSN ${p.hsn_sac}` : ""}</span>
                   </span>
                   {p.on_hand !== undefined && p.on_hand !== null && (
                     <span className={cn("num text-xs", Number(p.on_hand) <= 0 ? "text-destructive" : "text-muted-foreground")}>{qty(p.on_hand as string)} in stock</span>

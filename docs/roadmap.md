@@ -120,6 +120,30 @@ PostgreSQL.
     overdue amounts, and stock value.
   * Shown per business and in total, for today, this month or this financial year.
   * A six-month sales chart. Clicking a business opens its dashboard.
+* **Pharmacy** (migration 0017):
+  * Products carry a salt / composition, rack, drug schedule (None, G, H, H1, X, narcotic),
+    PTR and PTS, and a pack size and name for loose selling.
+  * Searching a salt finds every brand. `GET /products/{id}/substitutes` lists other active
+    products with the same salt (spacing and case ignored), cheapest first.
+  * **Loose selling:** stock and prices stay per base unit (tablet). The bill shows
+    "2 strip + 3 loose" and has a +1 strip button.
+  * **PTR / PTS** are price tiers on a sales document. A missing rate falls back to wholesale,
+    then retail. A customer's price list still comes first.
+  * **Doctors** (`/doctors`; manage with `customers.manage`): name, registration number,
+    qualification, clinic, address, phone.
+  * **Prescriptions:** a sales invoice with a Schedule H, H1, X or narcotic drug cannot be
+    finalized without the doctor and the patient's name. H1, X and narcotics also need the Rx
+    number. All three print on A4 and thermal bills.
+  * **Schedule register** (`GET /reports/schedule-register`, `reports.view`): one row per line
+    sold, with date, bill, patient and address, doctor with registration number, Rx, drug,
+    batch and quantity. Defaults to H1, X and narcotics; `schedule=` chooses others.
+  * **Doctor-wise sales** (`GET /reports/doctor-sales`): bills, taxable value and bill value per
+    doctor.
+  * **Near-expiry discount** (Settings → Pharmacy, `business.settings`): a batch expiring
+    within N days gets X % off automatically on sales invoices.
+    * The batch is the chosen one, or the first-expiry batch when it covers the whole line.
+    * The line is flagged `near_expiry`.
+    * Lines with their own discount, and free scheme lines, are left alone.
 * Fixed: the daily overdue scan used the UTC date, so invoices became overdue a day late after
   midnight IST. It now uses the business date.
 

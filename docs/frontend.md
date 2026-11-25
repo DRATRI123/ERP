@@ -93,6 +93,22 @@ CI runs these plus `npm audit`, and an end-to-end job that installs with `setup.
 * The guides live in `src/features/help/content.ts`. Each topic lists the routes it belongs to,
   and its steps name the real buttons, so update the text when you rename a button.
 
+## Pharmacy
+
+* **Product form:** a *Pharmacy (optional)* section with salt / composition, rack, drug
+  schedule, PTR, PTS, pack size and pack name. It shows the price per pack.
+* **Bill editor (sales):**
+  * The *Rate* select offers Retail, Wholesale, MRP, PTR and PTS.
+  * Lines show a schedule badge, the rack, a *Substitutes* link (same salt, swap in one click),
+    the strip + loose breakdown with *+1 strip*, and a *Near expiry −x%* badge.
+  * A Schedule H / H1 / X / narcotic item opens the **Prescription** card: doctor (with + to
+    add one on the spot), patient, Rx number and address. *Save & finalize* stays disabled
+    until the required fields are filled.
+* **Doctors page** (`/doctors`): list, search, add and edit, with this month's bills and value
+  per doctor.
+* **Reports → Pharmacy:** Schedule H1 / X register and doctor-wise sales, with print and CSV.
+* **Settings → Pharmacy:** the near-expiry discount. `/settings?tab=pharmacy` opens it directly.
+
 ## Expiry, licences, pricing
 
 * **Billing:**

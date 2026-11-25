@@ -179,6 +179,19 @@ Also: `outbox_events.webhooks_dispatched_at`, `documents.overdue_notified_at`.
 Also on `users`: `totp_secret_encrypted` (Fernet), `totp_enabled_at`, `totp_last_step`
 (replay protection).
 
+## Pharmacy (migration 0017)
+
+| Table | Purpose |
+|---|---|
+| `doctors` | Prescribing doctors: name, registration no., qualification, clinic, address, phone, active |
+
+Also:
+
+* On `products`: `composition` (indexed with the business), `rack`, `drug_schedule` (none / g /
+  h / h1 / x / narcotic), `ptr`, `pts`, `pack_size` (> 0), `pack_label`.
+* On `documents`: `doctor_id`, `patient_name`, `patient_address`, `rx_number`.
+* `documents.price_tier` also accepts `ptr` and `pts`.
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |

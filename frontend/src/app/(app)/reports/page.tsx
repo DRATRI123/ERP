@@ -32,6 +32,7 @@ const REPORTS = [
   { id: "cf", label: "Cash flow", group: "Financial statements" }, { id: "tb", label: "Trial balance", group: "Books" },
   { id: "db", label: "Day book", group: "Books" }, { id: "ar", label: "Receivables aging", group: "Parties" },
   { id: "ap", label: "Payables aging", group: "Parties" }, { id: "sv", label: "Stock valuation", group: "Inventory" },
+  { id: "rx", label: "Schedule H1 / X register", group: "Pharmacy" }, { id: "ds", label: "Doctor-wise sales", group: "Pharmacy" },
 ] as const;
 type Id = (typeof REPORTS)[number]["id"];
 
@@ -68,7 +69,15 @@ export default function ReportsPage() {
   const ar = useBizQuery<{ parties: R[] }>(["rep-ar"], "/accounting/reports/aging", { side: "receivable", as_of: asOf }, { enabled: report === "ar" });
   const ap = useBizQuery<{ parties: R[] }>(["rep-ap"], "/accounting/reports/aging", { side: "payable", as_of: asOf }, { enabled: report === "ap" });
   const sv = useBizQuery<{ method: string; total_value: string; warehouses: R[] }>(["rep-sv"], "/inventory/valuation", undefined, { enabled: report === "sv" });
-  const active = { pl, bs, cf, tb, db: dbk, ar, ap, sv }[report];
+  const rx = useBizQuery<{ rows: R[] }>(["rep-rx"], "/reports/schedule-register", ranged, { enabled: report === "rx" });
+  const ds = useBizQuery<{ rows: R[] }>(["rep-ds"], "/reports/doctor-sales", ranged, { enabled: report === "ds" });
+  const active = { pl, bs, cf, tb, db: dbk, ar, ap, sv, rx, ds }[report];
+  const rxCols: MCol[] = [{ key: "date", header: "Date" }, { key: "number", header: "Bill no." }, { key: "patient_name", header: "Patient" },
+    { key: "patient_address", header: "Patient address" }, { key: "doctor_name", header: "Doctor" }, { key: "doctor_registration", header: "Reg. no." },
+    { key: "rx_number", header: "Rx no." }, { key: "product_name", header: "Drug" }, { key: "schedule_label", header: "Schedule" },
+    { key: "batch_no", header: "Batch" }, { key: "quantity", header: "Qty", align: "right" }];
+  const dsCols: MCol[] = [{ key: "doctor_name", header: "Doctor" }, { key: "clinic", header: "Clinic" }, { key: "bills", header: "Bills", align: "right" },
+    { key: "taxable", header: "Taxable value", money: true }, { key: "total", header: "Bill value", money: true }];
   const usesAsOf = report === "bs" || report === "ar" || report === "ap";
 
   const agingCols: MCol[] = [{ key: "name", header: "Party" }, { key: "not_due", header: "Not due", money: true }, { key: "1_30", header: "1–30", money: true },
@@ -81,6 +90,8 @@ export default function ReportsPage() {
     if (report === "tb" && tb.data) downloadCsv(name, tbCols.map((c) => c.header), tb.data.rows.map((r) => tbCols.map((c) => r[c.key] as string)));
     else if ((report === "ar" || report === "ap") && (report === "ar" ? ar : ap).data) downloadCsv(name, agingCols.map((c) => c.header), (report === "ar" ? ar : ap).data!.parties.map((r) => agingCols.map((c) => r[c.key] as string)));
     else if (report === "db" && dbk.data) downloadCsv(name, ["Number", "Date", "Reference", "Account", "Debit", "Credit"], dbk.data.flatMap((e) => e.lines.map((l) => [e.number, e.date, e.source_ref, l.account, l.debit, l.credit])));
+    else if (report === "rx" && rx.data) downloadCsv(name, rxCols.map((c) => c.header), rx.data.rows.map((r) => rxCols.map((c) => r[c.key] as string)));
+    else if (report === "ds" && ds.data) downloadCsv(name, dsCols.map((c) => c.header), ds.data.rows.map((r) => dsCols.map((c) => r[c.key] as string)));
     else if (report === "pl" && pl.data) {
       const keys = ["revenue", "cost_of_goods_sold", "other_income", "operating_expenses", "depreciation", "finance_costs"];
       downloadCsv(name, ["Section", "Code", "Account", "Amount"], keys.flatMap((k) => ((pl.data![k] as Row[] | undefined) ?? []).map((r) => [k, r.code, r.name, r.amount])));
@@ -125,6 +136,10 @@ export default function ReportsPage() {
     body = <MoneyTable rows={(report === "ar" ? ar : ap).data!.parties} cols={agingCols} />;
   } else if (report === "sv" && sv.data) {
     body = <MoneyTable rows={sv.data.warehouses} cols={[{ key: "code", header: "Warehouse" }, { key: "name", header: "Name" }, { key: "stock_lines", header: "Stock lines", align: "right" }, { key: "value", header: "Value", money: true }]} />;
+  } else if (report === "rx" && rx.data) {
+    body = rx.data.rows.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">No Schedule H1, X or narcotic sales in this period.</p> : <MoneyTable rows={rx.data.rows} cols={rxCols} />;
+  } else if (report === "ds" && ds.data) {
+    body = ds.data.rows.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">No bills with a doctor in this period. Choose the doctor on a bill to see it here.</p> : <MoneyTable rows={ds.data.rows} cols={dsCols} />;
   }
 
   const groups = [...new Set(REPORTS.map((r) => r.group))];
@@ -149,7 +164,7 @@ export default function ReportsPage() {
               {report === "sv" ? null : usesAsOf ? <label className="flex items-center gap-2 text-sm text-muted-foreground">As of <Input type="date" className="w-40" value={asOf} onChange={(e) => setAsOf(e.target.value)} /></label>
                 : <PeriodPicker value={period} onChange={setPeriod} />}
               <Button variant="outline" size="icon" onClick={() => window.print()} aria-label="Print"><PrinterIcon /></Button>
-              {["pl", "tb", "db", "ar", "ap"].includes(report) && <Button variant="outline" size="icon" onClick={exportCsv} aria-label="Export CSV"><DownloadIcon /></Button>}
+              {["pl", "tb", "db", "ar", "ap", "rx", "ds"].includes(report) && <Button variant="outline" size="icon" onClick={exportCsv} aria-label="Export CSV"><DownloadIcon /></Button>}
             </div>
           </div>
           {body}

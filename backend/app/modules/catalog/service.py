@@ -21,6 +21,7 @@ PRODUCT_FIELDS = [
     "unit_id", "purchase_price", "selling_price", "wholesale_price", "mrp", "prices_include_tax",
     "gst_rate", "cess_rate", "track_inventory", "batch_tracking", "serial_tracking",
     "reorder_level", "reorder_quantity", "attributes", "is_active",
+    "ptr", "pts", "composition", "rack", "drug_schedule", "pack_size", "pack_label",
 ]
 # Changing these after stock has moved would make the stock ledger meaningless.
 _STOCK_LOCKED_FIELDS = {"unit_id", "track_inventory", "batch_tracking", "serial_tracking", "kind"}
@@ -186,6 +187,7 @@ def search_products(db: Session, access: BusinessAccess, *, q: str | None, categ
     if q:
         like = f"%{q.lower()}%"
         stmt = stmt.where(or_(func.lower(Product.name).like(like), func.lower(Product.sku).like(like),
+                              func.lower(Product.composition).like(like),
                               Product.barcode == q, Product.hsn_sac == q))
     if category_id:
         stmt = stmt.where(Product.category_id == category_id)
@@ -204,6 +206,10 @@ def lookup_barcode(db: Session, access: BusinessAccess, code: str) -> Product:
 
 
 def _validate_product(db: Session, access: BusinessAccess, data: dict[str, Any], current: Product | None) -> None:
+    if "composition" in data:
+        from app.modules.pharmacy.service import normalise_composition
+
+        data["composition"] = normalise_composition(data["composition"])
     merged = {f: getattr(current, f) for f in PRODUCT_FIELDS} if current else {}
     merged.update(data)
     if merged.get("unit_id"):
@@ -220,6 +226,10 @@ def _validate_product(db: Session, access: BusinessAccess, data: dict[str, Any],
     hsn = merged.get("hsn_sac")
     if hsn and merged.get("kind") == ProductKind.SERVICE and not hsn.startswith("99"):
         raise ValidationFailed("SAC codes for services start with 99")
+    if merged.get("pack_label") and not merged.get("pack_size"):
+        raise ValidationFailed("Enter how many units a pack holds (pack size) to sell loose")
+    if merged.get("pack_size") is not None and merged.get("kind") == ProductKind.SERVICE:
+        raise ValidationFailed("Services are not sold in packs")
     mrp, sp = merged.get("mrp"), merged.get("selling_price")
     if mrp is not None and sp is not None and merged.get("prices_include_tax") and sp > mrp:
         raise ValidationFailed("Selling price cannot exceed MRP")
