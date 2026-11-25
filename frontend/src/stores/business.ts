@@ -6,6 +6,9 @@ interface BusinessState {
   setBusiness: (id: string) => void;
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
+  /** Sidebar groups folded by the user (e.g. "manage"). */
+  foldedGroups: string[];
+  toggleGroup: (g: string) => void;
 }
 
 /** The selected business and UI preferences, remembered per browser (never data). */
@@ -16,6 +19,8 @@ export const useWorkspace = create<BusinessState>()(
       setBusiness: (businessId) => set({ businessId }),
       sidebarCollapsed: false,
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      foldedGroups: [],
+      toggleGroup: (g) => set((s) => ({ foldedGroups: s.foldedGroups.includes(g) ? s.foldedGroups.filter((x) => x !== g) : [...s.foldedGroups, g] })),
     }),
     { name: "erp-workspace" },
   ),

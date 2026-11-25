@@ -44,7 +44,7 @@ export default function GstPage() {
       <PageHeader title="GST & tax" description="Returns prepared from your finalized documents — review here, then file on the GST portal."
         actions={<PeriodPicker value={period} onChange={setPeriod} />} />
       <Tabs defaultValue="gstr1">
-        <TabsList className="h-auto flex-wrap"><TabsTrigger value="gstr1">GSTR-1</TabsTrigger><TabsTrigger value="gstr3b">GSTR-3B</TabsTrigger>
+        <TabsList><TabsTrigger value="gstr1">GSTR-1</TabsTrigger><TabsTrigger value="gstr3b">GSTR-3B</TabsTrigger>
           <TabsTrigger value="hsn">HSN summary</TabsTrigger><TabsTrigger value="sales">Sales register</TabsTrigger><TabsTrigger value="purchases">Purchase register</TabsTrigger><TabsTrigger value="eway">E-way bills</TabsTrigger></TabsList>
         <TabsContent value="gstr1" className="space-y-4">
           {g1.isLoading ? <Card><TableSkeleton /></Card> : g1.error ? <Card><ErrorState error={g1.error} /></Card> : g1.data && <>

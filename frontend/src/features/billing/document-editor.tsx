@@ -164,7 +164,7 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
   const tax = totals ? (totals.is_interstate ? [["IGST", totals.igst_total]] : [["CGST", totals.cgst_total], ["SGST", totals.sgst_total]]) : [];
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
+    <div className="grid gap-4 pb-16 sm:gap-5 xl:grid-cols-[1fr_360px] xl:pb-0">
       <div className="min-w-0 space-y-4">
         <Card>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -195,9 +195,9 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
           {lines.length === 0 ? (
             <EmptyState title="Add items to start" description="Scan a barcode or type a product name, SKU or HSN, then press Enter. F2 jumps back here." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/40 text-xs text-muted-foreground uppercase">
+            <div className="md:overflow-x-auto">
+              <table className="w-full text-sm max-md:block">
+                <thead className="bg-muted/40 text-xs text-muted-foreground uppercase max-md:hidden">
                   <tr>
                     <th className="w-8 px-3 py-2 text-left">#</th><th className="px-3 py-2 text-left">Item</th>
                     <th className="w-28 px-2 py-2 text-center">Qty</th><th className="w-32 px-2 py-2 text-right">Rate</th>
@@ -205,14 +205,14 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                     <th className="w-32 px-3 py-2 text-right">Amount</th><th className="w-10" />
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y max-md:block">
                   {lines.map((l, i) => {
                     const t = lineTotals.get(i);
                     const low = l.stock !== undefined && l.stock !== null && side === "sales" && Number(l.stock) < Number(l.quantity || 0);
                     return (
-                      <tr key={l.key} className="align-middle">
-                        <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
-                        <td className="px-3 py-2">
+                      <tr key={l.key} className="align-middle max-md:grid max-md:grid-cols-3 max-md:gap-x-2 max-md:gap-y-2 max-md:px-3 max-md:py-3">
+                        <td className="px-3 py-2 text-muted-foreground max-md:hidden">{i + 1}</td>
+                        <td className="px-3 py-2 max-md:col-span-3 max-md:p-0">
                           {l.product_id ? <p className="font-medium">{l.name}</p> : (
                             <Input value={l.name} onChange={(e) => update(l.key, { name: e.target.value })} placeholder="Description" className="h-8" />
                           )}
@@ -227,24 +227,25 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
                             </div>
                           ) : <BatchSelect productId={l.product_id} value={l.batch_no ?? ""} onChange={(b) => update(l.key, { batch_no: b || undefined })} />)}
                         </td>
-                        <td className="px-2 py-2">
-                          <div className="flex items-center justify-center gap-1">
+                        <td className="px-2 py-2 max-md:p-0">
+                          <span className="text-[10px] text-muted-foreground uppercase md:hidden">Qty</span>
+                          <div className="flex items-center justify-center gap-1 max-md:justify-start">
                             <Button type="button" variant="ghost" size="icon-sm" className="size-7" onClick={() => update(l.key, { quantity: String(Math.max(1, Number(l.quantity || 0) - 1)) })} aria-label="Decrease"><MinusIcon /></Button>
                             <Input value={l.quantity} inputMode="decimal" onChange={(e) => update(l.key, { quantity: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 w-14 px-1 text-center" aria-label="Quantity" />
                             <Button type="button" variant="ghost" size="icon-sm" className="size-7" onClick={() => update(l.key, { quantity: String(Number(l.quantity || 0) + 1) })} aria-label="Increase"><PlusIcon /></Button>
                           </div>
                         </td>
-                        <td className="px-2 py-2"><Input value={l.priceTyped || !t ? l.unit_price : String(Number(t.unit_price))} inputMode="decimal" onChange={(e) => update(l.key, { unit_price: e.target.value.replace(/[^\d.]/g, ""), priceTyped: true })} className="num h-8 text-right" aria-label="Rate" />
+                        <td className="px-2 py-2 max-md:p-0"><span className="text-[10px] text-muted-foreground uppercase md:hidden">Rate</span><Input value={l.priceTyped || !t ? l.unit_price : String(Number(t.unit_price))} inputMode="decimal" onChange={(e) => update(l.key, { unit_price: e.target.value.replace(/[^\d.]/g, ""), priceTyped: true })} className="num h-8 text-right" aria-label="Rate" />
                           {typeof t?.custom_fields === "object" && (t.custom_fields as Record<string, string>)?.scheme && <p className="mt-0.5 text-right text-[11px] text-primary">{(t.custom_fields as Record<string, string>).scheme}</p>}</td>
-                        <td className="px-2 py-2"><Input value={l.discount_percent} inputMode="decimal" placeholder="0" onChange={(e) => update(l.key, { discount_percent: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 text-right" aria-label="Discount percent" /></td>
+                        <td className="px-2 py-2 max-md:p-0"><span className="text-[10px] text-muted-foreground uppercase md:hidden">Disc %</span><Input value={l.discount_percent} inputMode="decimal" placeholder="0" onChange={(e) => update(l.key, { discount_percent: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 text-right" aria-label="Discount percent" /></td>
                         <td className="num hidden px-2 py-2 text-right text-muted-foreground md:table-cell">{l.gst_rate ? `${Number(l.gst_rate)}%` : "—"}</td>
-                        <td className="num px-3 py-2 text-right font-medium">{t ? money(t.line_total) : preview.isFetching ? <Skeleton className="ml-auto h-4 w-16" /> : "—"}</td>
-                        <td className="px-1"><Button type="button" variant="ghost" size="icon-sm" onClick={() => remove(l.key)} aria-label="Remove line"><Trash2Icon className="text-muted-foreground" /></Button></td>
+                        <td className="num px-3 py-2 text-right font-medium max-md:col-span-2 max-md:self-center max-md:p-0 max-md:text-left max-md:text-base">{t ? money(t.line_total) : preview.isFetching ? <Skeleton className="ml-auto h-4 w-16 max-md:ml-0" /> : "—"}</td>
+                        <td className="px-1 max-md:justify-self-end max-md:p-0"><Button type="button" variant="ghost" size="icon-sm" onClick={() => remove(l.key)} aria-label="Remove line"><Trash2Icon className="text-muted-foreground" /></Button></td>
                       </tr>
                     );
                   })}
                   {freeLines.map((f, i) => (
-                    <tr key={`free-${i}`} className="bg-primary-soft/40">
+                    <tr key={`free-${i}`} className="bg-primary-soft/40 max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-2 max-md:px-3 max-md:py-2">
                       <td className="px-3 py-2 text-primary"><GiftIcon className="size-4" /></td>
                       <td className="px-3 py-2 font-medium text-primary" colSpan={2}>{f.description}</td>
                       <td className="num px-2 py-2 text-center" colSpan={2}>{qty(f.quantity)} free</td>
@@ -333,6 +334,15 @@ function Editor({ side, draftId, draft }: { side: "sales" | "purchase"; draftId?
           </CardContent>
         </Card>
       </div>
+      {lines.length > 0 && (
+        <div className="no-print fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 flex items-center gap-3 border-t bg-background/95 px-3 py-2 backdrop-blur xl:hidden">
+          <div className="min-w-0 flex-1"><p className="text-[11px] text-muted-foreground">{lines.length} item{lines.length === 1 ? "" : "s"} · total</p>
+            <p className="num truncate text-lg font-semibold">{money(grand)}</p></div>
+          <Button variant="outline" size="sm" disabled={!canSave} onClick={() => save.mutate(false)} aria-label="Save draft"><SaveIcon /></Button>
+          <Button disabled={!canSave} onClick={() => save.mutate(true)}>
+            {save.isPending ? <Loader2Icon className="animate-spin" /> : <CheckCircle2Icon />} {finalizeLabel}</Button>
+        </div>
+      )}
       <PartyDialog kind={side === "sales" ? "customers" : "suppliers"} open={newParty !== null} initialName={newParty ?? undefined}
         onOpenChange={(v) => !v && setNewParty(null)} onSaved={(p) => { setParty(p); setNewParty(null); }} />
     </div>

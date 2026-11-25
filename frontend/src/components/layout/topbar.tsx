@@ -23,12 +23,13 @@ export function Topbar({ onMenu, onSearch, onHelp, live }: { onMenu: () => void;
   const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
   return (
-    <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-2 border-b bg-background/85 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-5">
+    <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-1.5 border-b bg-background/85 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/70 sm:px-5">
       <Button variant="ghost" size="icon" className="lg:hidden" onClick={onMenu} aria-label="Open menu"><MenuIcon /></Button>
       <button type="button" onClick={onSearch}
-        className="flex h-9 w-full max-w-md items-center gap-2 rounded-md border bg-card px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent">
-        <SearchIcon className="size-4" />
-        <span className="flex-1 truncate text-left">Search or jump to…</span>
+        aria-label="Search"
+        className="flex h-9 w-full max-w-md min-w-0 items-center gap-2 rounded-md border bg-card px-3 text-sm text-muted-foreground shadow-xs transition-colors hover:bg-accent">
+        <SearchIcon className="size-4 shrink-0" />
+        <span className="flex-1 truncate text-left">Search…<span className="hidden sm:inline"> or jump to</span></span>
         <kbd className="hidden rounded border bg-muted px-1.5 text-[11px] font-medium sm:inline">Ctrl K</kbd>
       </button>
       <div className="ml-auto flex items-center gap-1">

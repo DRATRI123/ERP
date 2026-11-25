@@ -22,6 +22,49 @@ export interface Column<T> {
   sortValue?: (row: T) => string | number;
   className?: string;
   hideOnMobile?: boolean;
+  /** Phones show rows as cards: "title" (top left), "aside" (top right, e.g. amount),
+   *  "row" (a labelled line), "hide". Default: first column title, last right-aligned column aside. */
+  mobile?: "title" | "aside" | "row" | "hide";
+}
+
+function mobileRoles<T>(columns: Column<T>[]) {
+  const title = columns.find((c) => c.mobile === "title") ?? columns[0];
+  const aside = columns.find((c) => c.mobile === "aside") ?? [...columns].reverse().find((c) => c.align === "right" && c !== title && c.mobile !== "hide");
+  const rest = columns.filter((c) => c !== title && c !== aside && c.mobile !== "hide");
+  return { title, aside, rest };
+}
+
+/** Rows as cards on phones (tables are unreadable at 375 px). */
+export function MobileRows<T>({ rows, columns, rowKey, onRowClick }: {
+  rows: T[]; columns: Column<T>[]; rowKey: (row: T, i: number) => string; onRowClick?: (row: T) => void;
+}) {
+  const { title, aside, rest } = mobileRoles(columns);
+  return (
+    <ul className="divide-y md:hidden">
+      {rows.map((row, i) => (
+        <li key={rowKey(row, i)} onClick={onRowClick ? () => onRowClick(row) : undefined}
+          className={cn("px-4 py-3", onRowClick && "cursor-pointer active:bg-accent")}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 font-medium">{title?.cell(row)}</div>
+            {aside && <div className="num shrink-0 text-right font-semibold">{aside.cell(row)}</div>}
+          </div>
+          {rest.length > 0 && (
+            <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+              {rest.map((c) => {
+                const label = typeof c.header === "string" && c.header ? c.header : null;
+                return (
+                  <div key={c.key} className={cn("min-w-0", !label && "col-span-2")}>
+                    {label && <dt className="text-muted-foreground">{label}</dt>}
+                    <dd className="truncate text-foreground">{c.cell(row)}</dd>
+                  </div>
+                );
+              })}
+            </dl>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /** Server-paginated list of a business endpoint returning Page<T>, with search and filters. */
@@ -74,7 +117,10 @@ export function DataTable<T extends object>({
       ) : rows.length === 0 ? (
         empty ?? <EmptyState title={q ? "Nothing matches your search" : "Nothing here yet"} />
       ) : (
-        <Table className={cn(isFetching && "opacity-70 transition-opacity")}>
+        <>
+        <MobileRows rows={rows} columns={columns} onRowClick={onRowClick}
+          rowKey={(row, i) => (rowKey ? rowKey(row, i) : String((row as { id?: string }).id ?? i))} />
+        <Table wrapperClassName="hidden md:block" className={cn(isFetching && "opacity-70 transition-opacity")}>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               {columns.map((c) => (
@@ -105,6 +151,7 @@ export function DataTable<T extends object>({
             ))}
           </TableBody>
         </Table>
+        </>
       )}
       {total > pageSize && (
         <div className="flex items-center justify-between border-t px-3 py-2 text-sm text-muted-foreground">
@@ -124,7 +171,9 @@ export function StaticTable<T>({ rows, columns, rowKey, footer }: {
   rows: T[]; columns: Column<T>[]; rowKey: (row: T, i: number) => string; footer?: React.ReactNode;
 }) {
   return (
-    <Table>
+    <>
+    <MobileRows rows={rows} columns={columns} rowKey={rowKey} />
+    <Table wrapperClassName={cn("hidden md:block", footer ? "" : "")}>
       <TableHeader>
         <TableRow className="hover:bg-transparent">
           {columns.map((c) => <TableHead key={c.key} className={cn(c.align === "right" && "text-right", c.hideOnMobile && "hidden md:table-cell")}>{c.header}</TableHead>)}
@@ -139,5 +188,6 @@ export function StaticTable<T>({ rows, columns, rowKey, footer }: {
         {footer}
       </TableBody>
     </Table>
+    </>
   );
 }

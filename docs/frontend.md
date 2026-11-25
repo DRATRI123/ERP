@@ -58,6 +58,21 @@ requests), tabular figures for money, light and dark themes from the same tokens
 (`src/app/globals.css`), skeletons while loading, empty and error states with retry, toasts for
 outcomes. Layouts are responsive: a collapsible sidebar on desktop, a slide-over menu on phones.
 
+### Screen sizes
+
+* **Desktop** uses the full width of the screen (no fixed maximum). The sidebar groups (Main, Money,
+  Manage) fold away; a folded group still shows the page you are on. `[` collapses the sidebar to icons.
+* **Phones** get a bottom tab bar (Home, Sales, a large **+ New bill** button, Stock, More). "More"
+  opens the full menu.
+* Tables turn into cards on phones. A column chooses its place on the card with `mobile`:
+  `"title"`, `"aside"` (top right, e.g. the amount), `"row"` (label and value) or `"hide"`.
+* Dialogs open as bottom sheets on phones and as centred cards from the `sm` breakpoint up.
+* On a phone, the bill editor shows each line as a card with − / + quantity buttons. The total and
+  **Save & finalize** stay pinned above the tab bar.
+* Tabs and header buttons scroll sideways instead of wrapping onto several lines.
+* No page may be wider than the screen. `globals.css` lets every grid child shrink
+  (`:where(.grid) > * { min-width: 0 }`), so a long name is truncated instead of pushing the page wider.
+
 ## Checks
 
 ```bash

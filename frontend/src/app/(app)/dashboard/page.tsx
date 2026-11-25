@@ -55,7 +55,7 @@ export default function DashboardPage() {
       />
       {error ? <Card><ErrorState error={error} retry={() => refetch()} /></Card> : (
         <div className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Today's sales" icon={IndianRupeeIcon} loading={isLoading} value={s ? money(s.today) : "—"}
               sub={s && <>{s.invoices_today} invoice{s.invoices_today === 1 ? "" : "s"} · {money(data?.payments_today?.received)} received</>} />
             <StatCard label="This month's revenue" icon={TrendingUpIcon} tone="blue" loading={isLoading} value={s ? money(s.month) : "—"}

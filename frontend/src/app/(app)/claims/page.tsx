@@ -50,7 +50,7 @@ export default function ClaimsPage() {
     <>
       <PageHeader title="Expense claims" description={approver ? "Staff claims with the bill photo — approve and pay from petty cash in one step." : "Spent your own money on the business? Claim it here with a photo of the bill."}
         actions={<Button onClick={() => setNewClaim(true)}><PlusIcon /> New claim</Button>} />
-      {approver && <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {approver && <div className="mb-4 sm:mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard label="Petty cash" icon={PiggyBankIcon} tone="blue" loading={petty.isLoading} value={petty.data ? money(petty.data.balance) : "—"}
           sub={<button type="button" className="text-blue hover:underline" onClick={() => setTopUp(true)}>Top up</button>} />
         <StatCard label="Claims waiting" icon={ReceiptIcon} tone={petty.data && Number(petty.data.claims_waiting) > 0 ? "amber" : "green"} loading={petty.isLoading}

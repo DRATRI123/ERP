@@ -17,8 +17,11 @@ function DialogContent({ className, children, wide, ...props }:
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px] data-[state=open]:animate-in" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[90vh] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border bg-card p-6 shadow-xl data-[state=open]:animate-in",
-          wide ? "max-w-3xl" : "max-w-lg",
+          // Phones: a sheet from the bottom, full width, thumb-reachable buttons.
+          "fixed inset-x-0 bottom-0 z-50 grid max-h-[92dvh] w-full gap-4 overflow-y-auto rounded-t-2xl border bg-card p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl data-[state=open]:animate-in",
+          // Tablets and up: a centred card.
+          "sm:inset-x-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:max-h-[90vh] sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl sm:p-6",
+          wide ? "sm:max-w-3xl" : "sm:max-w-lg",
           className,
         )}
         {...props}

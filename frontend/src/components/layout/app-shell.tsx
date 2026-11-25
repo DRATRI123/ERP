@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { CommandPalette } from "@/components/layout/command-palette";
+import { MobileTabBar } from "@/components/layout/mobile-tab-bar";
 import { Sidebar, SidebarContent } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, Sheet } from "@/components/ui/dialog";
@@ -60,7 +61,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <Sheet open={mobileNav} onOpenChange={setMobileNav}><SidebarContent onNavigate={() => setMobileNav(false)} /></Sheet>
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenu={() => setMobileNav(true)} onSearch={openSearch} onHelp={openHelp} live={live} />
-        <main className="mx-auto w-full max-w-[1400px] flex-1 animate-in px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="w-full min-w-0 flex-1 animate-in px-3 pt-4 pb-24 sm:px-6 sm:pt-6 lg:px-8 lg:pb-8 2xl:px-10">{children}</main>
+        <MobileTabBar onMore={() => setMobileNav(true)} />
       </div>
       <CommandPalette open={search} onOpenChange={setSearch} />
       <Dialog open={help} onOpenChange={setHelp}>

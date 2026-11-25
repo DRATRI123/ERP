@@ -81,7 +81,7 @@ function InventoryPage() {
           </>}
           {manage && <Button onClick={() => setNewProduct(true)}><PackagePlusIcon /> New product</Button>}
         </>} />
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-4 sm:mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Stock value" icon={WarehouseIcon} loading={valuation.isLoading} value={valuation.data ? money(valuation.data.total_value) : "—"} sub={valuation.data && `Valued at ${titleCase(valuation.data.method)}`} />
         <StatCard label="Below reorder level" icon={BoxesIcon} tone={low.data?.length ? "red" : "green"} loading={low.isLoading} value={low.data?.length ?? "—"} />
         <StatCard label="Expiring in 60 days" icon={BoxesIcon} tone={expiring.data?.length ? "amber" : "blue"} loading={expiring.isLoading} value={expiring.data?.length ?? "—"} />

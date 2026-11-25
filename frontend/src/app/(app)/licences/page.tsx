@@ -54,7 +54,7 @@ export default function LicencesPage() {
     <>
       <PageHeader title="Licences & compliance" description="Drug, FSSAI, AYUSH, trade and other licences — numbers on your invoices and renewal reminders before they lapse."
         actions={manage && <Button onClick={() => open(EMPTY)}><PlusIcon /> Add licence</Button>} />
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-4 sm:mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label="Active licences" icon={ShieldCheckIcon} loading={list.isLoading} value={rows.filter((r) => r.is_active).length} />
         <StatCard label="Renewal due (60 days)" icon={CalendarClockIcon} tone={count("due") ? "amber" : "green"} loading={list.isLoading} value={count("due")} />
         <StatCard label="Expired" icon={ShieldAlertIcon} tone={count("expired") ? "red" : "green"} loading={list.isLoading} value={count("expired")} />

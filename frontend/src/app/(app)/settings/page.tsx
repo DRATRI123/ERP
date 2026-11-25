@@ -36,7 +36,7 @@ export default function SettingsPage() {
     <>
       <PageHeader title="Settings" description="Business profile, branches, numbering, print templates and system." />
       <Tabs defaultValue="business">
-        <TabsList className="h-auto flex-wrap">
+        <TabsList>
           <TabsTrigger value="business">Business</TabsTrigger><TabsTrigger value="branches">Branches</TabsTrigger>
           <TabsTrigger value="numbering">Numbering</TabsTrigger><TabsTrigger value="templates">Print templates</TabsTrigger>
           {isOwner && <TabsTrigger value="system">System</TabsTrigger>}

@@ -33,16 +33,16 @@ export const PRESETS: Record<string, () => Period> = {
 /** Date range with Indian-business presets (financial year starts 1 April). */
 export function PeriodPicker({ value, onChange }: { value: Period; onChange: (p: Period) => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <NativeSelect className="w-40" defaultValue="" onChange={(e) => { const f = PRESETS[e.target.value]; if (f) onChange(f()); }} aria-label="Period">
+    <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2 sm:flex sm:w-auto sm:flex-wrap">
+      <NativeSelect className="col-span-3 sm:w-40" defaultValue="" onChange={(e) => { const f = PRESETS[e.target.value]; if (f) onChange(f()); }} aria-label="Period">
         <option value="" disabled>Quick period…</option>
         <option value="today">Today</option><option value="this_month">This month</option>
         <option value="last_month">Last month</option><option value="this_quarter">This quarter</option>
         <option value="this_fy">This financial year</option>
       </NativeSelect>
-      <Input type="date" className="w-40" value={value.from} max={value.to} onChange={(e) => onChange({ ...value, from: e.target.value })} aria-label="From" />
+      <Input type="date" className="min-w-0 sm:w-40" value={value.from} max={value.to} onChange={(e) => onChange({ ...value, from: e.target.value })} aria-label="From" />
       <span className="text-sm text-muted-foreground">to</span>
-      <Input type="date" className="w-40" value={value.to} min={value.from} onChange={(e) => onChange({ ...value, to: e.target.value })} aria-label="To" />
+      <Input type="date" className="min-w-0 sm:w-40" value={value.to} min={value.from} onChange={(e) => onChange({ ...value, to: e.target.value })} aria-label="To" />
     </div>
   );
 }

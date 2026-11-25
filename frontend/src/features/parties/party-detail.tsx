@@ -55,7 +55,7 @@ export function PartyDetail({ kind }: { kind: "customers" | "suppliers" }) {
           {(isOwner || can(sales ? "invoices.create" : "purchases.create")) && <Button asChild><Link href={sales ? "/sales/new" : "/purchases/new"}><FilePlus2Icon /> New {sales ? "invoice" : "bill"}</Link></Button>}
         </div>
       </div>
-      {seeBal && <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      {seeBal && <div className="mb-4 sm:mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3">
         <StatCard label={sales ? "To receive" : "To pay"} icon={HandCoinsIcon} loading={out.isLoading} value={money(out.data?.outstanding)} />
         <StatCard label="Overdue" icon={AlarmClockIcon} tone={Number(out.data?.overdue ?? 0) > 0 ? "red" : "green"} loading={out.isLoading} value={money(out.data?.overdue)} />
         <StatCard label="Credit terms" icon={HandCoinsIcon} tone="blue" value={p.credit_limit ? money(p.credit_limit) : "No limit"} sub={p.credit_days ? `${p.credit_days} days` : "Due on receipt"} />

@@ -56,7 +56,7 @@ export default function OwnerPage() {
             className={cn("rounded-md px-3 py-1.5 text-sm", period === k ? "bg-primary text-primary-foreground" : "hover:bg-accent")}>{label}</button>))}</div>} />
       {q.error ? <Card><ErrorState error={q.error} retry={() => q.refetch()} /></Card> : (
         <>
-          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mb-4 sm:mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <StatCard label="Sales" icon={TrendingUpIcon} loading={q.isLoading} value={t ? money(t.sales) : "—"}
               sub={t && <span className="flex items-center gap-1"><Growth value={t.growth_percent} /> vs same days before</span>} />
             <StatCard label="Net profit (books)" icon={ReceiptIndianRupeeIcon} tone={t && Number(t.net_profit) < 0 ? "red" : "green"} loading={q.isLoading} value={t ? money(t.net_profit) : "—"} />

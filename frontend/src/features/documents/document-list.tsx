@@ -46,7 +46,7 @@ export function DocumentList({ side }: { side: "sales" | "purchase" }) {
         </>}
       />
       <Tabs value={docType} onValueChange={(v) => setDocType(v as DocType | "all")} className="mb-4">
-        <TabsList className="h-auto flex-wrap">
+        <TabsList>
           {types.map((t) => <TabsTrigger key={t} value={t}>{DOC_LABEL[t]}</TabsTrigger>)}
           <TabsTrigger value="all">All</TabsTrigger>
         </TabsList>
