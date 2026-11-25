@@ -69,7 +69,9 @@ It is **not** a SaaS product: there is no public sign-up, subscriptions or tenan
   staff attendance and salaries with commission; expense claims with bill photos and petty cash;
   e-way bill JSON for the GST portal; export of masters and vouchers to Tally; a WhatsApp
   catalogue link where buyers order from their phone; per-business modules (Settings → Modules)
-  so each business shows only what it uses; for a medical store, pharmacy billing with salts and
+  so each business shows only what it uses; a post-dated cheque register with cheque
+  printing, TDS on payments and receipts with challan tracking, and interest on overdue bills;
+  for a medical store, pharmacy billing with salts and
   substitutes, rack, PTR/PTS, strip + loose selling, doctors, prescriptions required for
   Schedule H/H1/X, the H1 register, doctor-wise sales and an automatic near-expiry discount. Every page has an ⓘ guide, and Help & guide
   explains each workflow step by step. See [docs/roadmap.md](docs/roadmap.md).

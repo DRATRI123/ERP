@@ -23,7 +23,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, Timestamps, UUIDPrimaryKey
-from app.db.types import Money, UTCDateTime, str_enum
+from app.db.types import Money, ScaledDecimal, UTCDateTime, str_enum
 
 
 class PartyRole(enum.StrEnum):
@@ -93,6 +93,10 @@ class Party(UUIDPrimaryKey, Timestamps, Base):
     # Customer-type prices (hospital, doctor, wholesale…); None = normal prices.
     price_list_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, ForeignKey("price_lists.id", ondelete="SET NULL"))
     credit_days: Mapped[int | None] = mapped_column(Integer)
+    # Interest on overdue bills, % per year; empty = the business default (Settings → Modules).
+    interest_rate: Mapped[Decimal | None] = mapped_column(ScaledDecimal(9, 4))
+    # Usual TDS section when paying this party (e.g. 194C for a transporter).
+    tds_section: Mapped[str | None] = mapped_column(String(10))
 
     notes: Mapped[str | None] = mapped_column(Text)
     attributes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)

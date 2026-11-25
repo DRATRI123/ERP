@@ -267,6 +267,9 @@ class PartyCommon(BaseModel):
     credit_days: int | None = Field(None, ge=0, le=3650)
     notes: str | None = Field(None, max_length=5000)
     credit_hold: bool = False
+    interest_rate: Decimal | None = Field(None, ge=0, le=60, decimal_places=2,
+                                          description="Interest on overdue bills, % per year (empty: business default)")
+    tds_section: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{3}[A-Z0-9()]{0,6}$")] | None = None
     price_list_id: uuid.UUID | None = None
 
 
@@ -306,6 +309,8 @@ class PartyOut(ORM):
     credit_days: int | None
     notes: str | None
     credit_hold: bool = False
+    interest_rate: Decimal | None = None
+    tds_section: str | None = None
     price_list_id: uuid.UUID | None = None
     attributes: dict[str, Any]
     is_active: bool

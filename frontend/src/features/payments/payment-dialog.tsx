@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/form-field";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
-import { useBusiness } from "@/hooks/use-business";
+import { useBizQuery, useBusiness } from "@/hooks/use-business";
+import { useModules } from "@/hooks/use-modules";
 import { api, ApiError } from "@/lib/api";
 import { date, dec, decStr, money, todayISO } from "@/lib/format";
 import type { DocumentSummary, Party } from "@/lib/types";
@@ -28,6 +29,22 @@ export function PaymentDialog({ open, onOpenChange, initial }: {
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [alloc, setAlloc] = useState<Record<string, string>>({});
+  const tdsOn = useModules().on("tds");
+  const [tds, setTds] = useState({ on: false, section: "", rate: "", amount: "" });
+  const sections = useBizQuery<{ section: string; label: string; rate: string | null }[]>(["tds-sections"], "/tds/sections", undefined, { enabled: open && tdsOn, staleTime: Infinity });
+  const pickParty = (p: Party | null) => {
+    setParty(p); setAlloc({});
+    const sec = (p?.tds_section as string | null | undefined) ?? "";
+    const rate = sections.data?.find((x) => x.section === sec)?.rate ?? "";
+    setTds({ on: !!sec && direction === "out", section: sec, rate: rate ?? "", amount: "" });
+  };
+  /** Bill amount settled = money + TDS: split it at the rate. */
+  function applyRate() {
+    const gross = Object.values(alloc).reduce((s, v) => s + Number(v || 0), 0) || Number(amount || 0) + Number(tds.amount || 0);
+    const t = Math.round(gross * Number(tds.rate || 0)) / 100;
+    setTds((x) => ({ ...x, amount: t.toFixed(2) }));
+    setAmount((gross - t).toFixed(2));
+  }
   const kind = direction === "in" ? "customers" : "suppliers";
 
   // Prefill from a document ("Record payment" on an invoice).
@@ -46,8 +63,9 @@ export function PaymentDialog({ open, onOpenChange, initial }: {
   });
   const docs = (outstanding.data?.documents ?? []).filter((d) => ["sales_invoice", "debit_note", "purchase_invoice"].includes(d.doc_type));
 
-  function autoAllocate(total: string) {
-    let left = dec(total || "0");
+  const tdsAmount = tds.on ? tds.amount : "";
+  function autoAllocate(total: string, tdsPart = tdsAmount) {
+    let left = dec(total || "0") + dec(tdsPart || "0");
     const next: Record<string, string> = {};
     for (const d of [...docs].sort((a, b) => (a.due_date ?? a.doc_date).localeCompare(b.due_date ?? b.doc_date))) {
       if (left <= 0n) break;
@@ -58,12 +76,13 @@ export function PaymentDialog({ open, onOpenChange, initial }: {
     setAlloc(next);
   }
   const allocated = Object.values(alloc).reduce((s, v) => s + dec(v || "0"), 0n);
-  const unallocated = dec(amount || "0") - allocated;
+  const unallocated = dec(amount || "0") + dec(tdsAmount || "0") - allocated;
 
   const save = useMutation({
     mutationFn: () => api<{ number: string }>(`${base}/payments`, { body: {
       direction, party_id: party?.id, mode, amount, payment_date: payDate, reference: reference || undefined, notes: notes || undefined,
       allocations: Object.entries(alloc).filter(([, v]) => Number(v) > 0).map(([document_id, a]) => ({ document_id, amount: a })),
+      ...(tds.on && Number(tds.amount) > 0 ? { tds_amount: tds.amount, tds_section: tds.section } : {}),
     } }),
     onSuccess: (p) => { toast.success(`${direction === "in" ? "Receipt" : "Payment"} ${p.number} recorded`); qc.invalidateQueries({ queryKey: ["biz", bizId] }); onOpenChange(false); setAmount(""); setAlloc({}); },
     onError: (e: ApiError) => toast.error(e.message),
@@ -76,13 +95,38 @@ export function PaymentDialog({ open, onOpenChange, initial }: {
         <div className="grid gap-4 sm:grid-cols-4">
           <Field label="Type"><NativeSelect value={direction} onChange={(e) => { setDirection(e.target.value as "in" | "out"); setParty(null); setAlloc({}); }}>
             <option value="in">Received from customer</option><option value="out">Paid to supplier</option></NativeSelect></Field>
-          <Field label={direction === "in" ? "Customer" : "Supplier"} className="sm:col-span-2"><PartyPicker kind={kind} value={party} onChange={(p) => { setParty(p); setAlloc({}); }} /></Field>
+          <Field label={direction === "in" ? "Customer" : "Supplier"} className="sm:col-span-2"><PartyPicker kind={kind} value={party} onChange={pickParty} /></Field>
           <Field label="Date"><Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} /></Field>
           <Field label="Mode"><NativeSelect value={mode} onChange={(e) => setMode(e.target.value)}>
             {["upi", "cash", "card", "bank_transfer", "cheque", "other"].map((m) => <option key={m} value={m}>{m.replace("_", " ").toUpperCase()}</option>)}</NativeSelect></Field>
-          <Field label="Amount"><Input value={amount} inputMode="decimal" className="num" onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); setAmount(v); autoAllocate(v); }} autoFocus /></Field>
+          <Field label="Amount" htmlFor="pay-amount"><Input id="pay-amount" value={amount} inputMode="decimal" className="num" onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); setAmount(v); autoAllocate(v); }} autoFocus /></Field>
           <Field label="Reference / UTR" className="sm:col-span-2"><Input value={reference} onChange={(e) => setReference(e.target.value)} /></Field>
         </div>
+        {tdsOn && party && (
+          <div className="rounded-lg border p-3">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input type="checkbox" className="size-4 accent-primary" checked={tds.on} onChange={(e) => setTds((x) => ({ ...x, on: e.target.checked }))} />
+              {direction === "out" ? "Deduct TDS on this payment" : "Customer deducted TDS"}
+            </label>
+            {tds.on && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-4">
+                <Field label="Section" htmlFor="tds-sec" className="sm:col-span-2">
+                  <NativeSelect id="tds-sec" value={`${tds.section}|${tds.rate}`} onChange={(e) => { const [section, rate] = e.target.value.split("|"); setTds((x) => ({ ...x, section: section!, rate: rate ?? "" })); }}>
+                    <option value="|">— Choose section —</option>
+                    {sections.data?.map((s) => <option key={`${s.section}-${s.label}`} value={`${s.section}|${s.rate ?? ""}`}>{s.section} · {s.label}{s.rate ? ` (${s.rate}%)` : ""}</option>)}
+                  </NativeSelect>
+                </Field>
+                <Field label="Rate %" htmlFor="tds-rate"><Input id="tds-rate" inputMode="decimal" className="num" value={tds.rate} onChange={(e) => setTds((x) => ({ ...x, rate: e.target.value.replace(/[^\d.]/g, "") }))} /></Field>
+                <Field label="TDS amount" htmlFor="tds-amt"><Input id="tds-amt" inputMode="decimal" className="num" value={tds.amount}
+                  onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); setTds((x) => ({ ...x, amount: v })); autoAllocate(amount, v); }} /></Field>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:col-span-4">
+                  <Button type="button" size="sm" variant="outline" disabled={!tds.rate} onClick={applyRate}>Split bill amount at {tds.rate || "—"}%</Button>
+                  <span>Bills settled = amount {direction === "out" ? "paid" : "received"} + TDS. Rates change each year: check the current rate; without the payee’s PAN it is 20%.</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {party && (
           <div className="rounded-lg border">
             <div className="flex items-center justify-between border-b px-3 py-2 text-sm">
@@ -106,7 +150,7 @@ export function PaymentDialog({ open, onOpenChange, initial }: {
         <Field label="Notes"><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-12" /></Field>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button disabled={!amount || Number(amount) <= 0 || unallocated < 0n || save.isPending} onClick={() => save.mutate()}>
+          <Button disabled={!amount || Number(amount) <= 0 || unallocated < 0n || save.isPending || (tds.on && Number(tds.amount) > 0 && !tds.section)} onClick={() => save.mutate()}>
             {save.isPending && <Loader2Icon className="animate-spin" />} Record {money(amount || "0")}
           </Button>
         </DialogFooter>

@@ -83,11 +83,22 @@ def create_payment(db: Session, access: BusinessAccess, *, direction: PaymentDir
                    party_id: uuid.UUID | None, payment_date: date, mode: PaymentMode,
                    amount: Decimal, reference: str | None, notes: str | None,
                    allocations: list[dict[str, Any]], branch_id: uuid.UUID | None = None,
-                   account_id: uuid.UUID | None = None) -> Payment:
+                   account_id: uuid.UUID | None = None, tds_amount: Decimal = ZERO,
+                   tds_section: str | None = None) -> Payment:
     _require(access, direction, "create")
     amount = q2(amount)
+    tds_amount = q2(Decimal(tds_amount or 0))
     if amount <= 0:
         raise ValidationFailed("Amount must be positive")
+    if tds_amount < 0:
+        raise ValidationFailed("TDS cannot be negative")
+    if tds_amount > 0:
+        if party_id is None:
+            raise ValidationFailed("TDS needs a party")
+        if not tds_section:
+            raise ValidationFailed("Choose the TDS section (e.g. 194C)")
+    else:
+        tds_section = None
     party = db.get(Party, party_id) if party_id else None
     if party_id and (party is None or party.business_id != access.business.id):
         raise ValidationFailed("Party not found in this business")
@@ -105,7 +116,7 @@ def create_payment(db: Session, access: BusinessAccess, *, direction: PaymentDir
     pay = Payment(business_id=access.business.id, branch_id=branch.id, financial_year_id=fy.id,
                   direction=direction, number=number, payment_date=payment_date,
                   party_id=party_id, mode=mode, account_id=account.id, amount=amount,
-                  reference=reference, notes=notes,
+                  reference=reference, notes=notes, tds_amount=tds_amount, tds_section=tds_section,
                   created_by_id=access.user.id)
     db.add(pay)
     db.flush()
@@ -133,12 +144,13 @@ def create_payment(db: Session, access: BusinessAccess, *, direction: PaymentDir
         _apply(doc, alloc)
         touched.append(doc)
         total += alloc
-    if total > amount:
-        raise ValidationFailed(f"Allocations ({total}) exceed the amount ({amount})")
+    if total > amount + tds_amount:
+        raise ValidationFailed(f"Allocations ({total}) exceed the amount ({amount + tds_amount})")
     db.flush()
     audit.record(db, action="payment.created", entity_type="payment", entity_id=pay.id,
                  business_id=access.business.id, actor_id=access.user.id,
                  changes={"number": number, "amount": amount, "mode": mode.value,
+                          **({"tds_amount": tds_amount, "tds_section": tds_section} if tds_amount else {}),
                           "allocations": [{"document_id": d.id, "amount": a.amount}
                                           for d, a in zip(touched, pay.allocations, strict=True)]})
     post_payment(db, access.business, pay, user_id=access.user.id)

@@ -350,7 +350,8 @@ def create_payment(body: PaymentIn, access: PaymentsCreate, db: DB) -> PaymentOu
         db, access, direction=body.direction, party_id=body.party_id,
         payment_date=body.payment_date, mode=body.mode, amount=body.amount,
         reference=body.reference, notes=body.notes, branch_id=body.branch_id,
-        account_id=body.account_id, allocations=[a.model_dump() for a in body.allocations])
+        account_id=body.account_id, allocations=[a.model_dump() for a in body.allocations],
+        tds_amount=body.tds_amount, tds_section=body.tds_section)
     db.commit()
     return PaymentOut.model_validate(p)
 

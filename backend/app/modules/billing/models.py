@@ -281,6 +281,7 @@ class Payment(UUIDPrimaryKey, Timestamps, Base):
     __table_args__ = (
         UniqueConstraint("business_id", "number"),
         CheckConstraint("amount > 0", name="amount_positive"),
+        CheckConstraint("tds_amount >= 0", name="tds_non_negative"),
         Index("ix_payments_business_date", "business_id", "payment_date"),
     )
 
@@ -301,6 +302,10 @@ class Payment(UUIDPrimaryKey, Timestamps, Base):
         Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"))
     amount: Mapped[Decimal] = mapped_column(Money(), nullable=False)
     reference: Mapped[str | None] = mapped_column(String(100))  # UTR, cheque no., card ref
+    # TDS deducted on this payment (by us on a supplier payment, or by the customer on a receipt).
+    # ``amount`` is the money that moved; amount + tds_amount is what settles the bills.
+    tds_amount: Mapped[Decimal] = mapped_column(Money(), default=Decimal(0), server_default="0", nullable=False)
+    tds_section: Mapped[str | None] = mapped_column(String(10))  # e.g. 194C, 194J, 194Q
     notes: Mapped[str | None] = mapped_column(String(500))
     status: Mapped[PaymentState] = mapped_column(
         str_enum(PaymentState, 10), default=PaymentState.POSTED, nullable=False)

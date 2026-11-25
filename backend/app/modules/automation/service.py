@@ -84,6 +84,14 @@ TRIGGERS: dict[str, dict[str, Any]] = {
     "order.received": {"label": "An order arrives from the WhatsApp catalogue", "fields": [
         {"key": "grand_total", "label": "Order value (₹)", "type": "number"}, {"key": "name", "label": "Buyer name", "type": "text"}],
         "vars": ["name", "phone", "grand_total", "lines"]},
+    "cheque.due": {"label": "A post-dated cheque's date arrives (deposit it / fund the account)", "fields": [
+        {"key": "amount", "label": "Amount (₹)", "type": "number"},
+        {"key": "direction", "label": "Received or issued", "type": "choice", "choices": ["in", "out"]}],
+        "vars": ["cheque_no", "cheque_date", "amount", "party_name", "bank_name", "direction"]},
+    "cheque.bounced": {"label": "A cheque bounces", "fields": [
+        {"key": "amount", "label": "Amount (₹)", "type": "number"},
+        {"key": "direction", "label": "Received or issued", "type": "choice", "choices": ["in", "out"]}],
+        "vars": ["cheque_no", "cheque_date", "amount", "party_name", "bank_name", "direction"]},
     "customer.created": {"label": "A customer is added", "fields": [
         {"key": "name", "label": "Name", "type": "text"}, {"key": "city", "label": "City", "type": "text"}],
         "vars": ["name", "phone", "email"]},

@@ -120,6 +120,40 @@ PostgreSQL.
     overdue amounts, and stock value.
   * Shown per business and in total, for today, this month or this financial year.
   * A six-month sales chart. Clicking a business opens its dashboard.
+* **Cheques** (module `cheques`, migration 0019):
+  * A register of post-dated cheques received and issued (`/cheques`). A cheque is not in the
+    books while pending.
+  * Clearing it records the receipt or payment (mode cheque) and settles the chosen bills, up to
+    what each still owes. The rest is an advance.
+  * Bounced: a cleared cheque's payment is cancelled, so the bills are due again.
+  * Events `cheque.due` (daily, once its date arrives) and `cheque.bounced` feed automation.
+  * **Cheque printing** (`/cheques/{id}/print`, issued cheques only):
+    * Laid out for a CTS-2010 leaf (203 × 92 mm): date in eight boxes, payee, amount in Indian
+      words over two lines, `**12,500.50/-` in figures, and an optional A/C PAYEE crossing.
+    * Positions in mm, plus overall shifts, are stored in `settings.cheque_layout`
+      (`GET/PUT /cheque-layout`). `/cheque-layout/sample` gives a test print.
+* **TDS** (module `tds`):
+  * A payment carries `tds_amount` and `tds_section`. `amount` is the money that moved, and
+    `amount + tds_amount` is what settles the bills.
+  * Payments out post Cr TDS Payable. Receipts where the customer deducted TDS post Dr TDS
+    Receivable.
+  * Suppliers carry their PAN and usual section. Suggested rates for 194C/J/H/I/Q/A/T pre-fill
+    the form, and the user confirms them.
+  * `GET /reports/tds?direction=out|in` gives entries with PAN, gross, rate and TDS, a
+    section-wise summary and, for TDS we deducted, the month-by-month position. That covers
+    deducted, deposited and due date (7th of next month; 30 April for March), with an overdue
+    flag.
+  * `POST /tds/deposits` records a challan (serial no., BSR code) and posts Dr TDS Payable,
+    Cr Bank (journal source `tds`).
+* **Interest on overdue bills** (module `interest`, off by default):
+  * Simple interest at the party's rate (or the business default in `settings.interest`, with
+    grace days), day by day, on what was actually unpaid after the due date. Part payments stop
+    interest on that part from their date.
+  * `POST /interest/debit-notes` drafts one debit note per invoice. Each note carries the
+    invoice's HSN and GST rate, because interest on late payment is part of the value of
+    supply.
+  * The next calculation starts after the last note, so interest is never charged twice and
+    never charged on interest.
 * **Modules per business** (Settings → Modules; `GET/PUT /businesses/{id}/modules`):
   * The ERP serves different kinds of business. The core is always on: sales, purchases, stock,
     parties, payments, accounting, GST, reports, users and settings.

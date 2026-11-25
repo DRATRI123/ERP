@@ -266,6 +266,8 @@ class PaymentIn(BaseModel):
     reference: Annotated[str, StringConstraints(max_length=100)] | None = None
     notes: Annotated[str, StringConstraints(max_length=500)] | None = None
     allocations: list[AllocationIn] = Field(default_factory=list, max_length=200)
+    tds_amount: MoneyIn = Field(Decimal(0), description="TDS deducted; amount + tds_amount settles the bills")
+    tds_section: Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{3}[A-Z0-9()]{0,6}$")] | None = None
 
 
 class AllocationOut(ORM):
@@ -285,6 +287,8 @@ class PaymentOut(ORM):
     amount: MoneyOut
     reference: str | None
     notes: str | None
+    tds_amount: MoneyOut = Decimal(0)
+    tds_section: str | None = None
     status: PaymentState
     allocations: list[AllocationOut]
     created_at: datetime

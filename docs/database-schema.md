@@ -192,6 +192,20 @@ Also:
 * On `documents`: `doctor_id`, `patient_name`, `patient_address`, `rx_number`.
 * `documents.price_tier` also accepts `ptr` and `pts`.
 
+## Money (migration 0019)
+
+| Table | Purpose |
+|---|---|
+| `cheques` | Post-dated cheques received/issued: party, number, date, bank, amount, bills to settle (JSON), status pending/cleared/bounced/cancelled, the payment created on clearing, bounce reason, due-alert time |
+| `tds_deposits` | TDS challans: month of deduction, section, amount, deposit date, challan no., BSR code, bank account |
+
+Also:
+
+* On `payments`: `tds_amount` (≥ 0) and `tds_section`.
+* On `parties`: `interest_rate` and `tds_section`.
+* `journal_entries.source_type` also accepts `tds`.
+* New system accounts: 1310 TDS Receivable and 2120 TDS Payable.
+
 ## Planned schema by phase
 
 | Phase | Tables (indicative) |

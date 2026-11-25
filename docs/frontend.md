@@ -102,6 +102,25 @@ CI runs these plus `npm audit`, and an end-to-end job that installs with `setup.
   near-expiry discount sits under it while Pharmacy is on.
 * `/settings?tab=modules` opens the tab directly; the old `?tab=pharmacy` also lands there.
 
+## Cheques, TDS and interest
+
+* **Cheques** (`/cheques`):
+  * Totals for received and issued cheques, pending and due within 7 days.
+  * Pending / Cleared / Bounced tabs.
+  * Dialogs to record a cheque with the bills it pays, and to clear it on a date. Bounce and
+    cancel ask for a reason.
+  * Print opens the cheque. *Print layout* edits the mm positions and has a test print.
+* **Payment dialog:** with the TDS module on, "Deduct TDS" (payments) or "Customer deducted
+  TDS" (receipts) appears.
+  * The section list carries suggested rates, and a supplier's usual section pre-fills it.
+  * "Split bill amount at x%" fills in the TDS and the net amount.
+* **TDS page** (`/tds`): deducted by us / by customers, month-by-month deposit position with
+  *Record challan*, section totals, and a CSV for the quarterly return.
+* **Interest page** (`/interest`): default rate and grace days, then per customer each late
+  invoice with its period, days and interest, and *Draft debit notes*.
+* **Party form:** PAN for all parties. *Usual TDS section* appears with the TDS module on, and
+  *Interest %* for customers with the interest module on.
+
 ## Pharmacy
 
 Everything below appears only when the business has the Pharmacy module on.

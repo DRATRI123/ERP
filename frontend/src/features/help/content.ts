@@ -355,6 +355,78 @@ export const HELP: HelpTopic[] = [
     related: ["sales", "purchases", "accounting"],
   },
   {
+    id: "cheques", title: "Cheques: post-dated register and printing", group: "Money", routes: ["/cheques"],
+    summary: "Keep every post-dated cheque in one list. Nothing goes into the books until the bank clears it, and a bounce undoes the receipt.",
+    sections: [
+      { heading: "A customer gives you a post-dated cheque", steps: [
+        "Cheques → Cheque received: customer, cheque number, date written on it, their bank and the amount.",
+        "Tick the bills it pays (or leave them: it becomes an advance when it clears).",
+        "On its date you get an alert (set up an Automation rule on “A post-dated cheque's date arrives”) — deposit it.",
+        "When the bank credits it: Cleared → date. The receipt is recorded and the bills are marked paid.",
+      ] },
+      { heading: "It bounced", steps: [
+        "Press Bounced and give the reason (e.g. “Funds insufficient”).",
+        "If it had cleared, the receipt is cancelled, so the bills are due again. The bounce stays on record.",
+      ] },
+      { heading: "Issuing a cheque to a supplier", steps: [
+        "Cheques → Cheque issued: supplier, number, date, amount and the bills it pays.",
+        "Print puts the date, payee, amount in words and figures and “A/C PAYEE” on the bank's cheque leaf.",
+        "When it is debited in the bank: Cleared → the payment is recorded.",
+      ] },
+      { heading: "Getting the print to fit your cheque book", steps: [
+        "Cheques → Print layout → Test print, on plain paper.",
+        "Hold it against a cheque leaf. If everything is a little off, change only “Shift right / Shift down” (in mm).",
+        "Save the layout. Load the cheque in the printer's manual / envelope tray.",
+      ] },
+    ],
+    tips: ["Pending cheques are not in the cash book or the customer's balance until cleared — just as the bank sees it."],
+    related: ["payments"],
+  },
+  {
+    id: "tds", title: "TDS: deduct, record and deposit", group: "Money", routes: ["/tds"],
+    summary: "Deduct TDS when paying contractors, professionals, rent or commission; record TDS your customers deduct; see what to deposit each month.",
+    sections: [
+      { heading: "Set up once", steps: [
+        "On each supplier you deduct TDS from: Edit → PAN and Usual TDS section (e.g. 194C for transport).",
+        "Without a PAN the rate is 20% — the TDS page flags a missing PAN in red.",
+      ] },
+      { heading: "Paying with TDS", steps: [
+        "Banking & Payments → Record payment → supplier. “Deduct TDS” is ticked with their section.",
+        "Tick the bills you are paying, then press “Split bill amount at x%”: the TDS and the amount to pay fill in.",
+        "Example: bill ₹10,000 at 2% → pay ₹9,800, TDS ₹200. The bill is fully settled; ₹200 goes to TDS Payable.",
+      ] },
+      { heading: "When a customer deducts TDS", steps: [
+        "Record the receipt for the money that arrived, tick “Customer deducted TDS” and enter their TDS and section.",
+        "The invoice is fully settled; the TDS goes to TDS Receivable — you claim it in your income-tax return (check Form 26AS).",
+      ] },
+      { heading: "Depositing", steps: [
+        "TDS → Deducted by us → Month by month shows what is due by the 7th (March: 30 April).",
+        "Pay on the income-tax portal (challan ITNS 281), then Record challan with the serial no. and BSR code.",
+        "CSV for the return exports the entries for your accountant's quarterly return (24Q / 26Q).",
+      ] },
+    ],
+    tips: ["Rates and limits change with the Budget each year: the suggested rates only pre-fill the form; check them."],
+    related: ["payments", "accounting"],
+  },
+  {
+    id: "interest", title: "Interest on overdue bills", group: "Money", routes: ["/interest"],
+    summary: "Charge interest to customers who pay late — calculated day by day on what was actually unpaid, and billed with a debit note.",
+    sections: [
+      { heading: "Set it up", steps: [
+        "Settings → Modules → switch on “Interest on overdue bills”.",
+        "Interest on dues → set the default yearly rate (e.g. 18%) and grace days after the due date.",
+        "A customer can have their own rate on their page; 0% exempts them (e.g. a hospital you never charge).",
+      ] },
+      { heading: "Charge it", steps: [
+        "The page lists each customer with each late invoice, the days and the interest. A part payment stops interest on that part from its date.",
+        "Draft debit notes creates one draft per invoice. Review it in Sales, then finalize and send it.",
+        "Interest is never charged twice: the next calculation starts the day after the last debit note.",
+      ] },
+    ],
+    tips: ["Mention the interest rate in your invoice terms (Settings → Print templates) so customers know in advance."],
+    related: ["sales", "customers"],
+  },
+  {
     id: "accounting", title: "Accounting and expenses", group: "Money", routes: ["/accounting"],
     summary: "Double-entry books written automatically by every bill, payment and stock movement.",
     sections: [

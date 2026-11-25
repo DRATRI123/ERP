@@ -10,8 +10,9 @@
 | Purchase invoice          | Inventory / Purchases, Input GST (ITC)  | Payable (party), Landed-cost clearing    |
 |   reverse charge          | Input GST (if eligible)                 | GST payable under RCM                    |
 | Purchase return           | Payable (party), stock-cost difference  | Inventory / Purchases, Input GST         |
-| Receipt                   | Cash / Bank                             | Receivable (or Payable for refunds)      |
-| Payment                   | Payable (or Receivable for refunds)     | Cash / Bank                              |
+| Receipt                   | Cash / Bank, TDS receivable (if the     | Receivable (or Payable for refunds)      |
+|                           | customer deducted TDS)                  |                                          |
+| Payment                   | Payable (or Receivable for refunds)     | Cash / Bank, TDS payable (TDS deducted)  |
 | Opening stock             | Inventory                               | Opening balance equity                   |
 | Stock adjustment / count  | Inventory or Stock adjustments          | Stock adjustments or Inventory           |
 
@@ -216,13 +217,17 @@ def post_payment(db: Session, business: Business, pay: Payment, *, user_id: uuid
                      if pay.direction == PaymentDirection.IN else
                      Line(control, debit=a.amount, party_id=pay.party_id))
         allocated += a.amount
-    advance = pay.amount - allocated
+    advance = pay.amount + pay.tds_amount - allocated
     if advance:  # unallocated: an advance from a customer / to a supplier
         lines.append(Line(acc["ar"], credit=advance, party_id=pay.party_id)
                      if pay.direction == PaymentDirection.IN else
                      Line(acc["ap"], debit=advance, party_id=pay.party_id))
     lines.append(Line(money, debit=pay.amount) if pay.direction == PaymentDirection.IN
                  else Line(money, credit=pay.amount))
+    if pay.tds_amount:  # the part of the bill settled by TDS instead of money
+        lines.append(Line(acc["tds_receivable"], debit=pay.tds_amount, party_id=pay.party_id)
+                     if pay.direction == PaymentDirection.IN else
+                     Line(acc["tds_payable"], credit=pay.tds_amount, party_id=pay.party_id))
     return post(db, business.id, entry_date=pay.payment_date, source_type=JournalSource.PAYMENT,
                 source_id=pay.id, source_ref=pay.number, lines=lines, branch_id=pay.branch_id,
                 created_by=user_id,

@@ -31,6 +31,7 @@ PARTY_FIELDS = [
     "code", "name", "is_customer", "is_supplier", "gst_type", "gstin", "pan", "state_code",
     "contact_person", "phone", "email", "customer_group_id", "supplier_group_id",
     "credit_limit", "credit_days", "notes", "attributes", "is_active", "credit_hold", "price_list_id",
+    "interest_rate", "tds_section",
 ]
 ADDRESS_FIELDS = ["kind", "label", "address_line1", "address_line2", "city", "state_code",
                   "pincode", "country", "is_default"]

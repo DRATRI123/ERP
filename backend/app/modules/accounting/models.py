@@ -136,6 +136,7 @@ class JournalSource(enum.StrEnum):
     OPENING = "opening"
     CLOSING = "closing"
     PAYROLL = "payroll"
+    TDS = "tds"  # TDS deposited to the government
 
 
 class JournalEntry(UUIDPrimaryKey, Base):

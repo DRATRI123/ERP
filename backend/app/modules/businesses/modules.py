@@ -28,6 +28,11 @@ MODULES: tuple[Module, ...] = (
     Module("pharmacy", "Pharmacy / medical store",
            "Salt and substitutes, rack, drug schedules, PTR / PTS, strip + loose selling, doctors, prescriptions on "
            "Schedule H bills, the H1 register and the near-expiry discount.", False),
+    Module("cheques", "Cheques (post-dated) & cheque printing",
+           "Register of post-dated cheques received and issued, clearing and bounces, and printing on the bank's leaf.", True),
+    Module("tds", "TDS", "Deduct TDS on payments, record TDS customers deduct, section-wise register and challan deposits.", True),
+    Module("interest", "Interest on overdue bills",
+           "Interest at a yearly % on late payments, day by day, drafted as debit notes.", False),
     Module("manufacturing", "Manufacturing", "Recipes, production runs, batch costing and quality control.", True),
     Module("pricing", "Price lists & schemes", "Customer price lists, \"10 + 1\" and quantity-discount schemes.", True),
     Module("catalogue", "WhatsApp catalogue", "A link where buyers order from their phone.", True),

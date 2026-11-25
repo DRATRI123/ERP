@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Field } from "@/components/ui/form-field";
 import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { useBizQuery, useBusiness } from "@/hooks/use-business";
+import { useModules } from "@/hooks/use-modules";
 import { api, ApiError } from "@/lib/api";
 import { GSTIN_RE, STATES } from "@/lib/india";
 import type { Party } from "@/lib/types";
@@ -26,6 +27,9 @@ const schema = z.object({
   email: z.string().trim().refine((v) => !v || z.email().safeParse(v).success, "Not a valid e-mail").optional(),
   credit_limit: z.string().regex(/^\d*(\.\d{0,2})?$/).optional(),
   credit_days: z.string().regex(/^\d*$/).optional(),
+  pan: z.string().trim().toUpperCase().regex(/^([A-Z]{5}[0-9]{4}[A-Z])?$/, "10 characters, e.g. ABCDE1234F").optional(),
+  tds_section: z.string().optional(),
+  interest_rate: z.string().regex(/^\d*(\.\d{0,2})?$/, "A % like 18").optional(),
   address: z.string().optional(), city: z.string().optional(), pincode: z.string().regex(/^(\d{6})?$/, "6 digits").optional(),
   notes: z.string().optional(),
   price_list_id: z.string().optional(),
@@ -38,6 +42,7 @@ export function PartyDialog({ kind, open, onOpenChange, party, initialName, onSa
 }) {
   const { base, id } = useBusiness();
   const qc = useQueryClient();
+  const modules = useModules();
   const priceLists = useBizQuery<{ id: string; name: string; is_active: boolean }[]>(["price-lists"], "/price-lists", undefined, { enabled: open && kind === "customers" });
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -46,6 +51,8 @@ export function PartyDialog({ kind, open, onOpenChange, party, initialName, onSa
       contact_person: (party.contact_person as string) ?? "", phone: party.phone ?? "", email: party.email ?? "",
       credit_limit: party.credit_limit ? String(Number(party.credit_limit)) : "", credit_days: party.credit_days?.toString() ?? "", notes: (party.notes as string) ?? "",
       price_list_id: (party.price_list_id as string | null) ?? "", credit_hold: !!party.credit_hold,
+      pan: (party.pan as string | null) ?? "", tds_section: (party.tds_section as string | null) ?? "",
+      interest_rate: party.interest_rate !== null && party.interest_rate !== undefined ? String(Number(party.interest_rate)) : "",
     } : undefined,
     defaultValues: { name: initialName ?? "", gst_type: "unregistered", state_code: "" },
   });
@@ -55,7 +62,9 @@ export function PartyDialog({ kind, open, onOpenChange, party, initialName, onSa
       const body: Record<string, unknown> = {
         name: v.name, gst_type: v.gstin ? "regular" : v.gst_type, gstin: nn(v.gstin), state_code: nn(v.state_code ?? (v.gstin ? v.gstin.slice(0, 2) : "")),
         contact_person: nn(v.contact_person), phone: nn(v.phone), email: nn(v.email), credit_limit: nn(v.credit_limit),
-        credit_days: v.credit_days ? Number(v.credit_days) : null, notes: nn(v.notes),
+        credit_days: v.credit_days ? Number(v.credit_days) : null, notes: nn(v.notes), pan: nn(v.pan),
+        ...(modules.on("tds") ? { tds_section: nn(v.tds_section) } : {}),
+        ...(modules.on("interest") && kind === "customers" ? { interest_rate: nn(v.interest_rate) } : {}),
         ...(kind === "customers" ? { price_list_id: nn(v.price_list_id), credit_hold: !!v.credit_hold } : {}),
       };
       if (!party && v.address) body.addresses = [{ kind: "billing", address_line1: v.address, city: nn(v.city), pincode: nn(v.pincode), state_code: body.state_code, is_default: true }];
@@ -79,6 +88,14 @@ export function PartyDialog({ kind, open, onOpenChange, party, initialName, onSa
           <Field label="Phone" error={err.phone?.message}><Input inputMode="tel" {...form.register("phone")} /></Field>
           <Field label="E-mail" error={err.email?.message}><Input type="email" {...form.register("email")} /></Field>
           <Field label="Contact person"><Input {...form.register("contact_person")} /></Field>
+          <Field label="PAN" error={err.pan?.message} hint={modules.on("tds") ? "Without PAN, TDS is 20%" : undefined}><Input className="uppercase" maxLength={10} {...form.register("pan")} /></Field>
+          {modules.on("tds") && (
+            <Field label="Usual TDS section" hint="Pre-filled when paying them"><NativeSelect {...form.register("tds_section")}>
+              <option value="">No TDS</option>{["194C", "194J", "194H", "194I", "194Q", "194A", "194T"].map((x) => <option key={x} value={x}>{x}</option>)}</NativeSelect></Field>
+          )}
+          {modules.on("interest") && kind === "customers" && (
+            <Field label="Interest on overdue (% per year)" error={err.interest_rate?.message} hint="Empty: business default; 0: never"><Input inputMode="decimal" {...form.register("interest_rate")} /></Field>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="Credit limit"><Input inputMode="decimal" {...form.register("credit_limit")} /></Field>
             <Field label="Credit days"><Input inputMode="numeric" {...form.register("credit_days")} /></Field>

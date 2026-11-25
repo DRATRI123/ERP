@@ -1,5 +1,5 @@
 import {
-  BarChart3Icon, BookOpenIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
+  BanknoteIcon, BarChart3Icon, BookOpenIcon, PercentIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
   LayoutDashboardIcon, PlugIcon, ReceiptIndianRupeeIcon, SettingsIcon, ShoppingCartIcon, TruckIcon, UsersIcon,
   IdCardIcon, LifeBuoyIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, StethoscopeIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
 } from "lucide-react";
@@ -33,6 +33,9 @@ export const NAV: NavItem[] = [
   { href: "/doctors", label: "Doctors", icon: StethoscopeIcon, any: ["invoices.view"], group: "main", module: "pharmacy" },
   { href: "/accounting", label: "Accounting", icon: BookOpenIcon, any: ["accounting.view", "expenses.view"], group: "money", shortcut: "a" },
   { href: "/payments", label: "Banking & Payments", icon: WalletIcon, any: ["payments.view"], group: "money" },
+  { href: "/cheques", label: "Cheques (PDC)", icon: BanknoteIcon, any: ["payments.view"], group: "money", module: "cheques" },
+  { href: "/tds", label: "TDS", icon: LandmarkIcon, any: ["payments.view"], group: "money", module: "tds" },
+  { href: "/interest", label: "Interest on dues", icon: PercentIcon, any: ["invoices.view"], group: "money", module: "interest" },
   { href: "/claims", label: "Expense claims", icon: ReceiptIcon, any: ["expenses.claim", "expenses.manage"], group: "money", module: "claims" },
   { href: "/staff", label: "Staff & Salary", icon: IdCardIcon, any: ["payroll.manage", "attendance.mark"], group: "money", module: "payroll" },
   { href: "/gst", label: "GST & Tax", icon: LandmarkIcon, any: ["gst.view"], group: "money", shortcut: "t" },

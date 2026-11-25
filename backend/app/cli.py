@@ -147,6 +147,9 @@ def cmd_worker(args: argparse.Namespace) -> int:
                 from app.modules.compliance.service import emit_renewal_alerts
 
                 stats["licence_alerts"] = emit_renewal_alerts(db)
+                from app.modules.money.service import emit_cheque_due
+
+                stats["cheque_alerts"] = emit_cheque_due(db)
             stats.update(security.deliver_alerts(db))
             d = domains.reverify_due(db)
             if d["checked"]:

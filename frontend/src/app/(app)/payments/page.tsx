@@ -14,7 +14,7 @@ import { PaymentDialog } from "@/features/payments/payment-dialog";
 import { useBizMutation, useBusiness } from "@/hooks/use-business";
 import { date, money, titleCase } from "@/lib/format";
 
-interface Payment { id: string; direction: "in" | "out"; number: string; payment_date: string; mode: string; amount: string; reference: string | null; notes: string | null; status: string; allocations: { document_id: string; amount: string }[] }
+interface Payment { id: string; direction: "in" | "out"; number: string; payment_date: string; mode: string; amount: string; reference: string | null; notes: string | null; status: string; allocations: { document_id: string; amount: string }[]; tds_amount?: string; tds_section?: string | null }
 
 function PaymentsPage() {
   const params = useSearchParams();
@@ -34,7 +34,8 @@ function PaymentsPage() {
     { key: "m", header: "Mode", cell: (p) => <Badge variant="outline">{titleCase(p.mode)}</Badge> },
     { key: "r", header: "Reference", cell: (p) => <span className="block max-w-64 truncate">{p.reference ?? p.notes ?? "—"}</span>, hideOnMobile: true },
     { key: "s", header: "Status", cell: (p) => p.status === "cancelled" ? <Badge variant="destructive">Cancelled</Badge> : <Badge>{p.allocations.length ? "Settled" : "Advance"}</Badge> },
-    { key: "a", header: "Amount", align: "right", cell: (p) => <span className="font-medium">{p.direction === "out" ? "-" : ""}{money(p.amount)}</span> },
+    { key: "a", header: "Amount", align: "right", cell: (p) => <span className="font-medium">{p.direction === "out" ? "-" : ""}{money(p.amount)}
+      {Number(p.tds_amount ?? 0) > 0 && <span className="block text-xs font-normal text-muted-foreground">+ TDS {money(p.tds_amount)} u/s {p.tds_section}</span>}</span> },
     ...((isOwner || can("payments.create")) ? [{ key: "x", header: "", cell: (p: Payment) => p.status !== "cancelled" &&
       <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setCancelling(p)}>Cancel</Button> }] : []),
   ];
