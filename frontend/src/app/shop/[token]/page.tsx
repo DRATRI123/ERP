@@ -10,8 +10,9 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { money } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Thumb } from "@/components/data/thumb";
 
-interface Item { id: string; name: string; sku: string; price: string; mrp: string | null; prices_include_tax: boolean; gst_rate: string; category: string | null; in_stock: boolean | null }
+interface Item { id: string; name: string; sku: string; price: string; mrp: string | null; prices_include_tax: boolean; gst_rate: string; category: string | null; in_stock: boolean | null; image: string | null; description: string | null }
 interface Catalogue { business: string; title: string; welcome: string | null; whatsapp: boolean; min_order_value: string; phone: string | null; products: Item[] }
 interface Placed { reference: string; grand_total: string; lines: number; whatsapp_url: string | null }
 
@@ -91,8 +92,10 @@ export default function ShopPage() {
                 const out = p.in_stock === false;
                 return (
                   <li key={p.id} className={cn("flex items-center gap-3 p-3", out && "opacity-60")}>
+                    {p.image && <Thumb src={p.image} alt={p.name} className="size-16 rounded-lg" />}
                     <div className="min-w-0 flex-1">
                       <p className="font-medium leading-snug">{p.name}</p>
+                      {p.description && <p className="line-clamp-2 text-xs text-muted-foreground">{p.description}</p>}
                       <p className="text-sm"><span className="font-semibold">{money(p.price)}</span>
                         {p.mrp && Number(p.mrp) > Number(p.price) && <span className="ml-1.5 text-xs text-muted-foreground line-through">{money(p.mrp)}</span>}
                         <span className="ml-1.5 text-xs text-muted-foreground">{p.prices_include_tax ? "incl. GST" : `+ ${Number(p.gst_rate)}% GST`}</span></p>

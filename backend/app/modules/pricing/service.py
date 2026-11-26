@@ -174,7 +174,7 @@ def apply_schemes(db: Session, access: BusinessAccess, doc: Any) -> None:
         doc.lines.remove(ln)
     free_lines = []
     for ln in list(doc.lines):
-        if ln.product_id is None or ln.source_line_id is not None:
+        if ln.product_id is None or ln.source_line_id is not None or (ln.custom_fields or {}).get("free"):
             continue
         product = db.get(Product, ln.product_id)
         s = scheme_for(db, access.business.id, product, ln.quantity, doc.doc_date) if product else None

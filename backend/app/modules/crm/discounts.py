@@ -56,7 +56,7 @@ def biggest_discount(doc: Document) -> tuple[Decimal, Decimal]:
     top, total = ZERO, ZERO
     for ln in doc.lines:
         cf = ln.custom_fields or {}
-        if cf.get(FREE_FLAG) or cf.get("scheme_id") or ln.gross_amount <= 0:
+        if cf.get(FREE_FLAG) or cf.get("scheme_id") or cf.get("free") or ln.gross_amount <= 0:
             continue
         pct = (ln.discount_total * 100 / ln.gross_amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         top = max(top, pct)

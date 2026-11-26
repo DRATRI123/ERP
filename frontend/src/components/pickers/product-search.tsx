@@ -13,6 +13,7 @@ import { isNetworkError, isOnline, lookupCached, searchCached } from "@/lib/offl
 import { money, qty } from "@/lib/format";
 import type { Product } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Thumb, thumbOf } from "@/components/data/thumb";
 
 export interface ProductSearchHandle { focus: () => void }
 
@@ -100,6 +101,7 @@ export const ProductSearch = forwardRef<ProductSearchHandle, { onPick: (p: Produ
               <li key={p.id} role="option" aria-selected={i === active}>
                 <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(p)} onMouseEnter={() => setActive(i)}
                   className={cn("flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm", i === active && "bg-accent")}>
+                  {thumbOf(p) && <Thumb src={thumbOf(p)} className="size-9" />}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{p.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">{p.sku}{p.composition ? ` · ${p.composition as string}` : ""}{p.rack ? ` · Rack ${p.rack as string}` : ""}{p.barcode ? ` · ${p.barcode}` : ""}{p.hsn_sac ? ` · HSN ${p.hsn_sac}` : ""}</span>

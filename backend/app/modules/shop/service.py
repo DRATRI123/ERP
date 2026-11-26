@@ -40,6 +40,13 @@ PHONE = re.compile(r"^(?:\+?91)?([6-9][0-9]{9})$")
 MAX_LINES, MAX_QTY = 50, Decimal(1000)
 
 
+def _photo(p: Any) -> str | None:
+    from app.modules.catalog import images
+
+    first = images.ids(p)[:1]
+    return images.url(first[0], thumb=True) if first else None
+
+
 def _phone(raw: str) -> str:
     m = PHONE.match(re.sub(r"[\s\-()]", "", raw or ""))
     if not m:
@@ -134,6 +141,7 @@ def public_view(db: Session, token: str) -> dict[str, Any]:
         "business": biz.name, "title": c.title, "welcome": c.welcome, "whatsapp": bool(c.whatsapp_number),
         "min_order_value": c.min_order_value, "phone": biz.phone,
         "products": [{"id": p.id, "name": p.name, "sku": p.sku, "price": p.selling_price, "mrp": p.mrp,
+                      "image": _photo(p), "description": p.description,
                       "prices_include_tax": p.prices_include_tax, "gst_rate": p.gst_rate,
                       "category": cats.get(p.category_id) if p.category_id else None,
                       "in_stock": (not p.track_inventory) or (stock.get(p.id) or 0) > 0 if c.show_stock else None}

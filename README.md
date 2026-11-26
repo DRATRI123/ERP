@@ -102,6 +102,10 @@ You need **Python 3.12+** ([python.org](https://www.python.org/downloads/) — o
 3. **New code:** double-click **`update.bat`** (stops the ERP, `git pull`, starts it). Or
    `git pull` yourself and double-click `start.bat`.
 4. **`stop.bat`** stops it; **`backup.bat`** takes an encrypted backup now.
+5. **`online.bat`** puts the ERP on the internet while its window is open (free Cloudflare tunnel —
+   install once with `winget install --id Cloudflare.cloudflared`). Needed for the WhatsApp
+   catalogue and the salesperson portal (`/sp`) on phones outside this computer; the links in the
+   ERP switch to the https address by themselves. For a fixed, always-on address use a server.
 
 Updates only redo what changed (`tools/stamp.py` remembers a fingerprint of each step in
 `.setup-state.json`): Python packages only when `backend/pyproject.toml` changes, web packages

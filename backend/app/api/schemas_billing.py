@@ -71,6 +71,8 @@ class LineIn(BaseModel):
     expiry_date: date | None = None
     mrp: MoneyIn | None = Field(None, description="Purchases: MRP printed on this batch")
     serials: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]] | None = None
+    free_quantity: Annotated[Decimal, Field(ge=0, max_digits=15, decimal_places=3)] | None = Field(
+        None, description="Extra pieces given (or received) free with this line, e.g. 2 in '10 + 2 free'")
     source_line_id: uuid.UUID | None = None
     custom_fields: dict[str, Any] | None = None
 

@@ -107,6 +107,12 @@ def my_day(access: View, db: DB, day: date | None = None, salesman_id: uuid.UUID
     return service.my_day(db, access, day=day or local_today(), salesman_id=salesman_id, beat_id=beat_id)
 
 
+@router.get("/me")
+def my_summary(access: View, db: DB) -> dict[str, Any]:
+    """Salesperson portal home: today's orders, collections and visits, the month's target, recent work."""
+    return service.my_summary(db, access, today=local_today())
+
+
 @router.post("/visits", status_code=status.HTTP_201_CREATED)
 def record_visit(body: VisitIn, access: View, db: DB) -> dict[str, Any]:
     v = service.record_visit(db, access, body.model_dump())

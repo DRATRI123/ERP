@@ -7,7 +7,7 @@ draft save recomputes lines and totals from quantities, prices and tax rules.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -80,6 +80,7 @@ class LineIn:
     serials: list[str] | None = None
     source_line_id: uuid.UUID | None = None
     custom_fields: dict[str, Any] | None = None
+    free_quantity: Decimal | None = None  # '10 + 2 free': becomes its own 100 %-discount line
 
 
 def spec_of(doc: Document) -> DocTypeSpec:
@@ -364,7 +365,11 @@ def _apply(db: Session, access: BusinessAccess, doc: Document, spec: DocTypeSpec
         if doc.lines:
             doc.lines.clear()
             db.flush()  # delete old lines before inserting new ones with the same line numbers
+        lines = _with_free_lines(lines)
         doc.lines.extend(_price_line(db, access, doc, spec, i, li) for i, li in enumerate(lines, 1))
+        for ln in doc.lines:
+            if (ln.custom_fields or {}).get(MANUAL_FREE) and not ln.description.endswith("— FREE"):
+                ln.description = f"{ln.description} — FREE"[:500]
         if spec.side == Side.SALES and spec.code not in (DocType.CREDIT_NOTE, DocType.DEBIT_NOTE):
             from app.modules.pricing.service import apply_schemes
 
@@ -375,6 +380,28 @@ def _apply(db: Session, access: BusinessAccess, doc: Document, spec: DocTypeSpec
             apply_near_expiry_discount(db, access, doc)
     _validate_reference(db, access, doc, spec)
     recompute(db, access, doc)
+
+
+MANUAL_FREE = "free"  # custom_fields flag: pieces given / received free with the line before it
+
+
+def _with_free_lines(lines: list[LineIn]) -> list[LineIn]:
+    """'10 + 2 free': each line with ``free_quantity`` is followed by a line for the free pieces
+    at the same rate with 100 % discount (no taxable value; stock still moves)."""
+    out: list[Any] = []
+    for li in lines:
+        free = getattr(li, "free_quantity", None)
+        if (li.custom_fields or {}).get(MANUAL_FREE):
+            continue  # an old free line sent back: rebuilt from its parent's free_quantity
+        out.append(replace(li, free_quantity=None) if free is not None else li)
+        if free and free > 0:
+            if li.product_id is None:
+                raise ValidationFailed("Free quantity needs a product on the line")
+            if li.serials:
+                raise ValidationFailed("For serial-numbered items add the free pieces as their own line with their serials")
+            out.append(replace(li, quantity=free, discount_percent=Decimal(100), discount_amount=ZERO, free_quantity=None,
+                               source_line_id=None, custom_fields={**(li.custom_fields or {}), MANUAL_FREE: True}))
+    return out
 
 
 def create_draft(db: Session, access: BusinessAccess, doc_type: DocType, header: dict[str, Any],

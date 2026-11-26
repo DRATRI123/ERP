@@ -173,6 +173,16 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         ),
     ),
     RoleTemplate(
+        "field_rep",
+        "Field salesperson / MR",
+        "Uses only the salesperson portal (/sp) on the phone: beats, orders, collections, visits, new customers",
+        _codes(
+            "expenses.claim",
+            "business.view", "customers.view", "customers.manage", "customer_balances.view",
+            "products.view", "stock.view", "invoices.view", "invoices.create", "payments.view", "payments.create",
+        ),
+    ),
+    RoleTemplate(
         "sales_executive",
         "Sales Executive",
         "Quotations, orders and customer relationships",

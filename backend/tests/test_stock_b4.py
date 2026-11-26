@@ -164,3 +164,65 @@ def test_serial_switch_until_stock_moves_and_purchase_with_serials(s):
     assert got["stock_locked"] is True
     r = s.api.c.patch(f"{s.base}/products/{p['id']}", headers=s.h, json={"serial_tracking": False})
     assert r.status_code == 422  # stock has moved: fixed
+
+
+def test_manual_free_quantity_on_sales_and_purchase(s, db):
+    from tests.test_accounting import bal
+
+    p = s.product("chy2", selling_price="100", gst_rate="12")["id"]
+    sup = s.post("/suppliers", {"name": "Herbal Labs"})
+    pur = doc(s, "purchase_invoice", [{"product_id": p, "quantity": "10", "unit_price": "60", "free_quantity": "2"}],
+              party_id=sup["id"], supplier_invoice_no="F1")
+    assert [(ln["quantity"], ln["description"].endswith("FREE")) for ln in pur["lines"]] == [("10.000", False), ("2.000", True)]
+    assert D(pur["grand_total"]) == D("600.00")  # 10 x 60 (unregistered supplier: no GST); the free 2 carry no value
+    finalize(s, pur["id"])
+    assert s.stock(p)[0] == D(12)
+    assert bal(s, "inventory") == D(600)  # 12 pieces for ₹600: cost ₹50 each
+
+    c = customer(s)
+    sale = doc(s, "sales_invoice", [{"product_id": p, "quantity": "5", "free_quantity": "1"}], party_id=c["id"])
+    assert len(sale["lines"]) == 2 and D(sale["lines"][1]["line_total"]) == 0 and D(sale["grand_total"]) == D("560.00")
+    # Editing the draft and sending the lines back (free line included) does not double it.
+    again = s.api.c.patch(f"{s.base}/documents/{sale['id']}", headers=s.h, json={"lines": [
+        {"product_id": p, "quantity": "5", "free_quantity": "2"},
+        {"product_id": p, "quantity": "1", "discount_percent": "100", "custom_fields": {"free": True}}]}).json()
+    assert [ln["quantity"] for ln in again["lines"]] == ["5.000", "2.000"]
+    finalize(s, sale["id"])
+    assert s.stock(p)[0] == D(5)
+    s.assert_consistent(db)
+
+
+def test_product_photos(s):
+    import io
+
+    from PIL import Image
+
+    def photo(fmt: str = "JPEG", size=(2400, 1600), mode="RGB") -> bytes:
+        buf = io.BytesIO()
+        Image.new(mode, size, (200, 120, 40, 255) if mode == "RGBA" else (200, 120, 40)).save(buf, fmt)
+        return buf.getvalue()
+
+    p = s.product("ph1", selling_price="100")
+    up = lambda data, name="a.jpg": s.api.c.post(f"{s.base}/products/{p['id']}/images", headers=s.h,  # noqa: E731
+                                                 files={"file": (name, data)})
+    r = up(photo())
+    assert r.status_code == 200, r.text
+    img = r.json()["images"][0]
+    big = s.api.c.get(img["url"])  # no login needed: signed link
+    assert big.status_code == 200 and big.headers["content-type"] == "image/jpeg"
+    assert max(Image.open(io.BytesIO(big.content)).size) == 1200  # resized for phones
+    thumb = s.api.c.get(img["thumb"])
+    assert max(Image.open(io.BytesIO(thumb.content)).size) == 320
+    assert s.api.c.get(img["url"].replace("s=", "s=0")).status_code == 404  # tampered signature
+
+    two = up(photo("PNG", (300, 300), "RGBA"), "logo.png").json()["images"]
+    assert len(two) == 2 and s.api.c.get(two[1]["url"]).headers["content-type"] == "image/png"
+    assert up(b"not an image", "x.jpg").status_code == 422
+    main = s.post(f"/products/{p['id']}/images/{two[1]['id']}/main", {}, expect=200)["images"]
+    assert main[0]["id"] == two[1]["id"]
+    # Editing other attributes keeps the photos.
+    s.api.c.patch(f"{s.base}/products/{p['id']}", headers=s.h, json={"attributes": {"colour": "red"}}).raise_for_status()
+    assert len(s.get(f"/products/{p['id']}")["images"]) == 2
+    left = s.api.c.delete(f"{s.base}/products/{p['id']}/images/{img['id']}", headers=s.h).json()["images"]
+    assert [i["id"] for i in left] == [two[1]["id"]]
+    assert s.api.c.get(img["url"]).status_code == 404  # removed photo no longer served

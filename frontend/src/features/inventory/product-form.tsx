@@ -3,7 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2Icon } from "lucide-react";
-import { useEffect } from "react";
+import { CheckIcon, ImagePlusIcon, PlusIcon, StarIcon, Trash2Icon, XIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -11,7 +12,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/form-field";
-import { Input, NativeSelect } from "@/components/ui/input";
+import { Input, NativeSelect, Textarea } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useBizQuery, useBusiness } from "@/hooks/use-business";
 import { useModules } from "@/hooks/use-modules";
@@ -28,8 +29,12 @@ const schema = z.object({
   barcode: z.string().max(64).optional(),
   category_id: z.string().optional(),
   gst_rate: z.string(),
-  selling_price: money, purchase_price: money, mrp: money,
+  selling_price: money, purchase_price: money, mrp: money, wholesale_price: money,
   reorder_level: z.string().regex(/^\d*(\.\d{0,3})?$/).optional(),
+  reorder_quantity: z.string().regex(/^\d*(\.\d{0,3})?$/, "Enter a number").optional(),
+  description: z.string().max(2000).optional(),
+  brand_id: z.string().optional(),
+  cess_rate: z.string().regex(/^\d*(\.\d{0,4})?$/, "Enter a %").optional(),
   ptr: money, pts: money,
   composition: z.string().max(300).optional(),
   rack: z.string().max(30).optional(),
@@ -55,6 +60,8 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
   const service = modules.on("service");
   const units = useBizQuery<{ id: string; code: string; name: string }[]>(["units"], "/units", undefined, { enabled: open });
   const cats = useBizQuery<{ id: string; name: string }[]>(["categories"], "/categories", undefined, { enabled: open });
+  const brands = useBizQuery<{ id: string; name: string }[]>(["brands"], "/brands", undefined, { enabled: open });
+  const [pending, setPending] = useState<File[]>([]);
   const n = (v: unknown) => (v === null || v === undefined ? "" : String(Number(v)));
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -63,6 +70,8 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
       barcode: product.barcode ?? "", category_id: product.category_id ?? "", gst_rate: n(product.gst_rate),
       selling_price: n(product.selling_price), purchase_price: n(product.purchase_price), mrp: n(product.mrp),
       reorder_level: n(product.reorder_level), prices_include_tax: product.prices_include_tax,
+      wholesale_price: n(product.wholesale_price), reorder_quantity: n(product.reorder_quantity), description: (product.description as string | null) ?? "",
+      brand_id: (product.brand_id as string | null) ?? "", cess_rate: Number(product.cess_rate) ? n(product.cess_rate) : "",
       track_inventory: product.track_inventory, batch_tracking: product.batch_tracking, serial_tracking: product.serial_tracking,
       ptr: n(product.ptr), pts: n(product.pts), composition: (product.composition as string | null) ?? "", rack: (product.rack as string | null) ?? "",
       drug_schedule: ((product.drug_schedule as string) ?? "none") as Values["drug_schedule"], pack_size: n(product.pack_size), pack_label: (product.pack_label as string | null) ?? "", warranty_months: product.warranty_months ? String(product.warranty_months) : "",
@@ -71,10 +80,15 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
   });
   const save = useMutation({
     mutationFn: (v: Values) => {
-      const body = Object.fromEntries(Object.entries(v).map(([k, x]) => [k, x === "" ? null : x]));
+      const body = Object.fromEntries(Object.entries(v).map(([k, x]) => [k, x === "" ? (k === "cess_rate" ? "0" : null) : x]));
       return product ? api<Product>(`${base}/products/${product.id}`, { method: "PATCH", body }) : api<Product>(`${base}/products`, { body });
     },
-    onSuccess: (p) => { toast.success(`${p.name} saved`); qc.invalidateQueries({ queryKey: ["biz", id] }); onOpenChange(false); if (!product) form.reset(); },
+    onSuccess: async (p) => {
+      for (const f of pending) {  // photos chosen while creating: upload now that the product exists
+        const fd = new FormData(); fd.append("file", f);
+        try { await api(`${base}/products/${p.id}/images`, { body: fd }); } catch (e) { toast.error(`${f.name}: ${(e as ApiError).message}`); }
+      }
+      setPending([]); toast.success(`${p.name} saved`); qc.invalidateQueries({ queryKey: ["biz", id] }); onOpenChange(false); if (!product) form.reset(); },
     onError: (e: ApiError) => {
       for (const [k, msg] of Object.entries(e.fieldErrors)) form.setError(k as keyof Values, { message: msg });
       toast.error(e.message);
@@ -101,7 +115,12 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
             <NativeSelect {...form.register("unit_id")}>{units.data?.map((u) => <option key={u.id} value={u.id}>{u.code} — {u.name}</option>)}</NativeSelect>
           </Field>
           <Field label="Category" className="sm:col-span-2">
-            <NativeSelect {...form.register("category_id")}><option value="">—</option>{cats.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</NativeSelect>
+            <div className="relative flex gap-1"><NativeSelect {...form.register("category_id")}><option value="">—</option>{cats.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</NativeSelect>
+              <QuickAdd what="category" path="/categories" onAdded={(v) => form.setValue("category_id", v, { shouldDirty: true })} /></div>
+          </Field>
+          <Field label="Brand / company" className="sm:col-span-2">
+            <div className="relative flex gap-1"><NativeSelect {...form.register("brand_id")}><option value="">—</option>{brands.data?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</NativeSelect>
+              <QuickAdd what="brand" path="/brands" onAdded={(v) => form.setValue("brand_id", v, { shouldDirty: true })} /></div>
           </Field>
           <Field label="HSN / SAC" error={err.hsn_sac?.message} className="sm:col-span-2"><Input inputMode="numeric" {...form.register("hsn_sac")} /></Field>
           <Field label="GST rate" className="sm:col-span-2"><NativeSelect {...form.register("gst_rate")}>{GST.map((g) => <option key={g} value={g}>{g}%</option>)}</NativeSelect></Field>
@@ -109,7 +128,12 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
           <Field label="Selling price" error={err.selling_price?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("selling_price")} /></Field>
           <Field label="Purchase price" error={err.purchase_price?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("purchase_price")} /></Field>
           <Field label="MRP" error={err.mrp?.message} className="sm:col-span-2"><Input inputMode="decimal" {...form.register("mrp")} /></Field>
+          <Field label="Wholesale price" error={err.wholesale_price?.message} hint="Used with the Wholesale price tier" className="sm:col-span-2"><Input inputMode="decimal" {...form.register("wholesale_price")} /></Field>
           <Field label="Reorder level" hint="Alert when stock falls to this" className="sm:col-span-2"><Input inputMode="decimal" {...form.register("reorder_level")} /></Field>
+          <Field label="Reorder quantity" error={err.reorder_quantity?.message} hint="How much to order when low" className="sm:col-span-2"><Input inputMode="decimal" {...form.register("reorder_quantity")} /></Field>
+          <Field label="Cess %" error={err.cess_rate?.message} hint="Only for cess goods (tobacco, aerated drinks…)" className="sm:col-span-2"><Input inputMode="decimal" placeholder="0" {...form.register("cess_rate")} /></Field>
+          <Field label="Description" hint="Shown in the catalogue and to salespeople" className="sm:col-span-6"><Textarea rows={2} {...form.register("description")} placeholder="Uses, dose, pack contents, ingredients…" /></Field>
+          <div className="sm:col-span-6"><Photos product={product} pending={pending} setPending={setPending} /></div>
           {pharmacy && <fieldset className="grid gap-4 rounded-lg border p-3 sm:col-span-6 sm:grid-cols-6">
             <legend className="px-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Pharmacy (optional)</legend>
             <Field label="Salt / composition" hint="Finds substitutes with the same salt" className="sm:col-span-4"><Input placeholder="Paracetamol 500 mg" {...form.register("composition")} /></Field>
@@ -142,5 +166,84 @@ export function ProductDialog({ open, onOpenChange, product }: { open: boolean; 
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+type Photo = { id: string; url: string; thumb: string };
+
+/** Product photos: upload from the phone camera or files, choose the main one, remove. */
+function Photos({ product, pending, setPending }: { product?: Product; pending: File[]; setPending: (f: File[]) => void }) {
+  const { base, id } = useBusiness();
+  const qc = useQueryClient();
+  const [photos, setPhotos] = useState<Photo[]>(() => (product?.images as Photo[] | undefined) ?? []);
+  const [busy, setBusy] = useState(false);
+  const act = async (fn: () => Promise<Product>) => {
+    setBusy(true);
+    try { const p = await fn(); setPhotos((p.images as Photo[]) ?? []); qc.invalidateQueries({ queryKey: ["biz", id] }); }
+    catch (e) { toast.error((e as ApiError).message); } finally { setBusy(false); }
+  };
+  const add = async (files: FileList | null) => {
+    if (!files?.length) return;
+    if (!product) { setPending([...pending, ...Array.from(files)].slice(0, 6)); return; }
+    for (const f of Array.from(files)) {
+      const fd = new FormData(); fd.append("file", f);
+      await act(() => api<Product>(`${base}/products/${product.id}/images`, { body: fd }));
+    }
+  };
+  const count = product ? photos.length : pending.length;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">Photos <span className="font-normal text-muted-foreground">({count}/6 · the first is the main photo)</span></p>
+      <div className="flex flex-wrap gap-2">
+        {product ? photos.map((ph, i) => (
+          <div key={ph.id} className="group relative size-20 overflow-hidden rounded-lg border bg-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={ph.thumb} alt="" className="size-full object-cover" />
+            {i === 0 && <span className="absolute top-1 left-1 rounded bg-primary px-1 text-[10px] text-primary-foreground">Main</span>}
+            <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/50 p-0.5">
+              {i > 0 ? <button type="button" aria-label="Make main photo" disabled={busy} className="p-0.5 text-white" onClick={() => act(() => api<Product>(`${base}/products/${product.id}/images/${ph.id}/main`, { body: {} }))}><StarIcon className="size-3.5" /></button> : <span />}
+              <button type="button" aria-label="Remove photo" disabled={busy} className="p-0.5 text-white" onClick={() => act(() => api<Product>(`${base}/products/${product.id}/images/${ph.id}`, { method: "DELETE" }))}><Trash2Icon className="size-3.5" /></button>
+            </div>
+          </div>
+        )) : pending.map((f, i) => (
+          <div key={`${f.name}-${i}`} className="relative flex size-20 items-center justify-center overflow-hidden rounded-lg border bg-muted p-1 text-center text-[10px] break-all text-muted-foreground">
+            {f.name}<button type="button" aria-label="Remove photo" className="absolute top-0.5 right-0.5" onClick={() => setPending(pending.filter((_, j) => j !== i))}><Trash2Icon className="size-3" /></button>
+          </div>
+        ))}
+        {count < 6 && (
+          <label className="flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-xs text-muted-foreground hover:bg-accent">
+            {busy ? <Loader2Icon className="size-5 animate-spin" /> : <ImagePlusIcon className="size-5" />}Add
+            <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** "+" next to a dropdown: type a new name, it is created and chosen. */
+function QuickAdd({ what, path, onAdded }: { what: string; path: string; onAdded: (id: string) => void }) {
+  const { base, id } = useBusiness();
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (name.trim().length < 1) return;
+    setBusy(true);
+    try {
+      const out = await api<{ id: string }>(`${base}${path}`, { body: { name: name.trim() } });
+      await qc.invalidateQueries({ queryKey: ["biz", id, path.slice(1)] });
+      onAdded(out.id); setOpen(false); setName(""); toast.success(`${what[0]!.toUpperCase()}${what.slice(1)} added`);
+    } catch (e) { toast.error((e as ApiError).message); } finally { setBusy(false); }
+  };
+  if (!open) return <Button type="button" size="icon" variant="outline" className="shrink-0" aria-label={`New ${what}`} onClick={() => setOpen(true)}><PlusIcon /></Button>;
+  return (
+    <div className="absolute z-10 mt-10 flex gap-1 rounded-md border bg-popover p-1 shadow-md">
+      <Input autoFocus value={name} placeholder={`New ${what}`} aria-label={`New ${what} name`} className="h-8 w-40"
+        onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void save(); } if (e.key === "Escape") setOpen(false); }} />
+      <Button type="button" size="icon" className="size-8" disabled={busy || !name.trim()} aria-label="Save" onClick={() => void save()}>{busy ? <Loader2Icon className="animate-spin" /> : <CheckIcon />}</Button>
+      <Button type="button" size="icon" variant="ghost" className="size-8" aria-label="Cancel" onClick={() => setOpen(false)}><XIcon /></Button>
+    </div>
   );
 }

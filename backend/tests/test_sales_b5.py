@@ -176,3 +176,25 @@ def test_discount_above_limit_needs_a_manager(api, owner_headers, s):
 
     own = doc(s, "sales_invoice", [{"product_id": p, "quantity": "1", "discount_percent": "40"}], party_id=c["id"])
     finalize(s, own["id"])  # the owner may give any discount
+
+
+def test_field_rep_role_and_portal_summary(api, owner_headers, s):
+    assert api.c.put(f"{s.base}/modules", headers=owner_headers, json={"modules": {"field": True}}).status_code == 200
+    rep_h, _ = api.member_session(owner_headers, s.bid, "mr@example.com", "field_rep")
+    me = api.c.get("/api/v1/auth/me", headers=rep_h).json()
+    assert next(b for b in me["businesses"] if b["business_id"] == s.bid)["role"] == "field_rep"
+    p = stocked(s, "fr1", qty="50", selling_price="100")
+    # The rep adds a new shop, books an order with 2 free, and collects cash.
+    c = s.post("/customers", {"name": "Gupta Medical", "phone": "9811111111"}, headers=rep_h)
+    rep_id = me["user"]["id"]
+    order = doc(s, "sales_order", [{"product_id": p, "quantity": "10", "free_quantity": "2"}], party_id=c["id"],
+                salesperson_id=rep_id, headers=rep_h)
+    finalize(s, order["id"], headers=rep_h)
+    s.post("/payments", {"direction": "in", "party_id": c["id"], "mode": "cash", "amount": "500"}, headers=rep_h)
+    s.post("/field/visits", {"party_id": c["id"], "outcome": "order_payment", "note": "New shop"}, headers=rep_h)
+    out = s.get("/field/me", headers=rep_h)
+    assert out["today"]["orders"] == 1 and D(out["today"]["collected"]) == 500 and out["today"]["productive"] == 1
+    assert out["orders"][0]["party_name"] == "Gupta Medical" and out["collections"][0]["amount"] == "500.0000"
+    # The rep cannot reach the office screens: no purchases, accounts, settings or users.
+    for path in ("/documents?doc_type=purchase_invoice", "/accounting/accounts", "/members"):
+        assert s.api.c.get(f"{s.base}{path}", headers=rep_h).status_code == 403, path

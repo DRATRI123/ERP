@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useGlobalShortcuts } from "@/hooks/use-shortcuts";
 import { useRealtime } from "@/hooks/use-realtime";
 import { restoreSession } from "@/lib/session";
+import { useBusiness } from "@/hooks/use-business";
 import { useAuth } from "@/stores/auth";
 
 const SHORTCUTS: [string, string][] = [
@@ -42,12 +43,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (status === "unknown") void restoreSession();
     else if (status === "signed-out") router.replace(`/login?next=${encodeURIComponent(path)}`);
   }, [status, router, path]);
+  // Field salespeople / MRs work in the phone portal, not the full ERP.
+  const { business } = useBusiness();
+  const fieldRep = status === "signed-in" && business?.role === "field_rep";
+  useEffect(() => { if (fieldRep) router.replace("/sp"); }, [fieldRep, router]);
 
   const openSearch = useCallback(() => setSearch(true), []);
   const openHelp = useCallback(() => setHelp(true), []);
   useGlobalShortcuts({ openSearch, openHelp });
 
-  if (status !== "signed-in") {
+  if (status !== "signed-in" || fieldRep) {
     return (
       <div className="flex min-h-dvh">
         <div className="hidden w-64 border-r bg-sidebar p-4 lg:block"><Skeleton className="h-8 w-32" /><Skeleton className="mt-6 h-11" />

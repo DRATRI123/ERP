@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Header, Query, Response, status
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.api.deps import DB, OwnerPrincipal
+from app.api.deps import DB, CurrentPrincipal, OwnerPrincipal
 from app.api.pagination import Page, PageParams, page_params, paginate
 from app.core import metrics
 from app.core.config import get_settings
@@ -65,6 +65,15 @@ def tls_ask(db: DB, domain: str = Query(max_length=253), token: str = Query("", 
     if domains.certificate_allowed(db, domain):
         return Response(status_code=200)
     raise NotFound("Unknown domain")
+
+
+@router.get("/system/public-address")
+def public_address(_: CurrentPrincipal) -> dict:
+    """Where phones outside this computer can reach the ERP: a server domain, a running
+    online.bat tunnel, or none (links then only work on this computer / shop network)."""
+    from app.modules.system.public_address import public_address as find
+
+    return find()
 
 
 @router.get("/system/health")

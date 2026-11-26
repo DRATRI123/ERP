@@ -6,7 +6,7 @@ import uuid
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -26,13 +26,15 @@ from app.api.schemas_masters import (
     UnitOut,
     UnitUpdateIn,
 )
+from app.core.errors import NotFound, ValidationFailed
 from app.modules.access.service import BusinessAccess
-from app.modules.catalog import service
+from app.modules.catalog import images, service
 from app.modules.catalog.models import Product
 from app.modules.inventory.models import StockBalance
 from app.modules.inventory.service import visible_warehouse_ids
 
 router = APIRouter(prefix="/businesses/{business_id}", tags=["products"])
+public = APIRouter(prefix="/public", tags=["public"])
 
 ViewProducts = Annotated[BusinessAccess, Depends(require("products.view"))]
 ManageProducts = Annotated[BusinessAccess, Depends(require("products.manage"))]
@@ -59,6 +61,7 @@ def product_out(db: Session, access: BusinessAccess, products: list[Product]) ->
     for p in products:
         item = ProductOut.model_validate(p)
         item.stock_locked = p.id in moved
+        item.images = images.out(p)
         if not show_cost:
             item.purchase_price = None
         if show_stock and p.track_inventory:
@@ -171,6 +174,40 @@ def create_product(body: ProductIn, access: ManageProducts, db: DB) -> ProductOu
 @router.get("/products/{product_id}", response_model=ProductOut)
 def get_product(product_id: uuid.UUID, access: ViewProducts, db: DB) -> ProductOut:
     return product_out(db, access, [service.get_product(db, access, product_id)])[0]
+
+
+@router.post("/products/{product_id}/images", response_model=ProductOut)
+async def add_product_image(product_id: uuid.UUID, access: ManageProducts, db: DB, file: UploadFile = File(...)) -> ProductOut:
+    data = await file.read()
+    if len(data) > 15 * 1024 * 1024:
+        raise ValidationFailed("Photos up to 15 MB")
+    p = images.add(db, access, service.get_product(db, access, product_id), data=data, filename=file.filename or "photo.jpg")
+    db.commit()
+    return product_out(db, access, [p])[0]
+
+
+@router.delete("/products/{product_id}/images/{file_id}", response_model=ProductOut)
+def remove_product_image(product_id: uuid.UUID, file_id: uuid.UUID, access: ManageProducts, db: DB) -> ProductOut:
+    p = images.remove(db, access, service.get_product(db, access, product_id), file_id)
+    db.commit()
+    return product_out(db, access, [p])[0]
+
+
+@router.post("/products/{product_id}/images/{file_id}/main", response_model=ProductOut)
+def main_product_image(product_id: uuid.UUID, file_id: uuid.UUID, access: ManageProducts, db: DB) -> ProductOut:
+    p = images.make_main(db, access, service.get_product(db, access, product_id), file_id)
+    db.commit()
+    return product_out(db, access, [p])[0]
+
+
+@public.get("/img/{file_id}", include_in_schema=False)
+def product_image(file_id: uuid.UUID, db: DB, s: str = Query(max_length=64), w: str | None = Query(None, pattern="^t$")) -> Response:
+    """Product photo by signed link (no login): used by the app, the catalogue and the portal."""
+    if not images.check_sig(file_id, s, w or ""):
+        raise NotFound("Not found")
+    data, ctype = images.serve(db, file_id, thumb=w == "t")
+    return Response(data, media_type=ctype, headers={"Cache-Control": "public, max-age=604800, immutable",
+                                                     "X-Content-Type-Options": "nosniff"})
 
 
 @router.patch("/products/{product_id}", response_model=ProductOut)

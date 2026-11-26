@@ -38,6 +38,8 @@ PUBLIC_ROUTES = {
     ("GET", "/public/catalogue/{token}"), ("POST", "/public/catalogue/{token}/orders"),
     # Balance confirmation link: a 24-byte secret token, valid 90 days, answers only once.
     ("GET", "/public/confirm/{token}"), ("POST", "/public/confirm/{token}"),
+    # Product photos by signed link (HMAC of the file id with the server secret).
+    ("GET", "/public/img/{file_id}"),
 }
 AUTH_DEPS = {"get_any_principal", "get_principal", "require_owner"}
 MUTATING = {"POST", "PUT", "PATCH", "DELETE"}

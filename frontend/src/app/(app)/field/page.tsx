@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field } from "@/components/ui/form-field";
 import { Input, NativeSelect } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PortalLinkCard } from "@/features/system/portal-link";
 import { PaymentDialog } from "@/features/payments/payment-dialog";
 import { useBizMutation, useBizQuery, useBusiness } from "@/hooks/use-business";
 import { api, ApiError } from "@/lib/api";
@@ -47,6 +48,7 @@ function FieldPage() {
   return (
     <>
       <PageHeader title="Field sales" description="Beats for salesmen, their day on the phone — orders, collections and visit notes — and monthly targets." />
+      {(isOwner || can("users.manage")) && <PortalLinkCard />}
       <Tabs value={tab} onValueChange={(v) => router.replace(`/field?tab=${v}`)}>
         <TabsList className="mb-4">
           <TabsTrigger value="day">My day</TabsTrigger><TabsTrigger value="targets">Targets</TabsTrigger>

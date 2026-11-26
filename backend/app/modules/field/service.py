@@ -264,3 +264,36 @@ def targets(db: Session, access: BusinessAccess, *, month: date, today: date) ->
         })
     rows.sort(key=lambda r: r["sales"], reverse=True)
     return {"month": start, "days": days, "days_elapsed": elapsed, "rows": rows}
+
+
+def my_summary(db: Session, access: BusinessAccess, *, today: date) -> dict[str, Any]:
+    """The salesperson portal's home screen: today's work, the month against target, and the
+    latest orders and collections this person booked."""
+    access.require("customers.view")
+    me, bid = access.user.id, access.business.id
+    orders_q = select(Document).where(Document.business_id == bid, Document.doc_type == DocType.SALES_ORDER,
+                                      Document.salesperson_id == me, Document.status != DocStatus.CANCELLED)
+    today_orders = list(db.scalars(orders_q.where(Document.doc_date == today)))
+    coll_q = select(Payment).where(Payment.business_id == bid, Payment.direction == PaymentDirection.IN,
+                                   Payment.status == PaymentState.POSTED, Payment.created_by_id == me)
+    today_coll = list(db.scalars(coll_q.where(Payment.payment_date == today)))
+    v_today = list(db.scalars(select(Visit).where(Visit.business_id == bid, Visit.salesman_id == me, Visit.visit_date == today)))
+    month = targets(db, access, month=today, today=today)
+    mine = next((r for r in month["rows"] if r["salesman_id"] == me), None)
+    recent = list(db.scalars(orders_q.order_by(Document.doc_date.desc(), Document.created_at.desc()).limit(20)))
+    invoiced = set(db.scalars(select(Document.reference_document_id).where(
+        Document.reference_document_id.in_([d.id for d in recent]), Document.status == DocStatus.FINAL))) if recent else set()
+    payments = list(db.scalars(coll_q.order_by(Payment.payment_date.desc(), Payment.created_at.desc()).limit(10)))
+    names = dict(db.execute(select(Party.id, Party.name).where(
+        Party.id.in_({p.party_id for p in payments if p.party_id}))).all()) if payments else {}
+    return {
+        "name": access.user.full_name, "business": access.business.name, "day": today,
+        "today": {"orders": len(today_orders), "order_value": sum((d.grand_total for d in today_orders), Decimal(0)),
+                  "collected": sum((p.amount for p in today_coll), Decimal(0)), "collections": len(today_coll),
+                  "visits": len(v_today), "productive": sum(1 for v in v_today if v.outcome in (VisitOutcome.ORDER, VisitOutcome.PAYMENT, VisitOutcome.ORDER_AND_PAYMENT))},
+        "month": mine,
+        "orders": [{"id": d.id, "number": d.number, "doc_date": d.doc_date, "party_name": d.party_name,
+                    "total": d.grand_total, "status": d.status, "invoiced": d.id in invoiced} for d in recent],
+        "collections": [{"id": p.id, "date": p.payment_date, "party_name": names.get(p.party_id) if p.party_id else None, "amount": p.amount,
+                         "mode": p.mode, "reference": p.reference} for p in payments],
+    }

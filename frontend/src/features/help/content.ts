@@ -393,9 +393,14 @@ export const HELP: HelpTopic[] = [
     related: ["inventory", "stock-audit"],
   },
   {
-    id: "units", title: "Selling in packs and loose", group: "Stock", routes: ["/inventory"],
+    id: "units", title: "Packs, loose and free quantity", group: "Stock", routes: ["/inventory"],
     summary: "Stock and price are kept per base unit; a pack (box, case, strip, bag) lets you bill in packs or loose too.",
     sections: [
+      { heading: "Free quantity (10 + 2 free)", steps: [
+        "On any sales or purchase bill, type the free pieces in “+ free” under the quantity.",
+        "They are billed at 100 % discount: no GST on them, stock moves, and on purchases they lower the average cost.",
+        "Schemes set in Pricing & schemes still add their free goods automatically.",
+      ] },
       { heading: "Set it", steps: [
         "Edit the product → Bigger unit: units in one pack (e.g. 12) and its name (box).",
         "On a bill the line shows packs + loose, and +1 box adds a whole pack.",
@@ -418,6 +423,37 @@ export const HELP: HelpTopic[] = [
       ] },
     ],
     related: ["damage"],
+  },
+  {
+    id: "sp-portal", title: "Salesperson / MR portal", group: "Selling", routes: ["/sp", "/field"],
+    summary: "A simple phone page for MRs and field staff: today's beat, orders with free quantity, collections, visit notes and new shops.",
+    sections: [
+      { heading: "Give access", steps: [
+        "Users → Invite → role “Field salesperson / MR”. They set a password from the invitation.",
+        "Field sales → copy or WhatsApp the portal link (…/sp). On the phone: Add to home screen.",
+        "For phones outside the shop, the ERP must be online: run online.bat, or use a server with your domain.",
+      ] },
+      { heading: "What they can do", steps: [
+        "Today: their orders, collections and visits, the month against target, today's beat customers.",
+        "Order: product photos, price, MRP and stock; quantity and “+ free”. Booked as a sales order for the office to bill.",
+        "Collect: cash / UPI / cheque, recorded in the books at once. New shop: name, mobile, address — location saved.",
+        "They cannot open purchases, accounts, reports or settings; the full ERP sends them back to the portal.",
+      ] },
+    ],
+    related: ["leads"],
+  },
+  {
+    id: "online", title: "Using the ERP from phones outside (online.bat)", group: "Workspace", routes: ["/catalogue"],
+    summary: "Links with “localhost” only work on this computer. online.bat gives a temporary https address any phone can open.",
+    sections: [
+      { heading: "Quick (from this computer)", steps: [
+        "Install Cloudflare's free tunnel once: winget install --id Cloudflare.cloudflared",
+        "Double-click online.bat and keep its window open. The catalogue and salesperson links switch to the https address by themselves.",
+        "The address changes each time online.bat starts — share the links again after a restart.",
+      ] },
+      { heading: "Permanent", steps: ["Run the ERP on a small server with your own domain (see docs/deployment.md) for a fixed address that is always on."] },
+    ],
+    related: ["sp-portal"],
   },
   {
     id: "leads", title: "Leads and follow-ups", group: "Selling", routes: ["/leads"],

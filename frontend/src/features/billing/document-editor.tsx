@@ -35,6 +35,7 @@ interface Line {
   quantity: string; unit_price: string; discount_percent: string; gst_rate?: string; stock?: string | null;
   batched?: boolean; batch_no?: string; expiry_date?: string; mrp?: string;
   serialed?: boolean; serials?: string; // one serial number per unit, typed / scanned one per line
+  free?: string; // '10 + 2 free': pieces given / received free with this line
   priceTyped?: boolean; // only typed rates are sent; otherwise the server prices (price lists, tiers)
   incl?: boolean; // price includes GST (for the offline estimate)
   schedule?: string; rack?: string | null; composition?: string | null; packSize?: number; packLabel?: string | null;
@@ -92,7 +93,13 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
     patient_address: (draft?.patient_address as string | null) ?? "", rx_number: (draft?.rx_number as string | null) ?? "" });
   const [showRx, setShowRx] = useState(!!draft?.doctor_id || !!draft?.patient_name);
   const [subsFor, setSubsFor] = useState<Line | null>(null);
-  const [lines, setLines] = useState<Line[]>(() => (draft?.lines ?? []).filter((l) => !isFree(l)).map((l) => ({ priceTyped: true,
+  const [lines, setLines] = useState<Line[]>(() => (draft?.lines ?? []).filter((l) => !isFree(l)).reduce<DocumentLine[]>((acc, l) => {
+    if ((l.custom_fields as Record<string, unknown> | undefined)?.free && acc.length) {
+      const prev = acc[acc.length - 1]!;
+      acc[acc.length - 1] = { ...prev, custom_fields: { ...(prev.custom_fields as object), _free: String(Number(l.quantity)) } };
+    } else acc.push(l);
+    return acc;
+  }, []).map((l) => ({ priceTyped: true, free: ((l.custom_fields as Record<string, unknown> | undefined)?._free as string | undefined) ?? undefined,
     key: uid(), product_id: l.product_id, name: l.description, hsn: l.hsn_sac, unit: l.unit_code ?? undefined,
     quantity: String(Number(l.quantity)), unit_price: String(Number(l.unit_price)), discount_percent: String(Number(l.discount_percent)), gst_rate: l.gst_rate,
     batched: !!l.batch_no, batch_no: (l.batch_no as string | null) ?? undefined, expiry_date: (l.expiry_date as string | null) ?? undefined,
@@ -119,6 +126,7 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
       ...(l.batch_no ? { batch_no: l.batch_no } : {}),
       ...(side === "purchase" && l.batched ? { expiry_date: l.expiry_date || undefined, mrp: l.mrp || undefined } : {}),
       ...(l.serialed ? { serials: serialList(l.serials) } : {}),
+      ...(l.product_id && Number(l.free) > 0 ? { free_quantity: l.free } : {}),
     })),
   }), [docType, docDate, dueDate, party, partyName, supplierNo, notes, lines, side, tier, rx]);
   const previewBody = useDebounced(body, 250);
@@ -353,6 +361,14 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
                             <Input value={l.quantity} inputMode="decimal" onChange={(e) => update(l.key, { quantity: e.target.value.replace(/[^\d.]/g, "") })} className="num h-8 w-14 px-1 text-center" aria-label="Quantity" />
                             <Button type="button" variant="ghost" size="icon-sm" className="size-7" onClick={() => update(l.key, { quantity: String(Number(l.quantity || 0) + 1) })} aria-label="Increase"><PlusIcon /></Button>
                           </div>
+                          {l.product_id && !l.serialed && (
+                            <label className="mt-1 flex items-center justify-center gap-1 text-[11px] text-muted-foreground max-md:justify-start">
+                              + free
+                              <Input value={l.free ?? ""} inputMode="decimal" placeholder="0" aria-label="Free quantity"
+                                onChange={(e) => update(l.key, { free: e.target.value.replace(/[^\d.]/g, "") })}
+                                className={cn("num h-6 w-12 px-1 text-center text-xs", Number(l.free) > 0 && "border-primary text-primary")} />
+                            </label>
+                          )}
                           {l.packSize && l.packSize > 1 && (
                             <div className="mt-1 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground max-md:justify-start">
                               <span className="whitespace-nowrap">{packs(Number(l.quantity || 0), l.packSize, l.packLabel) || "—"}</span>
@@ -385,7 +401,7 @@ function Editor({ side, draftId, draft, preset }: { side: "sales" | "purchase"; 
             <Button type="button" variant="ghost" size="sm" onClick={() => setLines((ls) => [...ls, { key: uid(), product_id: null, name: "", quantity: "1", unit_price: "", discount_percent: "", gst_rate: "18" }])}>
               <PlusIcon /> {tr("Add service / custom line")}
             </Button>
-            <span className="text-xs text-muted-foreground">{lines.length} item{lines.length === 1 ? "" : "s"} · {qty(lines.reduce((s, l) => s + Number(l.quantity || 0), 0))} units</span>
+            <span className="text-xs text-muted-foreground">{lines.length} item{lines.length === 1 ? "" : "s"} · {qty(lines.reduce((s, l) => s + Number(l.quantity || 0), 0))} units{lines.some((l) => Number(l.free) > 0) ? ` + ${qty(lines.reduce((s, l) => s + Number(l.free || 0), 0))} free` : ""}</span>
           </div>
         </Card>
         {missingBatch && <p className="text-sm text-amber-700 dark:text-warning">Enter the batch number for each batch-tracked item (printed on the pack).</p>}

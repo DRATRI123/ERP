@@ -15,6 +15,8 @@ import { Field } from "@/components/ui/form-field";
 import { Input, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox, Switch } from "@/components/ui/switch";
+import { OnlineNotice } from "@/features/system/online-notice";
+import { usePublicAddress } from "@/hooks/use-public-address";
 import { useBizMutation, useBizQuery, useBusiness } from "@/hooks/use-business";
 import { dateTime, money } from "@/lib/format";
 
@@ -91,9 +93,9 @@ function SettingsCard({ s }: { s: Settings }) {
 }
 
 function LinkCard({ token, active, orders24 }: { token: string; active: boolean; orders24: number }) {
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const { base: origin } = usePublicAddress();
   const url = `${origin}/shop/${token}`;
-  const qr = useBizQuery<{ qr: string }>(["catalogue", "qr", token], "/catalogue/qr", { origin });
+  const qr = useBizQuery<{ qr: string }>(["catalogue", "qr", token, origin], "/catalogue/qr", { origin }, { enabled: !!origin });
   const [rotating, setRotating] = useState(false);
   const rotate = useBizMutation("POST", "/catalogue/rotate", { invalidate: [["catalogue"]], success: "New link created; the old one no longer works" });
   const share = `https://wa.me/?text=${encodeURIComponent(`Order from us on WhatsApp: ${url}`)}`;
@@ -102,6 +104,7 @@ function LinkCard({ token, active, orders24 }: { token: string; active: boolean;
       <CardHeader className="flex-row items-center justify-between pb-3"><CardTitle>Your link</CardTitle>
         <Badge variant={active ? "default" : "secondary"}>{active ? "Open" : "Closed"}</Badge></CardHeader>
       <CardContent className="space-y-4">
+        <OnlineNotice what="catalogue" />
         {/* eslint-disable-next-line @next/next/no-img-element -- an inline SVG data URL; nothing to optimise */}
         {qr.data ? <img src={qr.data.qr} alt="QR code of the catalogue link" className="mx-auto size-48 rounded-lg border bg-white p-2" /> : <Skeleton className="mx-auto size-48" />}
         <div className="flex gap-2"><Input readOnly value={url} aria-label="Catalogue link" className="text-xs" onFocus={(e) => e.target.select()} />

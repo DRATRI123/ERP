@@ -207,6 +207,7 @@ class ProductOut(ORM):
     updated_at: datetime
     on_hand: Decimal | None = Field(None, description="Total quantity in warehouses you can access")
     stock_locked: bool = Field(False, description="Stock has moved: unit, stock tracking, batches and serials can no longer change")
+    images: list[dict[str, str]] = Field(default_factory=list, description="Photos, main first: id, url, thumb (signed links)")
 
 
 # ---------------------------------------------------------------------------- parties

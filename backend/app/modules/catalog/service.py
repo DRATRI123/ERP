@@ -281,6 +281,8 @@ def update_product(db: Session, access: BusinessAccess, p: Product, data: dict[s
         raise ValidationFailed("These fields cannot change after stock has moved",
                                details={"fields": sorted(locked)})
     _validate_product(db, access, data, p)
+    if "attributes" in data and isinstance(data["attributes"], dict) and "images" in (p.attributes or {}):
+        data["attributes"] = {**data["attributes"], "images": p.attributes["images"]}  # photos have their own endpoints
     before = audit.snapshot(p, PRODUCT_FIELDS)
     for k, v in data.items():
         setattr(p, k, v)

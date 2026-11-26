@@ -642,3 +642,25 @@ def test_disconnect_wipes_secrets_and_blocks_webhooks(ishop, fake):
     ishop.post(f"/integrations/{i['id']}/credentials", {"key_id": "k2", "key_secret": "s2", "webhook_secret": "w2"},
                expect=200)
     assert ishop.get("/integrations")[0]["status"] == "connected"
+
+
+def test_public_address_server_tunnel_and_local(api, owner_headers, monkeypatch, tmp_path):
+    import json
+    import time
+
+    from app.core.config import get_settings
+    from app.modules.system import public_address as pa
+
+    r = api.c.get("/api/v1/system/public-address", headers=owner_headers).json()
+    assert r == {"url": "https://erp.test", "kind": "server"}  # tests run with a public base URL
+    monkeypatch.setattr(get_settings(), "public_base_url", "http://localhost:3000")
+    assert api.c.get("/api/v1/system/public-address", headers=owner_headers).json()["kind"] == "local"
+    state = tmp_path / "public_url.json"
+    monkeypatch.setattr(pa, "STATE", state)
+    state.write_text(json.dumps({"url": "https://abc.trycloudflare.com", "seen_at": time.time()}))
+    assert api.c.get("/api/v1/system/public-address", headers=owner_headers).json() == {
+        "url": "https://abc.trycloudflare.com", "kind": "tunnel"}
+    state.write_text(json.dumps({"url": "https://abc.trycloudflare.com", "seen_at": time.time() - 600}))
+    assert api.c.get("/api/v1/system/public-address", headers=owner_headers).json()["kind"] == "local"  # tunnel stopped
+    assert pa.is_local("http://192.168.1.5:3000") and not pa.is_local("https://erp.example.com")
+    assert api.c.get("/api/v1/system/public-address").status_code == 401

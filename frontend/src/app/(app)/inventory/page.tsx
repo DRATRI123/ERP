@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import { DataTable, StaticTable, type Column } from "@/components/data/data-table";
+import { Thumb, thumbOf } from "@/components/data/thumb";
 import { PageHeader } from "@/components/data/page-header";
 import { StatCard } from "@/components/data/stat-card";
 import { EmptyState, ErrorState, TableSkeleton } from "@/components/data/states";
@@ -44,7 +45,7 @@ function InventoryPage() {
   const editStock = isOwner || can("stock.edit");
 
   const productCols: Column<Product>[] = [
-    { key: "name", header: "Product", cell: (p) => <div><p className="font-medium">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}{p.barcode && ` · ${p.barcode}`}</p></div>, sortable: true, sortValue: (p) => p.name },
+    { key: "name", header: "Product", cell: (p) => <div className="flex items-center gap-2.5"><Thumb src={thumbOf(p)} /><div className="min-w-0"><p className="font-medium">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}{p.barcode && ` · ${p.barcode}`}</p></div></div>, sortable: true, sortValue: (p) => p.name },
     { key: "hsn", header: "HSN", cell: (p) => p.hsn_sac ?? "—", hideOnMobile: true },
     { key: "gst", header: "GST", cell: (p) => `${Number(p.gst_rate)}%`, hideOnMobile: true },
     { key: "price", header: "Price", align: "right", cell: (p) => money(p.selling_price), sortable: true, sortValue: (p) => Number(p.selling_price ?? 0) },
