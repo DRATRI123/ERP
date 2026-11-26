@@ -447,8 +447,8 @@ export const HELP: HelpTopic[] = [
     summary: "Links with “localhost” only work on this computer. online.bat gives a temporary https address any phone can open.",
     sections: [
       { heading: "Quick (from this computer)", steps: [
-        "Install Cloudflare's free tunnel once: winget install --id Cloudflare.cloudflared",
-        "Double-click online.bat and keep its window open. The catalogue and salesperson links switch to the https address by themselves.",
+        "Double-click online.bat. It starts the ERP if needed, downloads Cloudflare's free tunnel program the first time (no admin rights), and shows the portal link — already copied, paste it in WhatsApp.",
+        "Keep that window open. The catalogue and salesperson links inside the ERP switch to the https address by themselves.",
         "The address changes each time online.bat starts — share the links again after a restart.",
       ] },
       { heading: "Permanent", steps: ["Run the ERP on a small server with your own domain (see docs/deployment.md) for a fixed address that is always on."] },

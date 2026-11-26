@@ -21,3 +21,6 @@ target/
 
 # what setup/start last installed and built (tools/stamp.py)
 /.setup-state.json
+/tools/cloudflared
+/tools/cloudflared.exe
+/tools/*.download

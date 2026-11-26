@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { DataTable, type Column } from "@/components/data/data-table";
+import { PortalLinkCard } from "@/features/system/portal-link";
 import { PageHeader } from "@/components/data/page-header";
 import { ErrorState } from "@/components/data/states";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ export default function UsersPage() {
   return (
     <>
       <PageHeader title="Users & permissions" description="Up to 30 people per business. Each sees only what their role and branches allow." />
+      {(isOwner || can("users.manage")) && <PortalLinkCard />}
       <Tabs defaultValue="members">
         <TabsList><TabsTrigger value="members">Members</TabsTrigger><TabsTrigger value="roles">Roles</TabsTrigger>
           {(isOwner || can("audit.view")) && <TabsTrigger value="activity">Activity</TabsTrigger>}</TabsList>

@@ -30,13 +30,106 @@ LOCAL = os.environ.get("ERP_LOCAL_URL", "http://localhost:3000")
 URL_RE = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
 
 
+VERSION = "2026.10.1"  # pinned release of Cloudflare's tunnel program (official GitHub releases)
+RELEASES = f"https://github.com/cloudflare/cloudflared/releases/download/{VERSION}/"
+BIN = ROOT / "tools" / ("cloudflared.exe" if platform.system() == "Windows" else "cloudflared")
+
+
 def find_cloudflared() -> str | None:
-    for cand in (shutil.which("cloudflared"), ROOT / "tools" / "cloudflared.exe", ROOT / "tools" / "cloudflared",
+    for cand in (BIN, shutil.which("cloudflared"),
                  Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "cloudflared" / "cloudflared.exe",
                  Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "cloudflared" / "cloudflared.exe"):
         if cand and Path(cand).exists():
             return str(cand)
     return None
+
+
+def _asset() -> str | None:
+    system, machine = platform.system(), platform.machine().lower()
+    arm = machine in ("arm64", "aarch64")
+    if system == "Windows":
+        return "cloudflared-windows-amd64.exe" if machine in ("amd64", "x86_64", "arm64") else "cloudflared-windows-386.exe"
+    if system == "Darwin":
+        return f"cloudflared-darwin-{'arm64' if arm else 'amd64'}.tgz"
+    if system == "Linux":
+        return f"cloudflared-linux-{'arm64' if arm else 'amd64'}"
+    return None
+
+
+def download() -> str | None:
+    """One-time download of cloudflared into the ERP's tools folder (no admin rights needed)."""
+    import tarfile
+    import urllib.request
+
+    asset = _asset()
+    if asset is None:
+        return None
+    print(f"Downloading Cloudflare's tunnel program ({VERSION}, about 40-60 MB, only this once)...")
+    tmp = BIN.with_suffix(".download")
+    try:
+        with urllib.request.urlopen(RELEASES + asset, timeout=60) as r, tmp.open("wb") as f:
+            total, done, step = int(r.headers.get("Content-Length") or 0), 0, 0
+            while chunk := r.read(1 << 16):
+                f.write(chunk)
+                done += len(chunk)
+                if total and done * 20 // total > step:
+                    step = done * 20 // total
+                    print(f"\r  [{'#' * step}{'.' * (20 - step)}] {done * 100 // total}%", end="", flush=True)
+        print()
+        if asset.endswith(".tgz"):
+            with tarfile.open(tmp) as t:
+                member = next(m for m in t.getmembers() if m.name.endswith("cloudflared") and m.isfile())
+                src = t.extractfile(member)
+                assert src is not None
+                BIN.write_bytes(src.read())
+            tmp.unlink()
+        else:
+            tmp.replace(BIN)
+        BIN.chmod(0o755)
+        subprocess.run([str(BIN), "--version"], check=True, capture_output=True, timeout=30)
+        return str(BIN)
+    except Exception as exc:  # noqa: BLE001 - explain and fall back to manual steps
+        print(f"\n  Download did not work: {exc}")
+        tmp.unlink(missing_ok=True)
+        BIN.unlink(missing_ok=True)
+        return None
+
+
+def erp_running() -> bool:
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"{LOCAL}/login", timeout=4) as r:
+            return r.status < 500
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def ensure_erp() -> bool:
+    if erp_running():
+        return True
+    if platform.system() == "Windows" and (ROOT / "start.bat").exists():
+        print("The ERP is not running on this computer - starting it first (start.bat)...")
+        subprocess.run(["cmd", "/c", str(ROOT / "start.bat")], cwd=ROOT)
+    else:
+        print("The ERP is not running. Start it (./start.sh) in another window; waiting for it...")
+    for _ in range(120):
+        if erp_running():
+            return True
+        time.sleep(2)
+    print("The ERP did not start. Run start.bat, check it opens in the browser, then run online.bat again.")
+    return False
+
+
+def copy_to_clipboard(text: str) -> bool:
+    cmd = ["clip"] if platform.system() == "Windows" else ["pbcopy"] if platform.system() == "Darwin" else None
+    if not cmd:
+        return False
+    try:
+        subprocess.run(cmd, input=text, text=True, check=True, timeout=5)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def write(url: str, started: float) -> None:
@@ -56,9 +149,11 @@ def main() -> int:
     for sig in (getattr(signal, "SIGTERM", None), getattr(signal, "SIGBREAK", None)):
         if sig is not None:
             signal.signal(sig, _stop)
-    exe = find_cloudflared()
+    if not ensure_erp():
+        return 1
+    exe = find_cloudflared() or download()
     if exe is None:
-        print("\n  Cloudflare's free tunnel program (cloudflared) is not installed.")
+        print("\n  Cloudflare's free tunnel program (cloudflared) could not be set up automatically.")
         if platform.system() == "Windows":
             print("  Install it once with:   winget install --id Cloudflare.cloudflared")
             print("  (or download cloudflared-windows-amd64.exe from github.com/cloudflare/cloudflared/releases,")
@@ -94,12 +189,17 @@ def main() -> int:
             time.sleep(0.5)
         url = found["url"]
         write(url, started)
-        print("\n" + "=" * 64)
-        print(f"  Your ERP is online at:  {url}")
-        print("  Share the catalogue and salesperson links from inside the ERP;")
-        print("  they now use this address. Keep this window open.")
-        print("  Close it (or press Ctrl+C) to go offline again.")
-        print("=" * 64 + "\n")
+        portal = f"{url}/sp"
+        copied = copy_to_clipboard(portal)
+        print("\n" + "=" * 70)
+        print(f"  Your ERP is online at:      {url}")
+        print(f"  Salesperson / MR portal:    {portal}" + ("   (copied - paste it in WhatsApp)" if copied else ""))
+        print("  Catalogue: open WhatsApp catalogue in the ERP; its link and QR now use this address.")
+        print()
+        print("  If the link does not open on a phone yet, wait 30 seconds and try again.")
+        print("  Keep this window open. Close it (or press Ctrl+C) to go offline.")
+        print("  The address changes each time online.bat starts: send the link again after a restart.")
+        print("=" * 70 + "\n")
         while proc.poll() is None:
             write(url, started)
             time.sleep(30)
