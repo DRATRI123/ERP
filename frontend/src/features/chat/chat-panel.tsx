@@ -14,7 +14,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { type ChatMsg, type Contact, useChatState } from "./use-chat";
+import { type ChatMsg, type Contact, sendTyping, useChatState } from "./use-chat";
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
@@ -39,6 +39,7 @@ export function ChatPanel({ peer, onPeer, linkDocs = true, className }: {
 
 function Contacts({ data, loading, active, onPick }: { data?: Contact[]; loading: boolean; active: string | null; onPick: (id: string) => void }) {
   const [q, setQ] = useState("");
+  const online = useChatState((s) => s.online);
   const [perm, setPerm] = useState(() => (typeof window !== "undefined" && "Notification" in window ? Notification.permission : "denied"));
   const list = (data ?? []).filter((c) => !q || c.name.toLowerCase().includes(q.toLowerCase()));
   return (
@@ -51,7 +52,8 @@ function Contacts({ data, loading, active, onPick }: { data?: Contact[]; loading
         {loading ? <li className="p-3"><Skeleton className="h-24" /></li> : !list.length ? <li className="p-4 text-sm text-muted-foreground">Nobody else in this business yet. Invite people in Users.</li>
           : list.map((c) => (
             <li key={c.id}><button type="button" onClick={() => onPick(c.id)} className={cn("flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-accent", active === c.id && "bg-accent")}>
-              <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold", c.role === "owner" ? "bg-primary text-primary-foreground" : "bg-muted")}>{initials(c.name)}</span>
+              <span className={cn("relative flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold", c.role === "owner" ? "bg-primary text-primary-foreground" : "bg-muted")}>{initials(c.name)}
+                {online.includes(c.id) && <span className="absolute right-0 bottom-0 size-3 rounded-full border-2 border-card bg-green-500" aria-label="Online" />}</span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-center justify-between gap-2"><span className="truncate font-medium">{c.name}</span>
                   {c.last && <span className="shrink-0 text-[11px] text-muted-foreground">{new Date(c.last.at).toDateString() === new Date().toDateString() ? time(c.last.at) : day(c.last.at)}</span>}</span>
@@ -73,6 +75,15 @@ function Thread({ peer, onBack, linkDocs }: { peer: Contact; onBack: () => void;
   const [busy, setBusy] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   const setOpen = useChatState((s) => s.setOpenPeer);
+  const isOnline = useChatState((s) => s.online.includes(peer.id));
+  const typingAt = useChatState((s) => s.typing[peer.id]);
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {  // "typing…" shows for 4 seconds after the last signal
+    if (!typingAt) return;
+    const on = window.setTimeout(() => setTyping(true), 0);
+    const off = window.setTimeout(() => setTyping(false), 4000);
+    return () => { window.clearTimeout(on); window.clearTimeout(off); };
+  }, [typingAt]);
   useEffect(() => { setOpen(peer.id); return () => setOpen(null); }, [peer.id, setOpen]);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [msgs.data?.length]);
   const refresh = () => { void qc.invalidateQueries({ queryKey: ["biz", id, "chat"] }); };
@@ -95,7 +106,8 @@ function Thread({ peer, onBack, linkDocs }: { peer: Contact; onBack: () => void;
     <>
       <div className="flex items-center gap-2 border-b px-3 py-2">
         <Button variant="ghost" size="icon" className="size-8 md:hidden" aria-label="Back" onClick={onBack}><ArrowLeftIcon /></Button>
-        <div className="min-w-0 flex-1"><p className="truncate font-semibold">{peer.name}</p><p className="text-xs text-muted-foreground">{peer.role_name}</p></div>
+        <div className="min-w-0 flex-1"><p className="truncate font-semibold">{peer.name}</p>
+          <p className="text-xs text-muted-foreground">{typing ? <span className="text-primary">typing…</span> : isOnline ? <span className="text-green-600">online</span> : peer.role_name}</p></div>
         {peer.phone && <Button asChild size="sm" variant="outline"><a href={`tel:${peer.phone}`}>Call</a></Button>}
       </div>
       <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto bg-muted/30 p-3">
@@ -124,7 +136,7 @@ function Thread({ peer, onBack, linkDocs }: { peer: Contact; onBack: () => void;
       <form className="flex items-end gap-1.5 border-t p-2" onSubmit={(e) => { e.preventDefault(); void send(); }}>
         <label className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent" aria-label="Send a photo">
           <ImageIcon className="size-5" /><input type="file" accept="image/*" className="sr-only" onChange={(e) => { void photo(e.target.files?.[0]); e.target.value = ""; }} /></label>
-        <Textarea rows={1} value={text} onChange={(e) => setText(e.target.value)} placeholder="Message" aria-label="Message" className="max-h-32 min-h-9 resize-none"
+        <Textarea rows={1} value={text} onChange={(e) => { setText(e.target.value); if (e.target.value) sendTyping(peer.id); }} placeholder="Message" aria-label="Message" className="max-h-32 min-h-9 resize-none"
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} />
         <Button type="submit" size="icon" className="shrink-0" disabled={busy || !text.trim()} aria-label="Send">{busy ? <Loader2Icon className="animate-spin" /> : <SendIcon />}</Button>
       </form>

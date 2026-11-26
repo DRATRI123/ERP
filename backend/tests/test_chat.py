@@ -66,3 +66,52 @@ def test_chat_salesperson_and_owner(api, owner_headers, s):
     assert api.c.get(f"{other.base}/chat/contacts", headers=rep_h).status_code in (403, 404)
     old = (datetime.now(UTC) - timedelta(days=30)).isoformat()
     assert api.c.get(f"{base}/wait", headers=owner_headers, params={"after": old}).status_code == 200
+
+
+def test_chat_websocket_live(api, owner_headers, s):
+    rep_h, _ = api.member_session(owner_headers, s.bid, "rep2@example.com", "field_rep")
+    owner_tok = owner_headers["Authorization"].split()[1]
+    rep_tok = rep_h["Authorization"].split()[1]
+    owner_id = api.c.get("/api/v1/auth/me", headers=owner_headers).json()["user"]["id"]
+    rep_id = api.c.get("/api/v1/auth/me", headers=rep_h).json()["user"]["id"]
+
+    # Refused: bad token, other business, no auth frame.
+    with api.c.websocket_connect("/api/v1/chat/ws") as ws:
+        ws.send_json({"type": "auth", "token": "nope", "business_id": s.bid})
+        assert ws.receive_json()["type"] == "error"
+    other = Shop(api, owner_headers)
+    with api.c.websocket_connect("/api/v1/chat/ws") as ws:
+        ws.send_json({"type": "auth", "token": rep_tok, "business_id": other.bid})
+        assert ws.receive_json() == {"type": "error", "message": "No access to this business"}
+
+    with api.c.websocket_connect("/api/v1/chat/ws") as own, api.c.websocket_connect("/api/v1/chat/ws") as rep:
+        own.send_json({"type": "auth", "token": owner_tok, "business_id": s.bid})
+        assert own.receive_json()["type"] == "ready"
+        assert own.receive_json()["online"] == [owner_id]  # presence after joining
+        rep.send_json({"type": "auth", "token": rep_tok, "business_id": s.bid})
+        ready = rep.receive_json()
+        assert ready["type"] == "ready" and owner_id in ready["online"]
+        assert set(rep.receive_json()["online"]) == {owner_id, rep_id}
+        assert set(own.receive_json()["online"]) == {owner_id, rep_id}  # presence: the rep came online
+
+        rep.send_json({"type": "typing", "to": owner_id})
+        assert own.receive_json() == {"type": "typing", "from": rep_id}
+
+        rep.send_json({"type": "send", "to": owner_id, "body": "Order booked for Gupta Medical", "ref": "r1"})
+        frames = [rep.receive_json(), rep.receive_json()]
+        assert {f["type"] for f in frames} == {"message", "sent"}
+        got = own.receive_json()
+        assert got["type"] == "message" and got["message"]["body"] == "Order booked for Gupta Medical" and got["unread"] == 1
+
+        own.send_json({"type": "read", "peer": rep_id})
+        assert rep.receive_json() == {"type": "read", "by": owner_id}
+
+        # A message sent the normal way (HTTP) is pushed to the socket too.
+        api.c.post(f"{s.base}/chat/messages", headers=owner_headers, json={"to": rep_id, "body": "Well done"})
+        pushed = rep.receive_json()
+        assert pushed["type"] == "message" and pushed["message"]["body"] == "Well done" and pushed["message"]["mine"] is False
+
+        rep.send_json({"type": "send", "to": rep_id, "body": "me", "ref": "r2"})
+        assert rep.receive_json() == {"type": "error", "message": "You cannot message yourself", "ref": "r2"}
+        rep.send_json({"type": "ping"})
+        assert rep.receive_json() == {"type": "pong"}

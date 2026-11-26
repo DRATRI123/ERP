@@ -154,11 +154,16 @@ PostgreSQL.
 * **Chat** (migration 0029): one-to-one messages between the owner, staff and salespeople of a
   business (`/messages` in the ERP, the Chat tab in the salesperson portal): text, photos
   (re-encoded, signed links), shared orders/bills, read receipts, unread badges, browser
-  notifications. Delivery is a 20-second long-poll (`GET /chat/wait`) that checks the database
-  every second without holding a connection — under a second of delay, no extra service, works
-  through the online.bat tunnel and with several API workers. New permission `chat.use` on all
-  built-in roles. (Not written in Rust: it would add a compiler to every install for no gain at
-  this scale; the long-poll can be moved to the realtime service later if needed.)
+  notifications, "typing…" and online status.
+  * **WebSocket** `/api/v1/chat/ws` (same origin; Next.js, Caddy and the Cloudflare tunnel all pass
+    it through). The first frame authenticates with the access token (same session checks as any
+    request, plus `chat.use`). Messages sent in a process are pushed at once; one loop per process
+    picks up rows written by other workers every second. Typing and presence are per process.
+    Pings every 25 s keep proxies from closing idle sockets; the client reconnects with backoff.
+  * **Fallback:** after three failed socket attempts the client switches to `GET /chat/wait`, a
+    20-second long-poll that releases its database connection while waiting.
+  * New permission `chat.use` on all built-in roles. No Rust: it would add a compiler to every
+    install for no gain at this scale.
 * **Stock extras** (migration 0025):
   * **Packs for every business:** a product's "bigger unit" (12 in a box, 25 kg in a bag, 10 in
     a strip) bills as packs + loose; stock and prices stay per base unit.

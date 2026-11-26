@@ -22,7 +22,11 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { useWorkspace } from "@/stores/business";
 
-export function Topbar({ onMenu, onSearch, onHelp, live }: { onMenu: () => void; onSearch: () => void; onHelp: () => void; live: LiveState }) {
+export function Topbar({ onMenu, onSearch, onHelp, live: dataLive }: { onMenu: () => void; onSearch: () => void; onHelp: () => void; live: LiveState }) {
+  // Chat has its own WebSocket; when it is connected the app is live even without the optional
+  // Redis-based live-updates service.
+  const chatLive = useChatState((s) => s.transport) === "websocket";
+  const live: LiveState = dataLive === "live" || chatLive ? "live" : dataLive;
   const me = useAuth((s) => s.me);
   const { can, isOwner } = useBusiness();
   const { resolvedTheme, setTheme } = useTheme();
@@ -42,7 +46,7 @@ export function Topbar({ onMenu, onSearch, onHelp, live }: { onMenu: () => void;
       </button>
       <div className="ml-auto flex items-center gap-1">
         <OfflineBadge />
-        <Tooltip side="bottom" content={live === "live" ? "Live updates on" : live === "connecting" ? "Connecting to live updates…" : "Live updates unavailable — data refreshes on navigation"}>
+        <Tooltip side="bottom" content={live === "live" ? (dataLive === "live" ? "Live updates on" : "Connected — chat is live; other pages refresh as you open them") : live === "connecting" ? "Connecting to live updates…" : "Not connected live — pages refresh as you open them"}>
           <span className="hidden items-center gap-1.5 px-2 text-xs text-muted-foreground sm:flex">
             <span className={cn("size-2 rounded-full", live === "live" ? "bg-success shadow-[0_0_0_3px] shadow-success/20" : live === "connecting" ? "bg-warning" : "bg-muted-foreground/40")} />
             {live === "live" ? "Live" : live === "connecting" ? "…" : "Offline"}
