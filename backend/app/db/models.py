@@ -9,6 +9,7 @@ from app.modules.automation import models as automation_models  # noqa: F401
 from app.modules.billing import models as billing_models  # noqa: F401
 from app.modules.businesses import models as business_models  # noqa: F401
 from app.modules.catalog import models as catalog_models  # noqa: F401
+from app.modules.chat import models as chat_models  # noqa: F401
 from app.modules.claims import models as claim_models  # noqa: F401
 from app.modules.compliance import models as compliance_models  # noqa: F401
 from app.modules.crm import models as crm_models  # noqa: F401

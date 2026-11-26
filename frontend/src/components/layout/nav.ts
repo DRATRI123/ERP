@@ -1,5 +1,5 @@
 import {
-  BadgePercentIcon, BanknoteIcon, BarChart3Icon, TargetIcon, WrenchIcon, FileUpIcon, PackageOpenIcon, ScanLineIcon, RouteIcon, PackageXIcon, StarIcon, BookOpenIcon, PercentIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
+  BadgePercentIcon, BanknoteIcon, MessagesSquareIcon, BarChart3Icon, TargetIcon, WrenchIcon, FileUpIcon, PackageOpenIcon, ScanLineIcon, RouteIcon, PackageXIcon, StarIcon, BookOpenIcon, PercentIcon, FactoryIcon, BotIcon, BoxesIcon, Building2Icon, CodeXmlIcon, FileTextIcon, LandmarkIcon,
   LayoutDashboardIcon, PlugIcon, ReceiptIndianRupeeIcon, SettingsIcon, ShoppingCartIcon, TruckIcon, UsersIcon,
   IdCardIcon, LifeBuoyIcon, MessageCircleIcon, ReceiptIcon, ShieldCheckIcon, StethoscopeIcon, TagsIcon, UserCogIcon, WalletIcon, type LucideIcon,
 } from "lucide-react";
@@ -36,6 +36,7 @@ export const NAV: NavItem[] = [
   { href: "/dispatch", label: "Dispatch & delivery", icon: TruckIcon, any: ["invoices.view"], group: "main", module: "dispatch" },
   { href: "/service", label: "Service & AMC", icon: WrenchIcon, any: ["invoices.view"], group: "main", module: "service" },
   { href: "/approvals", label: "Discount approvals", icon: BadgePercentIcon, any: ["discounts.approve"], group: "main" },
+  { href: "/messages", label: "Messages", icon: MessagesSquareIcon, any: ["chat.use"], group: "main" },
   { href: "/customers", label: "Customers", icon: UsersIcon, any: ["customers.view"], group: "main", shortcut: "c" },
   { href: "/suppliers", label: "Suppliers", icon: TruckIcon, any: ["suppliers.view"], group: "main" },
   { href: "/loyalty", label: "Loyalty points", icon: StarIcon, any: ["customers.view"], group: "main", module: "loyalty" },

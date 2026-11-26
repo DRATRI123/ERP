@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useGlobalShortcuts } from "@/hooks/use-shortcuts";
 import { useRealtime } from "@/hooks/use-realtime";
 import { restoreSession } from "@/lib/session";
+import { useChatStream } from "@/features/chat/use-chat";
 import { useBusiness } from "@/hooks/use-business";
 import { useAuth } from "@/stores/auth";
 
@@ -47,6 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { business } = useBusiness();
   const fieldRep = status === "signed-in" && business?.role === "field_rep";
   useEffect(() => { if (fieldRep) router.replace("/sp"); }, [fieldRep, router]);
+  useChatStream((peer) => router.push(`/messages?with=${peer}`));
 
   const openSearch = useCallback(() => setSearch(true), []);
   const openHelp = useCallback(() => setHelp(true), []);

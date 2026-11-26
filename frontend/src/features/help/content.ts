@@ -443,6 +443,22 @@ export const HELP: HelpTopic[] = [
     related: ["leads"],
   },
   {
+    id: "chat", title: "Messages (chat with salespeople)", group: "Selling", routes: ["/messages", "/sp"],
+    summary: "One-to-one chat between the owner, staff and salespeople of the business — on the computer and in the salesperson portal.",
+    sections: [
+      { heading: "Use it", steps: [
+        "Owner / office: the chat icon at the top (with the unread count) or Messages in the menu. Salespeople: the Chat tab in the portal.",
+        "Type and press Enter, or send a photo (shelf, damaged pack, shop board). After booking an order the salesperson can tap “Tell …” to send it to you in chat.",
+        "New messages arrive by themselves within about a second; ✓ sent, ✓✓ read.",
+        "Turn on message alerts (link at the top of the list) to get a notification and a short sound when the page is in the background.",
+      ] },
+      { heading: "Who can chat", steps: [
+        "Everyone in the business with the “Use chat” permission — all built-in roles have it. Phones outside the shop need the ERP online (online.bat or a server).",
+      ] },
+    ],
+    related: ["sp-portal"],
+  },
+  {
     id: "online", title: "Using the ERP from phones outside (online.bat)", group: "Workspace", routes: ["/catalogue"],
     summary: "Links with “localhost” only work on this computer. online.bat gives a temporary https address any phone can open.",
     sections: [

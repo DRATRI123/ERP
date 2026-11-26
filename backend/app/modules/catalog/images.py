@@ -120,7 +120,7 @@ def serve(db: Session, file_id: uuid.UUID, *, thumb: bool) -> tuple[bytes, str]:
     from app.modules.files.models import StoredFile
 
     f = db.get(StoredFile, file_id)
-    if f is None or f.deleted_at is not None or "product-photo" not in (f.tags or []):
+    if f is None or f.deleted_at is not None or not {"product-photo", "chat-photo"} & set(f.tags or []):
         raise NotFound("Not found")
     data, _ = files.content(db, f)
     if thumb:

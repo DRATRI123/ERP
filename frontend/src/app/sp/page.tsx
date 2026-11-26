@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  CheckCircle2Icon, ChevronLeftIcon, Loader2Icon, MapPinIcon, MessageCircleIcon, MinusIcon, NotebookPenIcon, PhoneIcon, PlusIcon,
+  CheckCircle2Icon, ChevronLeftIcon, Loader2Icon, MapPinIcon, MessageCircleIcon, MessagesSquareIcon, MinusIcon, NotebookPenIcon, PhoneIcon, PlusIcon,
   SearchIcon, ShoppingCartIcon, TargetIcon, UserPlusIcon, WalletIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -10,6 +10,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Thumb, thumbOf } from "@/components/data/thumb";
+import { ChatPanel } from "@/features/chat/chat-panel";
+import type { Contact } from "@/features/chat/use-chat";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -53,6 +55,7 @@ export default function SalesPortal() {
   if (tab === "collect") return picked ? <CollectView party={picked} /> : <PickCustomer next="collect" title="Collect from which customer?" />;
   if (tab === "visit" && picked) return <VisitView party={picked} />;
   if (tab === "new") return <NewCustomer />;
+  if (tab === "chat") return <ChatView peer={sp.get("with")} />;
   return <Home />;
 }
 
@@ -175,7 +178,7 @@ function OrderView({ party }: { party: Picked }) {
   const [cart, setCart] = useState<Record<string, { p: Product; qty: number; free: number }>>({});
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState<{ number: string; total: string } | null>(null);
+  const [done, setDone] = useState<{ id: string; number: string; total: string } | null>(null);
   const lines = Object.values(cart).filter((l) => l.qty > 0);
   const approx = lines.reduce((s, l) => s + l.qty * Number(l.p.selling_price ?? 0), 0);
   const set = (p: Product, patch: Partial<{ qty: number; free: number }>) => setCart((c) => {
@@ -191,7 +194,7 @@ function OrderView({ party }: { party: Picked }) {
       const fin = await api<{ id: string; number: string; grand_total: string }>(`${base}/documents/${doc.id}/finalize`, { body: { payments: [] } });
       await api(`${base}/field/visits`, { body: { party_id: party.id, outcome: "order", document_id: fin.id, note: note || undefined, ...(await gps()) } }).catch(() => undefined);
       void qc.invalidateQueries({ queryKey: ["biz"] });
-      setDone({ number: fin.number, total: fin.grand_total });
+      setDone({ id: fin.id, number: fin.number, total: fin.grand_total });
     } catch (e) { toast.error((e as ApiError).message); } finally { setBusy(false); }
   }
   const summary = lines.map((l) => `${l.p.name} × ${l.qty}${l.free ? ` + ${l.free} free` : ""}`).join("\n");
@@ -202,6 +205,7 @@ function OrderView({ party }: { party: Picked }) {
       <p className="text-sm text-muted-foreground">{party.name} · {money(done.total)}. The office makes the bill when the goods go out.</p>
       <Button asChild className="w-full bg-[#25D366] text-white hover:bg-[#1ebe57]"><a target="_blank" rel="noreferrer"
         href={`https://wa.me/${(party.phone ?? "").replace(/\D/g, "").replace(/^(\d{10})$/, "91$1")}?text=${encodeURIComponent(`Order ${done.number} for ${party.name}\n${summary}\nTotal ${money(done.total)}`)}`}><MessageCircleIcon /> Send to the shop on WhatsApp</a></Button>
+      <TellOwner documentId={done.id} />
       <div className="grid grid-cols-2 gap-2"><Button asChild variant="outline"><Link href={go("collect", party)}>Collect payment</Link></Button><Button asChild variant="outline"><Link href="/sp">Done</Link></Button></div>
     </div>
   );
@@ -339,6 +343,31 @@ function NewCustomer() {
       <Field label="Notes" htmlFor="nc-no"><Textarea id="nc-no" rows={2} value={f.notes} onChange={set("notes")} placeholder="Doctor's clinic next door; buys on Monday…" /></Field>
       <p className="text-xs text-muted-foreground">Your location is saved with the shop so the office can see it on a map.</p>
       <Button className="w-full" disabled={f.name.trim().length < 2 || busy} onClick={save}>{busy && <Loader2Icon className="animate-spin" />} Add and take order</Button>
+    </div>
+  );
+}
+
+function ChatView({ peer }: { peer: string | null }) {
+  const router = useRouter();
+  return <ChatPanel peer={peer} linkDocs={false} onPeer={(id) => router.replace(id ? `/sp?tab=chat&with=${id}` : "/sp?tab=chat")} className="h-[calc(100dvh-10.5rem)]" />;
+}
+
+/** After booking an order: send it to the owner in chat with one tap. */
+function TellOwner({ documentId }: { documentId: string }) {
+  const { base } = useBusiness();
+  const contacts = useBizQuery<{ contacts: Contact[] }>(["chat", "contacts"], "/chat/contacts");
+  const owner = contacts.data?.contacts.find((c) => c.role === "owner") ?? contacts.data?.contacts[0];
+  const [note, setNote] = useState("");
+  const [sent, setSent] = useState(false);
+  if (!owner) return null;
+  if (sent) return <p className="text-sm text-primary">Sent to {owner.name} in chat ✓</p>;
+  return (
+    <div className="flex gap-2">
+      <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={`Note for ${owner.name} (optional)`} aria-label="Note" />
+      <Button variant="outline" onClick={async () => {
+        try { await api(`${base}/chat/messages`, { body: { to: owner.id, document_id: documentId, body: note || undefined } }); setSent(true); }
+        catch (e) { toast.error((e as ApiError).message); }
+      }}><MessagesSquareIcon /> Tell {owner.name.split(" ")[0]}</Button>
     </div>
   );
 }

@@ -151,6 +151,14 @@ PostgreSQL.
     `discounts.approve` permission approves in the app or reads a 6-digit code (HMAC of the
     request with the server secret, never stored; 15 minutes, five tries) that the biller sends
     as `discount_code` on finalize.
+* **Chat** (migration 0029): one-to-one messages between the owner, staff and salespeople of a
+  business (`/messages` in the ERP, the Chat tab in the salesperson portal): text, photos
+  (re-encoded, signed links), shared orders/bills, read receipts, unread badges, browser
+  notifications. Delivery is a 20-second long-poll (`GET /chat/wait`) that checks the database
+  every second without holding a connection — under a second of delay, no extra service, works
+  through the online.bat tunnel and with several API workers. New permission `chat.use` on all
+  built-in roles. (Not written in Rust: it would add a compiler to every install for no gain at
+  this scale; the long-poll can be moved to the realtime service later if needed.)
 * **Stock extras** (migration 0025):
   * **Packs for every business:** a product's "bigger unit" (12 in a box, 25 kg in a bag, 10 in
     a strip) bills as packs + loose; stock and prices stay per base unit.

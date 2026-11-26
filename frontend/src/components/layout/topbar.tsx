@@ -16,6 +16,8 @@ import type { LiveState } from "@/hooks/use-realtime";
 import { initials } from "@/lib/format";
 import { LANGS, useT } from "@/lib/i18n";
 import { signOut } from "@/lib/session";
+import { useCanChat, useChatState } from "@/features/chat/use-chat";
+import { MessagesSquareIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { useWorkspace } from "@/stores/business";
@@ -49,6 +51,7 @@ export function Topbar({ onMenu, onSearch, onHelp, live }: { onMenu: () => void;
         {(isOwner || can("invoices.create")) && (
           <Button size="sm" asChild className="hidden sm:inline-flex"><Link href="/sales/new"><PlusIcon /> {t("New invoice")}</Link></Button>
         )}
+        <ChatButton />
         <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label="Toggle dark mode">
           {resolvedTheme === "dark" ? <SunIcon /> : <MoonIcon />}
         </Button>
@@ -77,5 +80,15 @@ export function Topbar({ onMenu, onSearch, onHelp, live }: { onMenu: () => void;
         </DropdownMenu>
       </div>
     </header>
+  );
+}
+
+function ChatButton() {
+  const unread = useChatState((s) => s.unread);
+  if (!useCanChat()) return null;
+  return (
+    <Button variant="ghost" size="icon" asChild className="relative" aria-label={unread ? `Messages, ${unread} unread` : "Messages"}>
+      <Link href="/messages"><MessagesSquareIcon />{unread > 0 && <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">{unread > 99 ? "99+" : unread}</span>}</Link>
+    </Button>
   );
 }

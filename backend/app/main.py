@@ -167,6 +167,7 @@ def create_app() -> FastAPI:
         billing,
         businesses,
         catalog,
+        chat,
         claims,
         compliance,
         crm,
@@ -197,7 +198,7 @@ def create_app() -> FastAPI:
     for router in (auth.router, businesses.router, access.router, users.router,
                    catalog.router, parties.customers, parties.suppliers, inventory.router,
                    billing.router, gst.router, accounting.router, integrations.router, hooks.router,
-                   developer.router, system.router, dashboard.router, files.router, automation.router, compliance.router, pricing.router, digest.router, manufacturing.router, payroll.router, claims.router, shop.router, shop.public, pharmacy.router, money.router, stockx.router, crm.router, field.router, gst_compliance.router, finance.router, finance.public, catalog.public,
+                   developer.router, system.router, dashboard.router, files.router, automation.router, compliance.router, pricing.router, digest.router, manufacturing.router, payroll.router, claims.router, shop.router, shop.public, pharmacy.router, money.router, stockx.router, crm.router, chat.router, field.router, gst_compliance.router, finance.router, finance.public, catalog.public,
                    audit.router, health.router):
         app.include_router(router, prefix=API_PREFIX)
     return app

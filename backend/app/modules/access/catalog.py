@@ -33,6 +33,7 @@ PERMISSIONS: tuple[Permission, ...] = (
     _P("users.manage", "Users", "Invite, edit and suspend business members"),
     _P("roles.manage", "Users", "Create and edit custom roles"),
     _P("audit.view", "Users", "View audit and activity logs"),
+    _P("chat.use", "Users", "Send and receive chat messages with the team and the owner"),
     # Sales / billing
     _P("invoices.view", "Sales", "View invoices"),
     _P("invoices.create", "Sales", "Create invoices"),
@@ -117,7 +118,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Branch Manager",
         "Runs day-to-day operations of assigned branches",
         _codes(
-            "expenses.claim",
+            "expenses.claim", "chat.use",
             *_VIEW_ALL - {"audit.view"},
             "invoices.create", "invoices.edit", "invoices.cancel",
             "purchases.create", "purchases.edit", "purchases.approve",
@@ -132,7 +133,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Accountant",
         "Books, ledgers, GST and financial reporting",
         _codes(
-            "expenses.claim",
+            "expenses.claim", "chat.use",
             *_VIEW_ALL - {"users.view"},
             "payments.create", "expenses.manage", "accounting.post", "gst.file",
             "financial_years.manage", "data.export", "files.manage",
@@ -143,7 +144,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Billing Operator",
         "Counter billing: create invoices and collect payments",
         _codes(
-            "expenses.claim",
+            "expenses.claim", "chat.use",
             "business.view", "invoices.view", "invoices.create", "invoices.edit",
             "products.view", "stock.view", "customers.view", "customers.manage",
             "payments.view", "payments.create", "dispatch.update",
@@ -154,7 +155,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Inventory Manager",
         "Products, stock levels, transfers and adjustments",
         _codes(
-            "expenses.claim",
+            "expenses.claim", "chat.use",
             "business.view", "products.view", "products.manage", "stock.view", "stock.edit",
             "stock_value.view", "warehouses.manage", "purchases.view", "suppliers.view",
             "reports.view",
@@ -165,7 +166,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Purchase Manager",
         "Purchase orders, bills and supplier relationships",
         _codes(
-            "expenses.claim",
+            "expenses.claim", "chat.use",
             "business.view", "purchases.view", "purchases.create", "purchases.edit",
             "purchases.approve", "suppliers.view", "suppliers.manage",
             "supplier_balances.view", "products.view", "stock.view", "stock_value.view",
@@ -177,7 +178,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Field salesperson / MR",
         "Uses only the salesperson portal (/sp) on the phone: beats, orders, collections, visits, new customers",
         _codes(
-            "expenses.claim",
+            "expenses.claim", "chat.use",
             "business.view", "customers.view", "customers.manage", "customer_balances.view",
             "products.view", "stock.view", "invoices.view", "invoices.create", "payments.view", "payments.create",
         ),
@@ -187,7 +188,7 @@ SYSTEM_ROLES: tuple[RoleTemplate, ...] = (
         "Sales Executive",
         "Quotations, orders and customer relationships",
         _codes(
-            "expenses.claim",
+            "expenses.claim", "chat.use",
             "business.view", "invoices.view", "invoices.create", "customers.view",
             "customers.manage", "customer_balances.view", "products.view", "stock.view",
         ),
